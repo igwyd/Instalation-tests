@@ -1,0 +1,1 @@
+# DEB-RPM-instalation-check
