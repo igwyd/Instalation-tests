@@ -1,1 +1,1 @@
-# DEB-RPM-instalation-check
+# RPM-instalation-check
