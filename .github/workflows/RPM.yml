@@ -1,0 +1,54 @@
+name: Test ONLYOFFICE Install
+
+on:
+  schedule:
+    - cron: '0 12 * * 3'  # Среда 15:00 по Москве (UTC+3)
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test-install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install DigitalOcean CLI
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Create Droplet
+        run: |
+          doctl compute droplet create automation-rpm-check \
+            --region fra1 \
+            --size s-2vcpu-4gb \
+            --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
+            --image centos-9-x64 \
+            --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
+            --wait
+          IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep automation-rpm-check | awk '{print $2}')
+          echo "DROPLET_IP=$IP" >> $GITHUB_ENV
+
+      - name: Wait for SSH to be Ready
+        run: sleep 60
+
+      - name: Install ONLYOFFICE
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          sudo dnf -y clean all
+          sudo dnf -y update
+          sudo dnf install wget -y
+          wget https://download.onlyoffice.com/docs/docs-enterprise-install.sh
+          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.OO_VERSION }}.repo
+          printf "n\n" | sudo bash docs-enterprise-install.sh
+          sudo rpm -qa | grep onlyoffice-documentserver
+          EOF
+
+      - name: Delete Droplet
+        run: doctl compute droplet delete automation-rpm-check --force
