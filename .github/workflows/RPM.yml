@@ -11,6 +11,9 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  ONLYOFFICE_VERSION: "8.3.0"
+
 jobs:
   test-install:
     runs-on: ubuntu-latest
@@ -29,7 +32,7 @@ jobs:
             --region fra1 \
             --size s-2vcpu-4gb \
             --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
-            --image centos-9-x64 \
+            --image centos-stream-9-x64 \
             --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
             --wait
           IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep automation-rpm-check | awk '{print $2}')
@@ -45,7 +48,7 @@ jobs:
           sudo dnf -y update
           sudo dnf install wget -y
           wget https://download.onlyoffice.com/docs/docs-enterprise-install.sh
-          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.OO_VERSION }}.repo
+          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
           printf "n\n" | sudo bash docs-enterprise-install.sh
           sudo rpm -qa | grep onlyoffice-documentserver
           EOF
