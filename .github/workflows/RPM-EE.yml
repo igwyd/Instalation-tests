@@ -1,4 +1,4 @@
-name: Test ONLYOFFICE Install
+name: ONLYOFFICE-EE RPM Install
 
 on:
   schedule:
