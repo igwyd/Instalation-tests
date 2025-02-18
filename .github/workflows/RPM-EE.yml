@@ -46,16 +46,32 @@ jobs:
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
 
-      - name: Install ONLYOFFICE
+      - name: Upgrade RPM packages
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
           sudo dnf -y clean all
           sudo dnf -y update
           sudo dnf install wget -y
+          EOF
+      
+      - name: Install ONLYOFFICE
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
           wget https://download.onlyoffice.com/docs/docs-enterprise-install.sh
           sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-8.3.1.repo
           printf "n\n" | sudo bash docs-enterprise-install.sh
+          EOF
+
+      - name: Info about installed Pachage
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
           sudo rpm -qa | grep onlyoffice-documentserver
+          EOF
+
+      - name: Smoke puppeteer tests # todo add puppeteer tests
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          sudo 
           EOF
 
       - name: Delete Droplet
