@@ -70,9 +70,9 @@ jobs:
 
       - name: Smoke puppeteer tests # todo add puppeteer tests
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo 
-          EOF
+          sudo apt update
+          sudo apt install git -y
+          
 
       - name: Delete Droplet
         run: doctl compute droplet delete automation-rpm-check --force
