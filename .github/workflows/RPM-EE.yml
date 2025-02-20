@@ -96,6 +96,7 @@ jobs:
           sed -i 's/"headless": false/"headless": true/' puppeteer/config_chrome_linux.json
           cd puppeteer/engine
           npm install
+          cat ../config_chrome_linux.json
 
       - name: Smoke puppeteer test
         run: |
