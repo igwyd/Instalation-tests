@@ -76,7 +76,7 @@ jobs:
           sudo systemctl start ds-example
           EOF
 
-      - name: Info about installed Pachage
+      - name: Info about installed Package
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
           sudo rpm -qa | grep onlyoffice-documentserver
@@ -115,7 +115,9 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
+          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet.js
+          python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
           
 
       - name: Delete Droplet
