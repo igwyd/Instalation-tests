@@ -23,6 +23,19 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
+      - name: Check existing Droplets
+        run: |
+          EXISTING_IDS=$(doctl compute droplet list --format ID,Name --no-header | awk '$2=="automation-rpm-check" {print $1}')
+          if [[ -n "$EXISTING_IDS" ]]; then
+            echo "Existing Droplets found with name 'automation-rpm-check'. Deleting..."
+            doctl compute droplet delete $EXISTING_IDS --force
+
+            while doctl compute droplet list --format Name --no-header | grep -q "automation-rpm-check"; do
+              echo "Waiting for existing Droplet to be deleted..."
+              sleep 5
+            done
+          fi
+
       - name: Create Droplet
         run: |
           doctl compute droplet create automation-rpm-check \
