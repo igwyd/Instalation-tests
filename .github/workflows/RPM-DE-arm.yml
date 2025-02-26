@@ -1,14 +1,8 @@
-name: ONLYOFFICE-EE RPM Install on DO centos-stream-9-x64
+name: ONLYOFFICE-DE arm64 RPM on Install on AWS RHEL 9
 
 on:
   schedule:
-    - cron: '0 12 * * 3'  # Wednesday 15:00 Mosсow time (UTC+3)
-#  push:
-#    branches:
-#      - main
-#  pull_request:
-#    branches:
-#      - main
+    - cron: '0 12 * * 3'  # Wednesday 15:00 Moscow time (UTC+3)
   workflow_dispatch:
 
 jobs:
@@ -18,35 +12,33 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install DigitalOcean CLI
-        uses: digitalocean/action-doctl@v2
-        with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-
-      - name: Check existing Droplets
+      - name: Configure AWS CLI
         run: |
-          EXISTING_IDS=$(doctl compute droplet list --format ID,Name --no-header | awk '$2=="onlyoffice-ee-rpm-check" {print $1}')
-          if [[ -n "$EXISTING_IDS" ]]; then
-            echo "Existing Droplets found with name 'onlyoffice-ee-rpm-check'. Deleting..."
-            doctl compute droplet delete $EXISTING_IDS --force
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-east-1
 
-            while doctl compute droplet list --format Name --no-header | grep -q "onlyoffice-ee-rpm-check"; do
-              echo "Waiting for existing Droplet to be deleted..."
-              sleep 5
-            done
-          fi
-
-      - name: Create Droplet
+      - name: Create EC2 Instance
         run: |
-          doctl compute droplet create onlyoffice-ee-rpm-check \
-            --region fra1 \
-            --size s-2vcpu-4gb \
-            --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
-            --image centos-stream-9-x64 \
-            --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
-            --wait
-          IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep onlyoffice-ee-rpm-check | awk '{print $2}')
-          echo "DROPLET_IP=$IP" >> $GITHUB_ENV
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id ami-09373db3d247551a0 \
+            --instance-type t4g.medium \
+            --key-name demin \
+            --security-groups AllPortsOpened \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=onlyoffice-de-rpm-check}]' \
+            --query "Instances[0].InstanceId" --output text)
+          
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+          echo "Waiting for instance to start..."
+          aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+
+      - name: Get EC2 Public IP
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ env.INSTANCE_ID }} \
+            --query "Reservations[].Instances[].PublicIpAddress" --output text)
+          echo "EC2 Public IP: $IP"
+          echo "EC2_IP=$IP" >> $GITHUB_ENV
 
       - name: Wait for SSH to be Ready
         run: sleep 60
@@ -54,31 +46,25 @@ jobs:
       - name: Add SSH Key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DIGITALOCEAN_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
 
-      - name: Upgrade RPM packages
-        run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo dnf -y clean all
-          sudo dnf -y update
-          sudo dnf install wget -y
-          EOF
-      
       - name: Install ONLYOFFICE and run test example
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo dnf -y update
+          sudo dnf -y install wget
           wget https://download.onlyoffice.com/docs/docs-enterprise-install.sh
           sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-8.3.1.repo
           printf "n\n" | sudo bash docs-enterprise-install.sh
           sudo systemctl start ds-example
           EOF
 
-      - name: Info about installed Package
+      - name: Check Installed ONLYOFFICE Package
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           sudo rpm -qa | grep onlyoffice-documentserver
           EOF
 
@@ -105,7 +91,7 @@ jobs:
           cd Dep.Tests
           sed -i 's/url=https:\/\/github.com\/ONLYOFFICE-data\/pp-files.git/url = git@github.com:ONLYOFFICE-data\/pp-files.git/' .gitmodules
           git submodule update --init puppeteer/files
-          sed -i "s#\"url\": \"https://kim.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" puppeteer/config_chrome_linux.json
+          sed -i "s#\"url\": \"https://kim.teamlab.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" puppeteer/config_chrome_linux.json
           sed -i 's/"headless": false/"headless": true/' puppeteer/config_chrome_linux.json
           cd puppeteer/engine
           npm install
@@ -118,7 +104,8 @@ jobs:
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
           python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet.js
           python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
-          
 
-      - name: Delete Droplet
-        run: doctl compute droplet delete onlyoffice-ee-rpm-check --force
+      - name: Delete EC2 Instance
+        run: |
+          aws ec2 terminate-instances --instance-ids ${{ env.INSTANCE_ID }}
+          aws ec2 wait instance-terminated --instance-ids ${{ env.INSTANCE_ID }}
