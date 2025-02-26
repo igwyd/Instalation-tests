@@ -1,4 +1,4 @@
-name: ONLYOFFICE-EE RPM Install
+name: ONLYOFFICE-EE RPM Install on DO centos-stream-9-x64
 
 on:
   schedule:
@@ -25,12 +25,12 @@ jobs:
 
       - name: Check existing Droplets
         run: |
-          EXISTING_IDS=$(doctl compute droplet list --format ID,Name --no-header | awk '$2=="automation-rpm-check" {print $1}')
+          EXISTING_IDS=$(doctl compute droplet list --format ID,Name --no-header | awk '$2=="onlyoffice-ee-rpm-check" {print $1}')
           if [[ -n "$EXISTING_IDS" ]]; then
-            echo "Existing Droplets found with name 'automation-rpm-check'. Deleting..."
+            echo "Existing Droplets found with name 'onlyoffice-ee-rpm-check'. Deleting..."
             doctl compute droplet delete $EXISTING_IDS --force
 
-            while doctl compute droplet list --format Name --no-header | grep -q "automation-rpm-check"; do
+            while doctl compute droplet list --format Name --no-header | grep -q "onlyoffice-ee-rpm-check"; do
               echo "Waiting for existing Droplet to be deleted..."
               sleep 5
             done
@@ -38,14 +38,14 @@ jobs:
 
       - name: Create Droplet
         run: |
-          doctl compute droplet create automation-rpm-check \
+          doctl compute droplet create onlyoffice-ee-rpm-check \
             --region fra1 \
             --size s-2vcpu-4gb \
             --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
             --image centos-stream-9-x64 \
             --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
             --wait
-          IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep automation-rpm-check | awk '{print $2}')
+          IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep onlyoffice-ee-rpm-check | awk '{print $2}')
           echo "DROPLET_IP=$IP" >> $GITHUB_ENV
 
       - name: Wait for SSH to be Ready
@@ -121,4 +121,4 @@ jobs:
           
 
       - name: Delete Droplet
-        run: doctl compute droplet delete automation-rpm-check --force
+        run: doctl compute droplet delete onlyoffice-ee-rpm-check --force
