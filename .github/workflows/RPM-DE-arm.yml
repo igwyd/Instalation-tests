@@ -1,4 +1,4 @@
-name: ONLYOFFICE-DE RPM on Install on AWS RHEL 9 arm64
+name: ONLYOFFICE-DE RPM Install on AWS RHEL 9 arm64
 
 on:
   schedule:
