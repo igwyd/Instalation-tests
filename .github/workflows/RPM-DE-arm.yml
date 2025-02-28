@@ -26,6 +26,7 @@ jobs:
             --key-name demin \
             --security-groups AllPortsOpened \
             --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=onlyoffice-de-rpm-check}]' \
+            --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":50,"VolumeType":"gp3"}}]' \
             --query "Instances[0].InstanceId" --output text)
           
           echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
@@ -41,7 +42,7 @@ jobs:
           echo "EC2_IP=$IP" >> $GITHUB_ENV
 
       - name: Wait for SSH to be Ready
-        run: sleep 60
+        run: sleep 120
 
       - name: Add SSH Key
         run: |
@@ -56,9 +57,9 @@ jobs:
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           sudo dnf -y update
           sudo dnf -y install wget
-          wget https://download.onlyoffice.com/docs/docs-enterprise-install.sh
           sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-8.3.1.repo
-          printf "n\n" | sudo bash docs-enterprise-install.sh
+          wget https://download.onlyoffice.com/docs/docs-developer-install.sh
+          printf "n\n" | sudo bash docs-developer-install.sh
           sudo systemctl start ds-example
           EOF
 
