@@ -1,4 +1,4 @@
-name: ONLYOFFICE-CE RPM Install on AWS RHEL 9 amd64
+name: ONLYOFFICE-CE RPM Install on AWS RHEL 9 x64
 
 on:
   schedule:
