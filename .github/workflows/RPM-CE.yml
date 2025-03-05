@@ -42,7 +42,7 @@ jobs:
           echo "EC2_IP=$IP" >> $GITHUB_ENV
 
       - name: Wait for SSH to be Ready
-        run: sleep 120
+        run: sleep 180
 
       - name: Add SSH Key
         run: |
