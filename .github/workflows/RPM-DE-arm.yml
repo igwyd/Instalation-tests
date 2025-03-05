@@ -1,8 +1,8 @@
 name: ONLYOFFICE-DE RPM Install on AWS RHEL 9 arm64
 
 on:
-  schedule:
-    - cron: '0 12 * * 3'  # Wednesday 15:00 Moscow time (UTC+3)
+#  schedule:
+#    - cron: '0 12 * * 3'  # Wednesday 15:00 Moscow time (UTC+3)
   workflow_dispatch:
 
 jobs:
