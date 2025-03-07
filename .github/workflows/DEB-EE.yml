@@ -1,0 +1,6 @@
+name: ONLYOFFICE-EE DEB Install on DO ubuntu 24.04 x64
+
+on:
+  schedule:
+    - cron: '0 12 * * 3'  # Wednesday 15:00 Mosсow time (UTC+3)
+  workflow_dispatch:
