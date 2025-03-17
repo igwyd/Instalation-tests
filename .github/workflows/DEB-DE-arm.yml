@@ -18,19 +18,6 @@ jobs:
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set default.region us-east-1
 
-      - name: Check Existing EC2 Instance
-        run: |
-          INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=onlyoffice-de-rpm-check" "Name=instance-state-name,Values=running" \
-            --query "Reservations[].Instances[].InstanceId" --output text)
-          
-          if [[ -n "$INSTANCE_ID" ]]; then
-            echo "Existing instance found: $INSTANCE_ID. Terminating..."
-            aws ec2 terminate-instances --instance-ids $INSTANCE_ID
-            aws ec2 wait instance-terminated --instance-ids $INSTANCE_ID
-            echo "Instance terminated."
-          fi
-
       - name: Create EC2 Instance
         run: |
           INSTANCE_ID=$(aws ec2 run-instances \
