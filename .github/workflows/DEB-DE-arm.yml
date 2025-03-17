@@ -101,9 +101,9 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js 2>&1 | grep -v "Running test file"
-          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet.js 2>&1 | grep -v "Running test file"
-          python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js 2>&1 | grep -v "Running test file"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
+          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet.js
+          python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
 
       - name: Delete EC2 Instance
         run: |
