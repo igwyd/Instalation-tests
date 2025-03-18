@@ -54,7 +54,7 @@ jobs:
 
       - name: Install ONLYOFFICE and run test example
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           sudo dnf -y update
           sudo dnf -y install wget
           sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-8.3.2.repo
@@ -65,7 +65,7 @@ jobs:
 
       - name: Check Installed ONLYOFFICE Package
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           sudo rpm -qa | grep onlyoffice-documentserver
           EOF
 
