@@ -1,0 +1,13 @@
+name: check DEB version in repo
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: test
+        run: |
+          lscpu
+          df -h
