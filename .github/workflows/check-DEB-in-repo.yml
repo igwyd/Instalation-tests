@@ -11,3 +11,5 @@ jobs:
         run: |
           lscpu
           df -h
+          free -h
+          ip a
