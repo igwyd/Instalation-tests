@@ -12,4 +12,4 @@ jobs:
           lscpu
           df -h
           free -h
-          ip a
+          hostname -I
