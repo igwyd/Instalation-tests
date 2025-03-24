@@ -62,9 +62,9 @@ jobs:
       
       - name: Install ONLYOFFICE and run test example
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << EOF
           wget https://download.onlyoffice.com/docs/docs-enterprise-install.sh
-          echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable 8.3.2" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
+          echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
           printf "n\n" | sudo bash docs-enterprise-install.sh
           sudo systemctl start ds-example
           EOF
