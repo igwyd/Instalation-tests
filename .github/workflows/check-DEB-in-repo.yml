@@ -39,49 +39,26 @@ jobs:
 
       - name: Install ONLYOFFICE-EE and run test example
         run: |
-          wget https://download.onlyoffice.com/docs/docs-enterprise-install.sh
-          printf "n\n" | sudo bash docs-enterprise-install.sh
-          sudo systemctl start ds-example
+          apt-get update && apt-get install gnupg sudo wget curl postgresql -y
+          service postgresql start
+          sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';"
+          sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;"
+          sudo apt-get install redis-server -y
+          sudo apt-get install rabbitmq-server -y
+          mkdir -p -m 700 ~/.gnupg
+          curl -fsSL https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE | gpg --no-default-keyring --keyring gnupg-ring:/tmp/onlyoffice.gpg --import
+          chmod 644 /tmp/onlyoffice.gpg
+          sudo chown root:root /tmp/onlyoffice.gpg
+          sudo mv /tmp/onlyoffice.gpg /usr/share/keyrings/onlyoffice.gpg
+          echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" | sudo tee /etc/apt/sources.list.d/onlyoffice.list
+          
+
 
       - name: Info about installed Package, must be ONLYOFFICE-EE
         run: |
           sudo dpkg-query -l | grep onlyoffice-documentserver
 
       - name: Smoke puppeteer test ONLYOFFICE-EE
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
-          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
-
-      - name: Install ONLYOFFICE-DE and run test example
-        run: |
-          wget https://download.onlyoffice.com/docs/docs-developer-install.sh
-          printf "n\n" | sudo bash docs-developer-install.sh
-          sudo systemctl start ds-example
-
-      - name: Info about installed Package, must be ONLYOFFICE-DE
-        run: |
-          sudo dpkg-query -l | grep onlyoffice-documentserver
-
-      - name: Smoke puppeteer test ONLYOFFICE-DE
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
-          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
-
-      - name: Install ONLYOFFICE-CE and run test example
-        run: |
-          wget https://download.onlyoffice.com/docs/docs-install.sh
-          printf "n\n" | sudo bash docs-install.sh
-          sudo systemctl start ds-example
-
-      - name: Info about installed Package, must be ONLYOFFICE-CE
-        run: |
-          sudo dpkg-query -l | grep onlyoffice-documentserver
-
-      - name: Smoke puppeteer test ONLYOFFICE-CE
         run: |
           cd Dep.Tests/puppeteer/engine
           python3 run.py --prcache
