@@ -69,9 +69,9 @@ jobs:
       
       - name: Install ONLYOFFICE and run test example
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << EOF
           wget https://download.onlyoffice.com/docs/docs-enterprise-install.sh
-          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-8.3.2.repo
+          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
           printf "n\n" | sudo bash docs-enterprise-install.sh
           sudo systemctl start ds-example
           EOF
