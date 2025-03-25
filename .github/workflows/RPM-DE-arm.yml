@@ -54,10 +54,10 @@ jobs:
 
       - name: Install ONLYOFFICE and run test example
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf -y update
           sudo dnf -y install wget
-          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-8.3.2.repo
+          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
           wget https://download.onlyoffice.com/docs/docs-developer-install.sh
           printf "n\n" | sudo bash docs-developer-install.sh
           sudo systemctl start ds-example
@@ -103,7 +103,7 @@ jobs:
           cd Dep.Tests/puppeteer/engine
           python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
-          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet.js
+          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
           python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
 
       - name: Delete EC2 Instance
