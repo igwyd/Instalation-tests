@@ -5,6 +5,9 @@ on:
     - cron: '0 11 * * 3'  # Wednesday 14:00 Mosсow time (UTC+3)
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   update-version:
     runs-on: ubuntu-latest
