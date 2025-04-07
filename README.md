@@ -1,5 +1,5 @@
 # Installation tests
-Installation pipelines, current test version is **{{ONLYOFFICE_VERSION}}**
+Installation pipelines, current test version is <!-- onlyoffice-version-start -->8.3.1<!-- onlyoffice-version-end -->
 ## RPM installation
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/RPM-EE.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/RPM-DE-arm.yml/badge.svg?branch=main)  
