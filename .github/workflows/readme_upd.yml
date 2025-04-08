@@ -25,7 +25,7 @@ jobs:
           START="<!-- onlyoffice-version-start -->"
           END="<!-- onlyoffice-version-end -->"
 
-          # Текущая версия в README
+          #Current version in README
           CURRENT=$(grep -oP "$START\K.*?(?=$END)" "$FILE")
 
           echo "Current version in README: $CURRENT"
