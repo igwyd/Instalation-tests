@@ -1,0 +1,52 @@
+name: Update version in README
+
+on:
+  schedule:
+    - cron: '0 11 * * 3'  # Wednesday 14:00 Mosсow time (UTC+3)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up version variable
+        run: echo "VERSION=v${{ vars.ONLYOFFICE_VERSION }}" >> $GITHUB_ENV
+
+      - name: Update version in README.md if changed
+        run: |
+          FILE="README.md"
+          START="<!-- onlyoffice-version-start -->"
+          END="<!-- onlyoffice-version-end -->"
+
+          #Current version in README
+          CURRENT=$(grep -oP "$START\K.*?(?=$END)" "$FILE")
+
+          echo "Current version in README: $CURRENT"
+          echo "Target version from variable: $VERSION"
+
+          if [ "$CURRENT" != "$VERSION" ]; then
+            echo "Updating version..."
+            sed -i "s|\($START\).*\($END\)|\1$VERSION\2|" "$FILE"
+          else
+            echo "Version is up to date, skipping change."
+          fi
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          if git diff --quiet; then
+            echo "No changes to commit"
+          else
+            git add README.md
+            git commit -m "Update ONLYOFFICE version to $VERSION"
+            git push
+          fi
