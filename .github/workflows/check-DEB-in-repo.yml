@@ -4,50 +4,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-install:
+  test-install-deb-in-repo:
     runs-on: ubuntu-latest
     steps:
-    #   - name: Install DigitalOcean CLI
-    #     uses: digitalocean/action-doctl@v2
-    #     with:
-    #       token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-
-    #   - name: Check existing Droplets
-    #     run: |
-    #       EXISTING_IDS=$(doctl compute droplet list --format ID,Name --no-header | awk '$2=="check-deb-in-repo" {print $1}')
-    #       if [[ -n "$EXISTING_IDS" ]]; then
-    #         echo "Existing Droplets found with name 'check-deb-in-repo'. Deleting..."
-    #         doctl compute droplet delete $EXISTING_IDS --force
-
-    #         while doctl compute droplet list --format Name --no-header | grep -q "check-deb-in-repo"; do
-    #           echo "Waiting for existing Droplet to be deleted..."
-    #           sleep 5
-    #         done
-    #       fi
-
-    #   - name: Create Droplet
-    #     run: |
-    #       doctl compute droplet create check-deb-in-repo \
-    #         --region fra1 \
-    #         --size s-2vcpu-4gb \
-    #         --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
-    #         --image ubuntu-24-04-x64 \
-    #         --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
-    #         --wait
-    #       IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep check-deb-in-repo | awk '{print $2}')
-    #       echo "DROPLET_IP=$IP" >> $GITHUB_ENV
-
-    #   - name: Wait for SSH to be Ready
-    #     run: sleep 180
-
-    #   - name: Add SSH Key
-    #     run: |
-    #       mkdir -p ~/.ssh
-    #       echo "${{ secrets.DIGITALOCEAN_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-    #       chmod 600 ~/.ssh/id_rsa
-    #       eval $(ssh-agent -s)
-    #       ssh-add ~/.ssh/id_rsa
-
       - name: Install prerequisites for puppeteer tests
         run: |
           sudo apt-get update
@@ -64,7 +23,7 @@ jobs:
           npm -v
 
           mkdir -p ~/.ssh
-          echo "${{ secrets.GIT_SSH_PRIVATE_KEY }}" >> ~/.ssh/id_rsa
+          echo "${{ secrets.GIT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
@@ -76,77 +35,114 @@ jobs:
           git submodule update --init puppeteer/files
           cd puppeteer/engine
           npm install
-          cat ../config_chrome_linux.json
           cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
 
-      # - name: Upgrade DEB packages
-      #   run: |
-      #     ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-      #     sudo apt-get update
-      #     sudo apt-get upgrade -y
-      #     EOF
+      - name: Install DigitalOcean CLI
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+  
+      - name: Check existing Droplets
+        run: |
+            EXISTING_IDS=$(doctl compute droplet list --format ID,Name --no-header | awk '$2=="check-deb-in-repo" {print $1}')
+            if [[ -n "$EXISTING_IDS" ]]; then
+              echo "Existing Droplets found with name 'check-deb-in-repo'. Deleting..."
+              doctl compute droplet delete $EXISTING_IDS --force
+  
+              while doctl compute droplet list --format Name --no-header | grep -q "check-deb-in-repo"; do
+                echo "Waiting for existing Droplet to be deleted..."
+                sleep 5
+              done
+            fi
+  
+      - name: Create Droplet
+        run: |
+            doctl compute droplet create check-deb-in-repo \
+              --region fra1 \
+              --size s-2vcpu-4gb \
+              --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
+              --image ubuntu-24-04-x64 \
+              --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
+              --wait
+            IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep check-deb-in-repo | awk '{print $2}')
+            echo "DROPLET_IP=$IP" >> $GITHUB_ENV
+  
+      - name: Wait for SSH to be Ready
+        run: sleep 180
+  
+      - name: Add SSH Key
+        run: |
+            mkdir -p ~/.ssh
+            echo "${{ secrets.DIGITALOCEAN_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+            chmod 600 ~/.ssh/id_rsa
+            eval $(ssh-agent -s)
+            ssh-add ~/.ssh/id_rsa
+
+      - name: Upgrade DEB packages
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          sudo apt-get update
+          sudo apt-get upgrade -y
+          EOF
       
-      # - name: Install ONLYOFFICE and run test example
-      #   run: |
-      #     ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-      #     export DS_DISTR=onlyoffice-documentserver-ee
+      - name: Install ONLYOFFICE-Docs EE and run test example
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
 
-      #     sudo apt-get update && sudo apt-get upgrade -y
+          sudo apt-get install postgresql -y && \
+          sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';" && \
+          sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;" && \
+          echo onlyoffice-documentserver-ee onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
 
-      #     sudo apt-get install postgresql -y && \
-      #     sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';" && \
-      #     sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;" && \
-      #     echo $DS_DISTR onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
+          sudo apt-get install redis-server -y
 
-      #     sudo apt-get install redis-server -y
+          sudo apt-get install rabbitmq-server -y
 
-      #     sudo apt-get install rabbitmq-server -y
+          mkdir -p -m 700 ~/.gnupg
+          curl -fsSL https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE | gpg --no-default-keyring --keyring gnupg-ring:/tmp/onlyoffice.gpg --import
+          chmod 644 /tmp/onlyoffice.gpg
+          sudo chown root:root /tmp/onlyoffice.gpg
+          sudo mv /tmp/onlyoffice.gpg /usr/share/keyrings/onlyoffice.gpg
 
-      #     mkdir -p -m 700 ~/.gnupg
-      #     curl -fsSL https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE | gpg --no-default-keyring --keyring gnupg-ring:/tmp/onlyoffice.gpg --import
-      #     chmod 644 /tmp/onlyoffice.gpg
-      #     sudo chown root:root /tmp/onlyoffice.gpg
-      #     sudo mv /tmp/onlyoffice.gpg /usr/share/keyrings/onlyoffice.gpg
+          echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" | sudo tee /etc/apt/sources.list.d/onlyoffice.list
 
-      #     echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" | sudo tee /etc/apt/sources.list.d/onlyoffice.list
+          sudo apt-get update && \
+          echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | debconf-set-selections && \
+          sudo apt-get install ttf-mscorefonts-installer -y
 
-      #     sudo apt-get update && \
-      #     echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | debconf-set-selections && \
-      #     sudo apt-get install ttf-mscorefonts-installer -y
+          sudo echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | debconf-set-selections && \
+          apt-get install onlyoffice-documentserver-ee -y
+          sudo systemctl start ds-example
+          EOF
 
-      #     sudo echo $DS_DISTR onlyoffice/wopi-enabled boolean true | debconf-set-selections && \
-      #     apt-get install $DS_DISTR -y
-      #     sudo systemctl start ds-example
-      #     EOF
+      - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          sudo dpkg-query -l | grep onlyoffice-documentserver
+          EOF
 
-      # - name: Info about installed Package
-      #   run: |
-      #     ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-      #     sudo dpkg-query -l | grep onlyoffice-documentserver
-      #     EOF
+      - name: Smoke puppeteer API tests 
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i "s#\"url\": \"https://kim.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../config_chrome_linux.json
+          sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
+          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
+          python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
+          python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
 
-      # - name: Smoke puppeteer API tests
-      #   run: |
-      #     cd Dep.Tests/puppeteer/engine
-      #     sed -i "s#\"url\": \"https://kim.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../config_chrome_linux.json
-      #     sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
-      #     cat ../config_chrome_linux.json
-      #     python3 run.py --prcache
-      #     python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
-      #     python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
-      #     python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
-      #     python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
+      - name: Smoke puppeteer WOPI tests
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          sed -i "s#\"url\": \"https://isa2.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../providers/wopi/config.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
+          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
+          python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
+          python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
 
-      # - name: Smoke puppeteer WOPI tests
-      #   run: |
-      #     cd Dep.Tests/puppeteer/engine
-      #     sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-      #     sed -i "s#\"url\": \"https://isa2.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../providers/wopi/config.json
-      #     python3 run.py --prcache
-      #     python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
-      #     python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
-      #     python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
-      #     python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
-
-#      - name: Delete Droplet
-#        run: doctl compute droplet delete check-deb-in-repo --force
+      - name: Delete Droplet
+        run: doctl compute droplet delete check-deb-in-repo --force
