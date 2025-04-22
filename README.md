@@ -11,5 +11,5 @@ Current test version is **<!-- onlyoffice-version-start -->v8.3.3<!-- onlyoffice
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/DEB-DE-arm.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/DEB-СE.yml/badge.svg?branch=main)  
 ## Check DEB version in repo (install from manual)
-Testing installation ONLYOFFICE-Docs from current release repo. \
+Test DEB package installation ONLYOFFICE-Docs EE, DE and CE from released repo. \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-DEB-in-repo.yml/badge.svg?branch=main)  
