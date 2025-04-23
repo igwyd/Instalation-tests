@@ -107,11 +107,11 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" | sudo tee /etc/apt/sources.list.d/onlyoffice.list
 
           sudo apt-get update && \
-          echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | debconf-set-selections && \
+          echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections && \
           sudo apt-get install ttf-mscorefonts-installer -y
 
-          sudo echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | debconf-set-selections && \
-          apt-get install onlyoffice-documentserver-ee -y
+          sudo echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
+          sudo apt-get install onlyoffice-documentserver-ee -y
           sudo systemctl start ds-example
           EOF
 
