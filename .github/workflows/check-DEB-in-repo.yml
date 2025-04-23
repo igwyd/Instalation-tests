@@ -110,7 +110,7 @@ jobs:
           echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections && \
           sudo apt-get install ttf-mscorefonts-installer -y
 
-          sudo echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
+          echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
           sudo apt-get install onlyoffice-documentserver-ee -y
           sudo systemctl start ds-example
           EOF
