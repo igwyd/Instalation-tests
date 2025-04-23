@@ -1,4 +1,4 @@
-name: check DEB version in repo
+name: check DEB version in repo x64
 
 on:
   workflow_dispatch:
