@@ -144,5 +144,15 @@ jobs:
           python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
           python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
 
+      - name: Install ONLYOFFICE-Docs DE and run test example
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          printf "n/n" | apt-get purge onlyoffice-documentserver* -y
+          echo onlyoffice-documentserver-de onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections && \
+          echo onlyoffice-documentserver-de onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
+          printf "n/n" | sudo apt-get install onlyoffice-documentserver-de -y && \
+          sudo systemctl start ds-example
+          EOF
+
       - name: Delete Droplet
         run: doctl compute droplet delete check-deb-in-repo --force
