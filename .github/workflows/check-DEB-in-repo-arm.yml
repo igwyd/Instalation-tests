@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-install-deb-in-repo:
+  test-install-deb-in-repo-arm64:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -80,3 +80,75 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
+
+      - name: Install ONLYOFFICE-Docs EE and run test example
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.EC2_IP }} << 'EOF'
+
+          sudo apt-get install postgresql -y && \
+          sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';" && \
+          sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;" && \
+          echo onlyoffice-documentserver-ee onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
+
+          sudo apt-get install redis-server -y
+
+          sudo apt-get install rabbitmq-server -y
+
+          mkdir -p -m 700 ~/.gnupg
+          curl -fsSL https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE | gpg --no-default-keyring --keyring gnupg-ring:/tmp/onlyoffice.gpg --import
+          chmod 644 /tmp/onlyoffice.gpg
+          sudo chown root:root /tmp/onlyoffice.gpg
+          sudo mv /tmp/onlyoffice.gpg /usr/share/keyrings/onlyoffice.gpg
+
+          echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" | sudo tee /etc/apt/sources.list.d/onlyoffice.list
+
+          sudo apt-get update && \
+          echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections && \
+          sudo apt-get install ttf-mscorefonts-installer -y
+
+          echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
+          sudo apt-get install onlyoffice-documentserver-ee -y
+          sudo systemctl start ds-example
+          EOF
+
+      - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          echo "Installed packages:"
+          echo "-------------------------------------"
+          sudo dpkg-query -l | grep onlyoffice-documentserver
+          echo "-------------------------------------"
+          echo "api.js from server:"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "-------------------------------------"
+          echo "info.json from server(packageType must be 1):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1:8000/info/info.json | jq
+          echo "-------------------------------------"
+          EOF
+
+      - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i "s#\"url\": \"https://kim.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../config_chrome_linux.json
+          sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
+          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
+          python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
+          python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
+
+      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          sed -i "s#\"url\": \"https://isa2.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../providers/wopi/config.json
+          cat ../config_chrome_linux.json
+          cat ../providers/wopi/config.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
+          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
+          python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
+          python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js

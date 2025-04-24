@@ -13,3 +13,4 @@ Current test version is **<!-- onlyoffice-version-start -->v9.0.0<!-- onlyoffice
 ## Check DEB version in repo (install from manual)
 Test DEB package installation ONLYOFFICE-Docs EE, DE and CE from released repo. \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-DEB-in-repo.yml/badge.svg?branch=main)  
+![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-DEB-in-repo-arm.yml/badge.svg?branch=main)
