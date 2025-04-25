@@ -161,7 +161,7 @@ jobs:
       - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          printf "n/n" | apt-get purge onlyoffice-documentserver* -y
+          printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
           echo onlyoffice-documentserver-de onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections && \
           echo onlyoffice-documentserver-de onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
           printf "n/n" | sudo apt-get install onlyoffice-documentserver-de -y && \
@@ -210,7 +210,7 @@ jobs:
       - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          printf "n/n" | apt-get purge onlyoffice-documentserver* -y
+          printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
           echo onlyoffice-documentserver onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections && \
           echo onlyoffice-documentserver onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
           printf "n/n" | sudo apt-get install onlyoffice-documentserver -y && \
