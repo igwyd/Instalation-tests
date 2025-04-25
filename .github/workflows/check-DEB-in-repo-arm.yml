@@ -81,6 +81,13 @@ jobs:
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
 
+      - name: Upgrade DEB packages
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          sudo apt-get update && \
+          sudo apt-get upgrade -y
+          EOF
+
       - name: Install ONLYOFFICE-Docs EE and run test example
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
