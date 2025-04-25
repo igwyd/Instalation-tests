@@ -120,7 +120,7 @@ jobs:
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "Installed packages:"
           echo "-------------------------------------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
@@ -138,7 +138,7 @@ jobs:
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i "s#\"url\": \"https://kim.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../config_chrome_linux.json
+          sed -i "s#\"url\": \"https://kim.teamlab.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
           sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
           cat ../config_chrome_linux.json
           python3 run.py --prcache
@@ -151,7 +151,7 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-          sed -i "s#\"url\": \"https://isa2.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../providers/wopi/config.json
+          sed -i "s#\"url\": \"https://isa2.teamlab.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../providers/wopi/config.json
           cat ../config_chrome_linux.json
           cat ../providers/wopi/config.json
           python3 run.py --prcache
@@ -159,3 +159,108 @@ jobs:
           python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
           python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
           python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
+
+      - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          echo onlyoffice-documentserver-ee onlyoffice/remove-db select false | sudo debconf-set-selections && \
+          sudo apt-get purge onlyoffice-documentserver* -y
+          echo onlyoffice-documentserver-de onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections && \
+          echo onlyoffice-documentserver-de onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
+          sudo apt-get install onlyoffice-documentserver-de -y
+          sudo systemctl start ds-example
+          EOF
+
+      - name: Info about installed Package, must be ONLYOFFICE-Docs DE
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          echo "Installed packages:"
+          echo "-------------------------------------"
+          sudo dpkg-query -l | grep onlyoffice-documentserver
+          echo "-------------------------------------"
+          echo "api.js from server:"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "-------------------------------------"
+          echo "info.json from server(packageType must be 2):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1:8000/info/info.json | jq
+          echo "-------------------------------------"
+          EOF
+
+      - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
+          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
+          python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
+          python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
+  
+      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
+          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
+          python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
+          python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
+
+      - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          echo onlyoffice-documentserver-de onlyoffice/remove-db select false | sudo debconf-set-selections && \
+          sudo apt-get purge onlyoffice-documentserver* -y
+          echo onlyoffice-documentserver onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections && \
+          echo onlyoffice-documentserver onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
+          sudo apt-get install onlyoffice-documentserver -y
+          sudo systemctl start ds-example
+          EOF
+
+      - name: Info about installed Package, must be ONLYOFFICE-Docs CE
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          echo "Installed packages:"
+          echo "-------------------------------------"
+          sudo dpkg-query -l | grep onlyoffice-documentserver
+          echo "-------------------------------------"
+          echo "api.js from server:"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "-------------------------------------"
+          echo "info.json from server(packageType must be 2):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1:8000/info/info.json | jq
+          echo "-------------------------------------"
+          EOF
+
+      - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
+          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
+          python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
+          python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
+  
+      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
+          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
+          python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
+          python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
+
+      - name: Delete EC2 Instance
+        run: |
+          aws ec2 terminate-instances --instance-ids ${{ env.INSTANCE_ID }}
+          aws ec2 wait instance-terminated --instance-ids ${{ env.INSTANCE_ID }}
