@@ -83,7 +83,7 @@ jobs:
 
       - name: Install ONLYOFFICE-Docs EE and run test example
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
 
           sudo apt-get install postgresql -y && \
           sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';" && \
@@ -113,7 +113,7 @@ jobs:
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.DROPLET_IP }} << 'EOF'
           echo "Installed packages:"
           echo "-------------------------------------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
