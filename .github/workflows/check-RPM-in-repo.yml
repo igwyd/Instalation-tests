@@ -37,3 +37,20 @@ jobs:
           cd puppeteer/engine
           npm install
           cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
+
+      - name: Install DigitalOcean CLI
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Create Droplet
+        run: |
+          doctl compute droplet create check-rpm-in-repo \
+            --region fra1 \
+            --size s-2vcpu-4gb \
+            --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
+            --image centos-stream-9-x64 \
+            --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
+            --wait
+          IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep check-rpm-in-repo | awk '{print $2}')
+          echo "DROPLET_IP=$IP" >> $GITHUB_ENV
