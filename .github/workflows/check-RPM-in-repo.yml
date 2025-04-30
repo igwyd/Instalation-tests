@@ -85,7 +85,7 @@ jobs:
           scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.conf root@${{ env.DROPLET_IP }}:/etc/nginx/nginx.conf
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
           sudo yum install epel-release -y
-          
+
           sudo yum install postgresql postgresql-server -y
           sudo service postgresql initdb
           sudo yum install chkconfig -y
@@ -116,7 +116,7 @@ jobs:
           sudo service nginx start
           sudo systemctl enable nginx
 
-          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh
+          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
 
           sudo firewall-cmd --zone=public --add-port=80/tcp --permanent
           sudo firewall-cmd --reload
