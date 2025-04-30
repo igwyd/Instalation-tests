@@ -118,6 +118,9 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+
+          sudo apt-get install jq -y
+          
           echo "Installed packages:"
           echo "-------------------------------------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
@@ -126,7 +129,6 @@ jobs:
           echo "-------------------------------------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "-------------------------------------"
-          sudo apt-get install jq -y
           echo "info.json from server(packageType must be 1):"
           echo "-------------------------------------"
           curl -s http://127.0.0.1:8000/info/info.json | jq
