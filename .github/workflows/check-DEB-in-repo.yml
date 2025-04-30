@@ -120,7 +120,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
 
           sudo apt-get install jq -y
-          
+
           echo "Installed packages:"
           echo "-------------------------------------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
@@ -132,6 +132,10 @@ jobs:
           echo "info.json from server(packageType must be 1):"
           echo "-------------------------------------"
           curl -s http://127.0.0.1:8000/info/info.json | jq
+          echo "-------------------------------------"
+          echo "check WOPI enabled(must be data except 404 Not Found):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/hosting/discovery
           echo "-------------------------------------"
           EOF
 
