@@ -189,6 +189,10 @@ jobs:
           echo "-------------------------------------"
           curl -s http://127.0.0.1:8000/info/info.json | jq
           echo "-------------------------------------"
+          echo "check WOPI enabled(must be data except 404 Not Found):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/hosting/discovery
+          echo "-------------------------------------"
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
@@ -237,6 +241,10 @@ jobs:
           echo "info.json from server(packageType must be 0):"
           echo "-------------------------------------"
           curl -s http://127.0.0.1:8000/info/info.json | jq
+          echo "-------------------------------------"
+          echo "check WOPI enabled(must be data except 404 Not Found):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/hosting/discovery
           echo "-------------------------------------"
           EOF
 
