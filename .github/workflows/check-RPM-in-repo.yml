@@ -88,7 +88,7 @@ jobs:
           
           sudo yum install postgresql postgresql-server -y
           sudo service postgresql initdb
-          sudo yum install chkconfig
+          sudo yum install chkconfig -y
           sudo chkconfig postgresql on
           sed -i '86s/\<ident\>/scram-sha-256/;88s/\<ident\>/scram-sha-256/' /var/lib/pgsql/data/pg_hba.conf
           sed -i "s/^#\?password_encryption *= *.*/password_encryption = 'scram-sha-256'/" /var/lib/pgsql/data/postgresql.conf
