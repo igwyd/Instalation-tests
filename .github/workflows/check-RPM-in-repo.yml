@@ -171,3 +171,8 @@ jobs:
           python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
           python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
           python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
+
+
+
+      - name: Delete Droplet
+        run: doctl compute droplet delete onlyoffice-ee-rpm-check --force
