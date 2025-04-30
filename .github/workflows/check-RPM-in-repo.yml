@@ -13,7 +13,6 @@ jobs:
       - name: Install prerequisites for puppeteer tests
         run: |
           sudo apt-get update
-          sudo apt-get install jq -y
           curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
           sudo apt-get install -y nodejs
           sudo apt-get install -y python3 python3-pip
@@ -85,7 +84,7 @@ jobs:
           scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.conf root@${{ env.DROPLET_IP }}:/etc/nginx/nginx.conf
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
           sudo yum install epel-release -y
-          
+
           sudo yum install postgresql postgresql-server -y
           sudo service postgresql initdb
           sudo yum install chkconfig -y
@@ -116,7 +115,7 @@ jobs:
           sudo service nginx start
           sudo systemctl enable nginx
 
-          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh
+          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
 
           sudo firewall-cmd --zone=public --add-port=80/tcp --permanent
           sudo firewall-cmd --reload
@@ -127,9 +126,12 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+
+          sudo dnf install jq -y
+
           echo "Installed packages:"
           echo "-------------------------------------"
-          sudo dpkg-query -l | grep onlyoffice-documentserver
+          sudo rpm -qa | grep onlyoffice-documentserver
           echo "-------------------------------------"
           echo "api.js from server:"
           echo "-------------------------------------"
@@ -138,6 +140,10 @@ jobs:
           echo "info.json from server(packageType must be 1):"
           echo "-------------------------------------"
           curl -s http://127.0.0.1:8000/info/info.json | jq
+          echo "-------------------------------------"
+          echo "check WOPI enabled(must be data except 404 Not Found):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/hosting/discovery
           echo "-------------------------------------"
           EOF
 
