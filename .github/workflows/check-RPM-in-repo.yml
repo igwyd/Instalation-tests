@@ -129,7 +129,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
           echo "Installed packages:"
           echo "-------------------------------------"
-          sudo dpkg-query -l | grep onlyoffice-documentserver
+          sudo rpm -qa | grep onlyoffice-documentserver
           echo "-------------------------------------"
           echo "api.js from server:"
           echo "-------------------------------------"
