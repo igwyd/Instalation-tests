@@ -126,6 +126,9 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+
+          sudo dnf install jq -y
+
           echo "Installed packages:"
           echo "-------------------------------------"
           sudo rpm -qa | grep onlyoffice-documentserver
