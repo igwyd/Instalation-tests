@@ -7,6 +7,9 @@ jobs:
   test-install-rpm-in-repo:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Install prerequisites for puppeteer tests
         run: |
           sudo apt-get update
@@ -60,11 +63,11 @@ jobs:
   
       - name: Add SSH Key
         run: |
-            mkdir -p ~/.ssh
-            echo "${{ secrets.DIGITALOCEAN_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-            chmod 600 ~/.ssh/id_rsa
-            eval $(ssh-agent -s)
-            ssh-add ~/.ssh/id_rsa
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DIGITALOCEAN_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
 
       - name: Upgrade RPM packages
         run: |
@@ -72,3 +75,93 @@ jobs:
           sudo dnf -y clean all
           sudo dnf upgrade -y
           EOF
+
+      - name: Install ONLYOFFICE-Docs EE and run test example
+        run: |
+          scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.repo root@${{ env.DROPLET_IP }}:/etc/yum.repos.d/nginx.repo
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          sudo yum install nginx -y
+          EOF
+          scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.conf root@${{ env.DROPLET_IP }}:/etc/nginx/nginx.conf
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          sudo yum install epel-release -y
+          
+          sudo yum install postgresql postgresql-server -y
+          sudo service postgresql initdb
+          sudo yum install chkconfig
+          sudo chkconfig postgresql on
+          sed -i '86s/\<ident\>/scram-sha-256/;88s/\<ident\>/scram-sha-256/' /var/lib/pgsql/data/pg_hba.conf
+          sed -i "s/^#\?password_encryption *= *.*/password_encryption = 'scram-sha-256'/" /var/lib/pgsql/data/postgresql.conf
+          sudo service postgresql restart
+          cd /tmp
+          sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';"
+          sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;"
+
+          sudo yum -y install redis
+          sudo systemctl enable --now redis
+
+          sudo curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | os=centos dist=9 sudo bash
+          sudo curl -s https://packagecloud.io/install/repositories/rabbitmq/erlang/script.rpm.sh | os=centos dist=9 sudo bash
+          sudo yum install rabbitmq-server -y
+          sudo systemctl enable --now rabbitmq-server
+
+          sudo yum install https://download.onlyoffice.com/repo/centos/main/noarch/onlyoffice-repo.noarch.rpm -y
+
+          sudo yum install cabextract xorg-x11-font-utils -y
+          sudo yum install fontconfig -y
+          sudo rpm -i https://sourceforge.net/projects/mscorefonts2/files/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm
+
+          sudo yum install onlyoffice-documentserver-ee -y
+
+          sudo service nginx start
+          sudo systemctl enable nginx
+
+          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh
+
+          sudo firewall-cmd --zone=public --add-port=80/tcp --permanent
+          sudo firewall-cmd --reload
+
+          sudo systemctl start ds-example
+          EOF
+
+      - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          echo "Installed packages:"
+          echo "-------------------------------------"
+          sudo dpkg-query -l | grep onlyoffice-documentserver
+          echo "-------------------------------------"
+          echo "api.js from server:"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "-------------------------------------"
+          echo "info.json from server(packageType must be 1):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1:8000/info/info.json | jq
+          echo "-------------------------------------"
+          EOF
+
+      - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i "s#\"url\": \"https://kim.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../config_chrome_linux.json
+          sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
+          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
+          python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
+          python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
+
+      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          sed -i "s#\"url\": \"https://isa2.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../providers/wopi/config.json
+          cat ../config_chrome_linux.json
+          cat ../providers/wopi/config.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js
+          python3 run.py ../tests/desktop/cell/smoke/smoke_test_spreadsheet_2.js
+          python3 run.py ../tests/desktop/pptx/font/input_text_and_change_font.js
+          python3 run.py ../tests/desktop/pdf/smoke/download-pdf-check-text.js
