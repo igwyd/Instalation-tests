@@ -175,4 +175,4 @@ jobs:
 
 
       - name: Delete Droplet
-        run: doctl compute droplet delete onlyoffice-ee-rpm-check --force
+        run: doctl compute droplet delete check-rpm-in-repo --force
