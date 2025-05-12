@@ -164,7 +164,7 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-          sed -i "s#\"url\": \"https://isa2.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../providers/wopi/config.json
+          sed -i "s#\"url\": \"https://kim.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../providers/wopi/config.json
           cat ../config_chrome_linux.json
           cat ../providers/wopi/config.json
           python3 run.py --prcache
