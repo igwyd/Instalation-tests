@@ -83,11 +83,10 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf -y update
-          sudo reboot
           EOF
-
-      - name: Wait for SSH to be Ready
-        run: sleep 180
+          aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+          echo "Waiting for instance to reboot..."
+          aws ec2 wait instance-status-ok --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Install ONLYOFFICE-Docs EE and run test example
         run: |
