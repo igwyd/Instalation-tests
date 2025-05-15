@@ -87,16 +87,19 @@ jobs:
           aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Wait for server reboot
-        run: sleep 600
+        run: sleep 300
 
       - name: Install ONLYOFFICE-Docs EE and run test example
         run: |
-          scp -o StrictHostKeyChecking=no rpm-check-configs-arm/nginx.repo ec2-user@${{ env.EC2_IP }}:/etc/yum.repos.d/nginx.repo
+          scp -o StrictHostKeyChecking=no rpm-check-configs-arm/nginx.repo ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.repo
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo mv /home/ec2-user/nginx.repo /etc/yum.repos.d/nginx.repo
           sudo yum install nginx -y
           EOF
-          scp -o StrictHostKeyChecking=no rpm-check-configs-arm/nginx.conf ec2-user@${{ env.EC2_IP }}:/etc/nginx/nginx.conf
+          scp -o StrictHostKeyChecking=no rpm-check-configs-arm/nginx.conf ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.conf
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          sudo mv /home/ec2-user/nginx.conf /etc/nginx/nginx.conf
+          
           sudo subscription-manager repos --enable codeready-builder-for-rhel-9-$(arch)-rpms
           sudo yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 
@@ -104,8 +107,8 @@ jobs:
           sudo service postgresql initdb
           sudo yum install chkconfig -y
           sudo chkconfig postgresql on
-          sed -i '86s/\<ident\>/scram-sha-256/;88s/\<ident\>/scram-sha-256/' /var/lib/pgsql/data/pg_hba.conf
-          sed -i "s/^#\?password_encryption *= *.*/password_encryption = 'scram-sha-256'/" /var/lib/pgsql/data/postgresql.conf
+          sudo sed -i '86s/\<ident\>/scram-sha-256/;88s/\<ident\>/scram-sha-256/' /var/lib/pgsql/data/pg_hba.conf
+          sudo sed -i "s/^#\?password_encryption *= *.*/password_encryption = 'scram-sha-256'/" /var/lib/pgsql/data/postgresql.conf
           sudo service postgresql restart
           cd /tmp
           sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';"
