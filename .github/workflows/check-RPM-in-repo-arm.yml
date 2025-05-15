@@ -83,12 +83,11 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf -y update
-          sleep 10
           EOF
           aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
-      - name: Wait for SSH to be Ready
-        run: sleep 180
+      - name: Wait for server reboot
+        run: sleep 600
 
       - name: Install ONLYOFFICE-Docs EE and run test example
         run: |
@@ -97,7 +96,7 @@ jobs:
           sudo yum install nginx -y
           EOF
           scp -o StrictHostKeyChecking=no rpm-check-configs-arm/nginx.conf ec2-user@${{ env.EC2_IP }}:/etc/nginx/nginx.conf
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo subscription-manager repos --enable codeready-builder-for-rhel-9-$(arch)-rpms
           sudo yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 
@@ -118,8 +117,11 @@ jobs:
           sudo yum install https://download.onlyoffice.com/repo/centos/main/noarch/onlyoffice-repo.noarch.rpm -y
           sudo yum instal xorg-x11-font-utils -y
 
-          sudo curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | os=centos dist=9 sudo bash
-          sudo curl -s https://packagecloud.io/install/repositories/rabbitmq/erlang/script.rpm.sh | os=centos dist=9 sudo bash
+          sudo curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | sudo bash
+          ERLANG_LATEST_VERSION=$(curl -s https://api.github.com/repos/rabbitmq/erlang-rpm/releases | sed -n 's/.*"tag_name":\s*"v\([^"]*\)".*/\1/p' | head -1)
+          REV=9
+          sudo rpm -ivh https://github.com/rabbitmq/erlang-rpm/releases/latest/download/erlang-${ERLANG_LATEST_VERSION}-1.el${REV}.aarch64.rpm
+          
           sudo yum install rabbitmq-server -y
           sudo systemctl enable --now rabbitmq-server
 
