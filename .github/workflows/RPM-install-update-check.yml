@@ -100,8 +100,8 @@ jobs:
       - name: Update ONLYOFFICE-EE to the NEXT RELEASE and run test example
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
-          
+          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_UPDATE_VERSION }}.repo
+
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
