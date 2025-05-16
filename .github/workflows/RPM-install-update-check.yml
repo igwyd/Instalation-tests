@@ -1,4 +1,4 @@
-name: RPM install and update on centos-9-x64
+name: RPM inst and upd on centos-9-x64
 
 on:
   schedule:
