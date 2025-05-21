@@ -1,4 +1,4 @@
-name: ONLYOFFICE-DE RPM Install on AWS RHEL 9 arm64
+name: RPM inst and upd on RHEL-9-arm64
 
 on:
   schedule:
@@ -51,6 +51,51 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
+
+      - name: Upgrade RPM packages
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo dnf -y clean all
+          sudo dnf -y update
+          sudo dnf install wget -y
+          EOF
+
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Wait for instance to reboot
+        run: sleep 180
+
+      - name: Install ms-core-fonts
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo dnf install -y cabextract
+          wget https://downloads.sourceforge.net/corefonts/mscorefonts-2.0-1.noarch.rpm
+          sudo dnf install -y mscorefonts-2.0-1.noarch.rpm
+          rm mscorefonts-2.0-1.noarch.rpm
+          EOF
+
+      - name: Install ONLYOFFICE-EE CURRENT RELEASE and run test example
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          wget https://download.onlyoffice.com/docs/docs-enterprise-install.sh
+          printf "n\n" | sudo bash docs-enterprise-install.sh
+          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
+          sudo systemctl restart ds-converter ds-docservice ds-example
+          EOF
+
+      - name: Update ONLYOFFICE-EE to the NEXT RELEASE and run test example
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_UPDATE_VERSION }}.repo
+          sudo dnf update onlyoffice-documentserver-ee${{ vars.ONLYOFFICE_RPM_VERSION }} -y
+          sudo systemctl restart ds-converter ds-docservice ds-example
+          EOF
+
+
+
+
+#=========================================================================
 
       - name: Install ONLYOFFICE and run test example
         run: |
