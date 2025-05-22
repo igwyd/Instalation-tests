@@ -66,22 +66,59 @@ jobs:
       - name: Wait for instance to reboot
         run: sleep 180
 
-      - name: Install ms-core-fonts
-        run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo dnf install -y cabextract
-          wget https://downloads.sourceforge.net/corefonts/mscorefonts-2.0-1.noarch.rpm
-          sudo dnf install -y mscorefonts-2.0-1.noarch.rpm
-          rm mscorefonts-2.0-1.noarch.rpm
-          EOF
-
       - name: Install ONLYOFFICE-EE CURRENT RELEASE and run test example
         run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << 'EOF'
-          wget https://download.onlyoffice.com/docs/docs-enterprise-install.sh
-          printf "n\n" | sudo bash docs-enterprise-install.sh
+          scp -o StrictHostKeyChecking=no rpm-check-configs-arm/nginx.repo ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.repo
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo mv /home/ec2-user/nginx.repo /etc/yum.repos.d/nginx.repo
+          sudo chown root:root /etc/yum.repos.d/nginx.repo
+          sudo yum install nginx -y
+          EOF
+          scp -o StrictHostKeyChecking=no rpm-check-configs-arm/nginx.conf ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.conf
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
+          sudo mv /home/ec2-user/nginx.conf /etc/nginx/nginx.conf
+          sudo chown root:root /etc/nginx/nginx.conf
+          sudo setenforce 0
+          
+          sudo subscription-manager repos --enable codeready-builder-for-rhel-9-$(arch)-rpms
+          sudo yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+
+          sudo yum install postgresql postgresql-server -y
+          sudo service postgresql initdb
+          sudo yum install chkconfig -y
+          sudo chkconfig postgresql on
+          sudo sed -i '86s/\<ident\>/scram-sha-256/;88s/\<ident\>/scram-sha-256/' /var/lib/pgsql/data/pg_hba.conf
+          sudo sed -i "s/^#\?password_encryption *= *.*/password_encryption = 'scram-sha-256'/" /var/lib/pgsql/data/postgresql.conf
+          sudo service postgresql restart
+          cd /tmp
+          sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';"
+          sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;"
+
+          sudo yum -y install redis
+          sudo systemctl enable --now redis
+
+          sudo yum install https://download.onlyoffice.com/repo/centos/main/noarch/onlyoffice-repo.noarch.rpm -y
+          sudo yum install xorg-x11-font-utils -y
+
+          sudo curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | sudo bash
+          ERLANG_LATEST_VERSION=$(curl -s https://api.github.com/repos/rabbitmq/erlang-rpm/releases | sed -n 's/.*"tag_name":\s*"v\([^"]*\)".*/\1/p' | head -1)
+          REV=9
+          sudo rpm -ivh https://github.com/rabbitmq/erlang-rpm/releases/latest/download/erlang-${ERLANG_LATEST_VERSION}-1.el${REV}.aarch64.rpm
+          
+          sudo yum install rabbitmq-server -y
+          sudo systemctl enable --now rabbitmq-server
+
+          sudo yum install onlyoffice-documentserver-ee -y
+
+          sudo service nginx start
+          sudo systemctl enable nginx
+
           printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
-          sudo systemctl restart ds-converter ds-docservice ds-example
+
+          sudo firewall-cmd --zone=public --add-port=80/tcp --permanent
+          sudo firewall-cmd --reload
+
+          sudo systemctl start ds-example
           EOF
 
       - name: Update ONLYOFFICE-EE to the NEXT RELEASE and run test example
@@ -92,10 +129,168 @@ jobs:
           sudo systemctl restart ds-converter ds-docservice ds-example
           EOF
 
+      - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
 
+          sudo dnf install jq -y
 
+          echo "Installed packages:"
+          echo "-------------------------------------"
+          sudo rpm -qa | grep onlyoffice-documentserver
+          echo "-------------------------------------"
+          echo "api.js from server:"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "-------------------------------------"
+          echo "info.json from server(packageType must be 1):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1:8000/info/info.json | jq
+          echo "-------------------------------------"
+          echo "check WOPI enabled(must be data instead 404 Not Found):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/hosting/discovery
+          echo "-------------------------------------"
+          EOF
 
-#=========================================================================
+      - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i "s#\"url\": \"https://kim.teamlab.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
+          sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
+          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
+          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
+          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
+
+      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          sed -i "s#\"url\": \"https://kim.teamlab.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../providers/wopi/config.json
+          cat ../config_chrome_linux.json
+          cat ../providers/wopi/config.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
+          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
+          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
+          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
+
+      - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo yum remove onlyoffice-documentserver-ee -y
+          sudo yum install onlyoffice-documentserver-de${{ vars.ONLYOFFICE_RPM_VERSION }} -y
+          sudo service nginx start
+          sudo systemctl enable nginx
+          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
+          sudo systemctl restart ds-example
+          EOF
+
+      - name: Info about installed Package, must be ONLYOFFICE-Docs DE
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          echo "Installed packages:"
+          echo "-------------------------------------"
+          sudo rpm -qa | grep onlyoffice-documentserver
+          echo "-------------------------------------"
+          echo "api.js from server:"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "-------------------------------------"
+          echo "info.json from server(packageType must be 2):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1:8000/info/info.json | jq
+          echo "-------------------------------------"
+          echo "check WOPI enabled(must be data instead 404 Not Found):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/hosting/discovery
+          echo "-------------------------------------"
+          EOF
+
+      - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
+          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
+          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
+          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
+
+      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
+          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
+          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
+          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
+
+      - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo yum remove onlyoffice-documentserver-de -y
+          sudo yum install onlyoffice-documentserver${{ vars.ONLYOFFICE_RPM_VERSION }} -y
+          sudo service nginx start
+          sudo systemctl enable nginx
+          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
+          sudo systemctl restart ds-example
+          EOF
+
+      - name: Info about installed Package, must be ONLYOFFICE-Docs CE
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          echo "Installed packages:"
+          echo "-------------------------------------"
+          sudo rpm -qa | grep onlyoffice-documentserver
+          echo "-------------------------------------"
+          echo "api.js from server:"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "-------------------------------------"
+          echo "info.json from server(packageType must be 0):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1:8000/info/info.json | jq
+          echo "-------------------------------------"
+          echo "check WOPI enabled(must be data instead 404 Not Found):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/hosting/discovery
+          echo "-------------------------------------"
+          EOF
+
+      - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
+          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
+          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
+          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
+
+      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
+          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
+          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
+          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
 
       - name: Delete EC2 Instance
         run: |
