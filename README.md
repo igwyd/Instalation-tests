@@ -1,6 +1,6 @@
 # Installation tests
 Installation pipelines
-## RPM installation (OneClickInstall script)
+## RPM installation (install from manual)
 Current test version is **<!-- onlyoffice-version-start -->v9.0.0<!-- onlyoffice-version-end -->** \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/RPM-install-update-check.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/RPM-install-update-check-arm.yml/badge.svg?branch=main)  
