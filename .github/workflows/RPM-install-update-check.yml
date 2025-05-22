@@ -83,10 +83,6 @@ jobs:
           sudo dnf -y update
           sudo dnf install wget -y
           EOF
-          doctl compute droplet-action reboot $(doctl compute droplet list --format ID,Name | grep rpm-x64-check | awk '{print $1}')
-
-      - name: Wait for server reboot
-        run: sleep 300
       
       - name: Install ONLYOFFICE-EE CURRENT RELEASE and run test example
         run: |
