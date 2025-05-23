@@ -90,6 +90,7 @@ jobs:
       
       - name: Install ONLYOFFICE-EE CURRENT RELEASE and run test example
         run: |
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << 'EOF'
           sudo apt-get install postgresql -y && \
           sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';" && \
           sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;" && \
