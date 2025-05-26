@@ -1,0 +1,11 @@
+name: Compile from source
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-compilation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
