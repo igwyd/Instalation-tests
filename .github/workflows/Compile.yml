@@ -9,3 +9,13 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: clone repo
+        run: git clone https://github.com/ONLYOFFICE/build_tools.git -b ${{ vars.ONLYOFFICE_BUILDTOOLS_VERSION }}
+
+      - name: Compile from source
+        run: |
+          cd build_tools
+          mkdir out
+          sudo docker build --tag onlyoffice-document-editors-builder .
+          docker run -v $PWD/out:/build_tools/out onlyoffice-document-editors-builder
