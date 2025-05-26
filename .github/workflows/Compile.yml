@@ -11,7 +11,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: clone repo
-        run: git clone https://github.com/ONLYOFFICE/build_tools.git -b ${{ vars.ONLYOFFICE_BUILDTOOLS_VERSION }}
+        run: git clone https://github.com/ONLYOFFICE/build_tools.git -b ${{ vars.ONLYOFFICE_BUILDTOOLS_BRANCH }}
 
       - name: Compile from source
         run: |
