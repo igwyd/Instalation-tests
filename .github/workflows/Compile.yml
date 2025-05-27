@@ -54,7 +54,7 @@ jobs:
 
       - name: Create Droplet
         run: |
-            doctl compute droplet create check-deb-in-repo \
+            doctl compute droplet create compile-test \
               --region fra1 \
               --size s-4vcpu-8gb \
               --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
