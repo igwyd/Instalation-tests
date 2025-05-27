@@ -10,12 +10,127 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: clone repo
-        run: git clone https://github.com/ONLYOFFICE/build_tools.git -b ${{ vars.ONLYOFFICE_BUILDTOOLS_BRANCH }}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-      - name: Compile from source
+      - name: Set up nodejs
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install prerequisites for puppeteer tests
         run: |
+          sudo apt-get update
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i google-chrome-stable_current_amd64.deb
+          sudo apt-get install -f -y
+          google-chrome --version
+          python3 --version
+          pip3 --version
+          node -v
+          npm -v
+
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GIT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
+          ssh-keyscan git.onlyoffice.com >> ~/.ssh/known_hosts
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          git clone git@git.onlyoffice.com:ONLYOFFICE-QA/Dep.Tests.git
+          cd Dep.Tests
+          sed -i 's/url=https:\/\/github.com\/ONLYOFFICE-data\/pp-files.git/url = git@github.com:ONLYOFFICE-data\/pp-files.git/' .gitmodules
+          git submodule update --init puppeteer/files
+          cd puppeteer/engine
+          npm install
+          cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
+
+      - name: Install DigitalOcean CLI
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Create Droplet
+        run: |
+            doctl compute droplet create check-deb-in-repo \
+              --region fra1 \
+              --size s-4vcpu-8gb \
+              --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
+              --image ubuntu-24-04-x64 \
+              --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
+              --wait
+            IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep compile-test | awk '{print $2}')
+            echo "DROPLET_IP=$IP" >> $GITHUB_ENV
+  
+      - name: Wait for SSH to be Ready
+        run: sleep 180
+  
+      - name: Add SSH Key
+        run: |
+            mkdir -p ~/.ssh
+            echo "${{ secrets.DIGITALOCEAN_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+            chmod 600 ~/.ssh/id_rsa
+            eval $(ssh-agent -s)
+            ssh-add ~/.ssh/id_rsa
+
+      - name: Upgrade DEB packages
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          sudo apt-get update
+          sudo apt-get upgrade -y
+          EOF
+
+      - name: Set swap
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          sudo fallocate -l 4G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+          sudo swapon --show
+          free -h
+          EOF
+
+      - name: Server restart
+        run: doctl compute droplet-action reboot $(doctl compute droplet list --format ID,Name | grep compile-test | awk '{print $1}')
+
+      - name: Wait for instance to reboot
+        run: sleep 180
+
+      - name: Install docker and ruby
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          sudo apt-get install ruby-full -y
+          for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
+          sudo apt-get update
+          sudo apt-get install ca-certificates curl
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+          # Add the repository to Apt sources:
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+            $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
+            sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+          sudo docker --version
+          sudo docker compose version
+          ruby --version
+          free -h
+          EOF
+
+      - name: Compile ONLYOFFICE Docs
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << EOF
+          git clone https://github.com/ONLYOFFICE/build_tools.git -b ${{ vars.ONLYOFFICE_BUILDTOOLS_BRANCH }}
           cd build_tools
           mkdir out
           sudo docker build --tag onlyoffice-document-editors-builder .
-          docker run -v $PWD/out:/build_tools/out onlyoffice-document-editors-builder
+          sudo docker run --name onlyoffice-build-tools -d -v $PWD/out:/build_tools/out onlyoffice-document-editors-builder
+          sudo docker logs -f onlyoffice-build-tools >> build_logs.txt 2>&1
+          sudo docker ps -a
+          EOF
