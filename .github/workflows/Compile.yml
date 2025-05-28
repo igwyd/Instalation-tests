@@ -125,7 +125,7 @@ jobs:
 
       - name: Compile ONLYOFFICE Docs
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << EOF
           git clone https://github.com/ONLYOFFICE/build_tools.git -b ${{ vars.ONLYOFFICE_BUILDTOOLS_BRANCH }}
           cd build_tools
           mkdir out
