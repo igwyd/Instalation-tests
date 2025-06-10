@@ -131,6 +131,14 @@ jobs:
           mkdir out
           sudo docker build --tag onlyoffice-document-editors-builder .
           sudo docker run --name onlyoffice-build-tools -d -v $PWD/out:/build_tools/out onlyoffice-document-editors-builder
-          sudo docker logs -f onlyoffice-build-tools >> build_logs.txt 2>&1
+          sudo docker logs -f onlyoffice-build-tools >> build.log 2>&1
           sudo docker ps -a
+          EOF
+
+      - name: Archive Compiled Files
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << EOF
+          cd build_tools
+          rake archive
+          ls -la
           EOF
