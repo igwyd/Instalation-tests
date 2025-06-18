@@ -13,7 +13,7 @@ Test DEB package installation ONLYOFFICE-Docs EE, DE and CE from released repo. 
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-DEB-in-repo.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-DEB-in-repo-arm.yml/badge.svg?branch=main)
 ## Check RPM version in repo, install from manual (Manual start)
-Test RPM package installation ONLYOFFICE-Docs EE, DE and CE from released repo.
+Test RPM package installation ONLYOFFICE-Docs EE, DE and CE from released repo. \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-RPM-in-repo.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-RPM-in-repo-arm.yml/badge.svg?branch=main)  
 ## Compile from source
