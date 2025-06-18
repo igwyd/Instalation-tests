@@ -1,4 +1,4 @@
-name: DEB inst and upd on ubuntu-24.04-arm64
+name: DEB dev arm64
 
 on:
   schedule:

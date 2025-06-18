@@ -1,4 +1,4 @@
-name: check RPM version in repo arm64
+name: check RPM release arm64
 
 on:
   workflow_dispatch:
