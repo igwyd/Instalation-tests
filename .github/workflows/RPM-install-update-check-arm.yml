@@ -1,4 +1,4 @@
-name: RPM inst and upd on RHEL-9-arm64
+name: RPM dev arm64
 
 on:
   schedule:
