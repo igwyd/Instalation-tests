@@ -8,11 +8,11 @@ Tested version **<!-- onlyoffice-version-start -->v9.0.0-117<!-- onlyoffice-vers
 Tested version **<!-- onlyoffice-version-start -->v9.0.0-117<!-- onlyoffice-version-end -->** \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/RPM-install-update-check.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/RPM-install-update-check-arm.yml/badge.svg?branch=main)  
-## Check DEB version in repo, install from manual (Manual start)
+## Check DEB version in current release repo, installation guide from helpcenter (Manual start)
 Test DEB package installation ONLYOFFICE-Docs EE, DE and CE from released repo. \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-DEB-in-repo.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-DEB-in-repo-arm.yml/badge.svg?branch=main)
-## Check RPM version in repo, install from manual (Manual start)
+## Check RPM version in current release repo, installation guide from helpcenter  (Manual start)
 Test RPM package installation ONLYOFFICE-Docs EE, DE and CE from released repo. \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-RPM-in-repo.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-RPM-in-repo-arm.yml/badge.svg?branch=main)  
