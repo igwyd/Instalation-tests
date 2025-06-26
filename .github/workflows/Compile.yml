@@ -130,9 +130,10 @@ jobs:
           cd build_tools
           mkdir out
           sudo docker build --tag onlyoffice-document-editors-builder .
-          sudo docker run --name onlyoffice-build-tools -d -v $PWD/out:/build_tools/out onlyoffice-document-editors-builder
+          sudo docker run --name onlyoffice-build-tools -d -v /root/build_tools/out:/build_tools/out onlyoffice-document-editors-builder
           sudo docker logs -f onlyoffice-build-tools >> build.log 2>&1
           sudo docker ps -a
+          ls /root/build_tools/out
           EOF
 
       - name: Archive Compiled Files
