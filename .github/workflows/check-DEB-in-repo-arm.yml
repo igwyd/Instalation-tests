@@ -151,7 +151,7 @@ jobs:
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i "s#\"url\": \"https://kim.teamlab.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
+          sed -i "s#\"url\": \"https://doc-linux.teamlab.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
           sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
           cat ../config_chrome_linux.json
           python3 run.py --prcache
@@ -165,7 +165,7 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-          sed -i "s#\"url\": \"https://kim.teamlab.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../providers/wopi/config.json
+          sed -i "s#\"url\": \"https://doc-linux.teamlab.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../providers/wopi/config.json
           cat ../config_chrome_linux.json
           cat ../providers/wopi/config.json
           python3 run.py --prcache
