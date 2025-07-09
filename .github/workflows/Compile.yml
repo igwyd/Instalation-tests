@@ -61,7 +61,7 @@ jobs:
               --image ubuntu-24-04-x64 \
               --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
               --wait
-            IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep compile-test | awk '{print $2}')
+            IP=$(https://doc-linux.teamlab.info/example | awk '{print $2}')
             echo "DROPLET_IP=$IP" >> $GITHUB_ENV
   
       - name: Wait for SSH to be Ready
