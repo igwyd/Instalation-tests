@@ -1,0 +1,21 @@
+name: check Docker DEB release x64
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-docker-deb-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up nodejs
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
