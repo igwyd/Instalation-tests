@@ -81,7 +81,6 @@ jobs:
             echo "$output"
           fi
           echo "-------------------------------------"
-          EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
