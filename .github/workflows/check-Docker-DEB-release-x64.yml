@@ -111,7 +111,7 @@ jobs:
           sleep 90
           docker exec ds-de-release supervisorctl start all
 
-      - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+      - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         run: |
           docker exec ds-de-release sed -i '70,71 s/^/# /' /etc/nginx/includes/ds-docservice.conf
           docker exec ds-de-release service nginx restart
