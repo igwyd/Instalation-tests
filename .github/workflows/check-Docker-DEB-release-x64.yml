@@ -108,3 +108,62 @@ jobs:
           python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
           python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
           python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
+
+      - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
+        run: |
+          docker stop ds-ee-release
+          docker rm ds-ee-release
+          docker rmi onlyoffice/documentserver-ee
+          docker pull onlyoffice/documentserver-de
+          docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-de-release onlyoffice/documentserver-de
+          sleep 90
+          docker exec ds-de-release supervisorctl start all
+
+      - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+        run: |
+          docker exec ds-de-release sed -i '70,71 s/^/# /' /etc/nginx/includes/ds-docservice.conf
+          docker exec ds-de-release service nginx restart
+
+          echo "Installed packages:"
+          echo "-------------------------------------"
+          docker exec ds-de-release bash -c "dpkg -l | grep onlyoffice"
+          echo "-------------------------------------"
+          echo "api.js from server:"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "-------------------------------------"
+          echo "info.json from server(packageType must be 1):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------------------------------"
+          echo "check WOPI enabled(must be data except 404 Not Found):"
+          echo "-------------------------------------"
+          output=$(curl -s http://127.0.0.1/hosting/discovery)
+          if echo "$output" | grep -q 'value='; then
+            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
+          else
+            echo "$output"
+          fi
+          echo "-------------------------------------"
+
+      - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
+          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
+          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
+          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
+
+      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
+          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
+          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
+          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
