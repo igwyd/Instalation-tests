@@ -124,7 +124,7 @@ jobs:
           echo "-------------------------------------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "-------------------------------------"
-          echo "info.json from server(packageType must be 1):"
+          echo "info.json from server(packageType must be 2):"
           echo "-------------------------------------"
           curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
@@ -146,6 +146,58 @@ jobs:
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+
+      - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
+        run: |
+          docker stop ds-de-release
+          docker rm ds-de-release
+          docker rmi onlyoffice/documentserver-de
+          docker pull onlyoffice/documentserver
+          docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-release onlyoffice/documentserver
+          sleep 90
+          docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
+          docker exec ds-release supervisorctl start all
+
+      - name: Info about installed Package, must be ONLYOFFICE-Docs CE
+        run: |
+          docker exec ds-release sed -i '70,71 s/^/# /' /etc/nginx/includes/ds-docservice.conf
+          docker exec ds-release service nginx restart
+
+          echo "Installed packages:"
+          echo "-------------------------------------"
+          docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
+          echo "-------------------------------------"
+          echo "api.js from server:"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "-------------------------------------"
+          echo "info.json from server(packageType must be 0):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------------------------------"
+          echo "check WOPI enabled(must be data except 404 Not Found):"
+          echo "-------------------------------------"
+          output=$(curl -s http://127.0.0.1/hosting/discovery)
+          if echo "$output" | grep -q 'value='; then
+            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
+          else
+            echo "$output"
+          fi
+          echo "-------------------------------------"
+
+      - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+
+      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
         run: |
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
