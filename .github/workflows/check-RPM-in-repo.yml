@@ -139,11 +139,16 @@ jobs:
           echo "-------------------------------------"
           echo "info.json from server(packageType must be 1):"
           echo "-------------------------------------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq
+          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
           echo "check WOPI enabled(must be data except 404 Not Found):"
           echo "-------------------------------------"
-          curl -s http://127.0.0.1/hosting/discovery
+          output=$(curl -s http://127.0.0.1/hosting/discovery)
+          if echo "$output" | grep -q 'value='; then
+            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
+          else
+            echo "$output"
+          fi
           echo "-------------------------------------"
           EOF
 
@@ -198,11 +203,16 @@ jobs:
           echo "-------------------------------------"
           echo "info.json from server(packageType must be 2):"
           echo "-------------------------------------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq
+          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
           echo "check WOPI enabled(must be data except 404 Not Found):"
           echo "-------------------------------------"
-          curl -s http://127.0.0.1/hosting/discovery
+          output=$(curl -s http://127.0.0.1/hosting/discovery)
+          if echo "$output" | grep -q 'value='; then
+            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
+          else
+            echo "$output"
+          fi
           echo "-------------------------------------"
           EOF
 
@@ -254,11 +264,16 @@ jobs:
           echo "-------------------------------------"
           echo "info.json from server(packageType must be 0):"
           echo "-------------------------------------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq
+          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
           echo "check WOPI enabled(must be data except 404 Not Found):"
           echo "-------------------------------------"
-          curl -s http://127.0.0.1/hosting/discovery
+          output=$(curl -s http://127.0.0.1/hosting/discovery)
+          if echo "$output" | grep -q 'value='; then
+            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
+          else
+            echo "$output"
+          fi
           echo "-------------------------------------"
           EOF
 
