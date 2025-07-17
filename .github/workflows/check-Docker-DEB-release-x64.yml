@@ -90,7 +90,7 @@ jobs:
           cat ../config_chrome_linux.json
           python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
-          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet.js --disable_animation
           python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
           python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
           python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
