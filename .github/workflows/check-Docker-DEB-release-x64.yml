@@ -19,3 +19,93 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Install prerequisites for puppeteer tests
+        run: |
+          sudo apt-get update
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i google-chrome-stable_current_amd64.deb
+          sudo apt-get install -f -y
+          google-chrome --version
+          python3 --version
+          pip3 --version
+          node -v
+          npm -v
+
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GIT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
+          ssh-keyscan git.onlyoffice.com >> ~/.ssh/known_hosts
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          git clone git@git.onlyoffice.com:ONLYOFFICE-QA/Dep.Tests.git
+          cd Dep.Tests
+          sed -i 's/url=https:\/\/github.com\/ONLYOFFICE-data\/pp-files.git/url = git@github.com:ONLYOFFICE-data\/pp-files.git/' .gitmodules
+          git submodule update --init puppeteer/files
+          cd puppeteer/engine
+          npm install
+          cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
+
+      - name: Docker run ONLYOFFICE-Docs EE
+        run: |
+          docker pull onlyoffice/documentserver-ee
+          docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-release onlyoffice/documentserver-ee
+          sleep 90
+          docker exec ds-ee-release supervisorctl start all
+
+      - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+        run: |
+          docker exec ds-ee-release sed -i '70,71 s/^/# /' /etc/nginx/includes/ds-docservice.conf
+          docker exec ds-ee-release service nginx restart
+          sudo apt-get install jq -y
+
+          echo "Installed packages:"
+          echo "-------------------------------------"
+          docker exec ds-ee-release bash -c "dpkg -l | grep onlyoffice"
+          echo "-------------------------------------"
+          echo "api.js from server:"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "-------------------------------------"
+          echo "info.json from server(packageType must be 1):"
+          echo "-------------------------------------"
+          curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------------------------------"
+          echo "check WOPI enabled(must be data except 404 Not Found):"
+          echo "-------------------------------------"
+          output=$(curl -s http://127.0.0.1/hosting/discovery)
+          if echo "$output" | grep -q 'value='; then
+            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
+          else
+            echo "$output"
+          fi
+          echo "-------------------------------------"
+          EOF
+
+      - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i "s#\"url\": \"https://doc-linux.teamlab.info/example\"#\"url\": \"http://127.0.0.1/example\"#" ../config_chrome_linux.json
+          sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
+          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
+          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
+          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
+
+      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          sed -i "s#\"url\": \"https://doc-linux.teamlab.info/example\"#\"url\": \"http://127.0.0.1/example\"#" ../providers/wopi/config.json
+          cat ../config_chrome_linux.json
+          cat ../providers/wopi/config.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
+          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
+          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
+          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
