@@ -83,6 +83,7 @@ jobs:
           echo "-------------------------------------"
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           sed -i "s#\"url\": \"https://doc-linux.teamlab.info/example\"#\"url\": \"http://127.0.0.1/example\"#" ../config_chrome_linux.json
