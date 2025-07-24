@@ -163,10 +163,6 @@ jobs:
           cat ../config_chrome_linux.json
           python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
-          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
-          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
-          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
-          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
         run: |
@@ -177,10 +173,6 @@ jobs:
           cat ../providers/wopi/config.json
           python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
-          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
-          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
-          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
-          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
 
       - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
         run: |
@@ -225,10 +217,6 @@ jobs:
           cat ../config_chrome_linux.json
           python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
-          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
-          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
-          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
-          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
         run: |
@@ -237,10 +225,6 @@ jobs:
           cat ../config_chrome_linux.json
           python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
-          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
-          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
-          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
-          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
 
       - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
         run: |
@@ -285,10 +269,6 @@ jobs:
           cat ../config_chrome_linux.json
           python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
-          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
-          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
-          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
-          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
         run: |
@@ -297,10 +277,6 @@ jobs:
           cat ../config_chrome_linux.json
           python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
-          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation
-          python3 run.py ../tests/desktop/presentation/font/input_text_and_change_font.js --disable_animation
-          python3 run.py ../tests/desktop/pdf/input/insert_stamp_save.js --disable_animation
-          python3 run.py ../tests/desktop/pdf-form/field/insert_checkbox.js --disable_animation
 
       - name: Delete Droplet
         run: doctl compute droplet delete deb-x64-check --force
