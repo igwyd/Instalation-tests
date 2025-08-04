@@ -22,4 +22,5 @@ Test RPM package installation ONLYOFFICE-Docs EE, DE and CE from released repo. 
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/Compile.yml/badge.svg?branch=main)  
 ### Check Docker version current release
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-Docker-DEB-release-x64.yml/badge.svg?branch=main) \
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-Docker-RPM-release-x64.yml/badge.svg?branch=main) 
+![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-Docker-RPM-release-x64.yml/badge.svg?branch=main) \
+![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/check-Docker-DEB-release-arm64.yml/badge.svg?branch=main)
