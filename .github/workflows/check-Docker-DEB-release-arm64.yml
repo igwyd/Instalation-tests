@@ -1,0 +1,8 @@
+name: check Docker DEB release arm64
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-docker-deb-arm64:
+    runs-on: ubuntu-latest
