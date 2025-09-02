@@ -1,4 +1,4 @@
-name: DEB dev arm64
+name: dev DEB arm64
 
 on:
   schedule:

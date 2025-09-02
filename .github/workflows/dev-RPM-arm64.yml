@@ -1,8 +1,8 @@
-name: DEB dev x64
+name: dev RPM arm64
 
 on:
   schedule:
-    - cron: '0 12 * * 3'  # Wednesday 15:00 Mosсow time (UTC+3)
+    - cron: '0 12 * * 3'  # Wednesday 15:00 Moscow time (UTC+3)
   workflow_dispatch:
 
 jobs:
@@ -49,22 +49,34 @@ jobs:
           npm install
           cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
 
-      - name: Install DigitalOcean CLI
-        uses: digitalocean/action-doctl@v2
-        with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-
-      - name: Create Droplet
+      - name: Configure AWS CLI
         run: |
-          doctl compute droplet create deb-x64-check \
-            --region fra1 \
-            --size s-2vcpu-4gb \
-            --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
-            --image ubuntu-24-04-x64 \
-            --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
-            --wait
-          IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep deb-x64-check | awk '{print $2}')
-          echo "DROPLET_IP=$IP" >> $GITHUB_ENV
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-east-1
+
+      - name: Create EC2 Instance
+        run: |
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id ami-09373db3d247551a0 \
+            --instance-type t4g.medium \
+            --key-name demin \
+            --security-groups AllPortsOpened \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=rpm-arm64-check}]' \
+            --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":50,"VolumeType":"gp3"}}]' \
+            --query "Instances[0].InstanceId" --output text)
+          
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+          echo "Waiting for instance to start..."
+          aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+
+      - name: Get EC2 Public IP
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ env.INSTANCE_ID }} \
+            --query "Reservations[].Instances[].PublicIpAddress" --output text)
+          echo "EC2 Public IP: $IP"
+          echo "EC2_IP=$IP" >> $GITHUB_ENV
 
       - name: Wait for SSH to be Ready
         run: sleep 180
@@ -72,69 +84,97 @@ jobs:
       - name: Add SSH Key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DIGITALOCEAN_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
 
-      - name: Upgrade DEB packages
+      - name: Upgrade RPM packages
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo apt-get update
-          sudo apt-get upgrade -y
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo dnf -y clean all
+          sudo dnf -y update
+          sudo dnf install wget -y
           EOF
-          doctl compute droplet-action reboot $(doctl compute droplet list --format ID,Name | grep deb-x64-check | awk '{print $1}')
 
-      - name: Wait for server reboot
-        run: sleep 300
-      
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Wait for instance to reboot
+        run: sleep 180
+
       - name: Install ONLYOFFICE-EE CURRENT RELEASE and run test example
         run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo apt-get install postgresql -y && \
-          sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';" && \
-          sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;" && \
-          echo onlyoffice-documentserver-ee onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
+          scp -o StrictHostKeyChecking=no rpm-check-configs-arm/nginx.repo ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.repo
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo mv /home/ec2-user/nginx.repo /etc/yum.repos.d/nginx.repo
+          sudo chown root:root /etc/yum.repos.d/nginx.repo
+          sudo yum install nginx -y
+          EOF
+          scp -o StrictHostKeyChecking=no rpm-check-configs-arm/nginx.conf ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.conf
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
+          sudo mv /home/ec2-user/nginx.conf /etc/nginx/nginx.conf
+          sudo chown root:root /etc/nginx/nginx.conf
+          sudo setenforce 0
+          
+          sudo subscription-manager repos --enable codeready-builder-for-rhel-9-$(arch)-rpms
+          sudo yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
 
-          sudo apt-get install redis-server -y
+          sudo yum install postgresql postgresql-server -y
+          sudo service postgresql initdb
+          sudo yum install chkconfig -y
+          sudo chkconfig postgresql on
+          sudo sed -i '86s/\<ident\>/scram-sha-256/;88s/\<ident\>/scram-sha-256/' /var/lib/pgsql/data/pg_hba.conf
+          sudo sed -i "s/^#\?password_encryption *= *.*/password_encryption = 'scram-sha-256'/" /var/lib/pgsql/data/postgresql.conf
+          sudo service postgresql restart
+          cd /tmp
+          sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';"
+          sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;"
 
-          sudo apt-get install rabbitmq-server -y
+          sudo yum -y install redis
+          sudo systemctl enable --now redis
 
-          mkdir -p -m 700 ~/.gnupg
-          curl -fsSL https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE | gpg --no-default-keyring --keyring gnupg-ring:/tmp/onlyoffice.gpg --import
-          chmod 644 /tmp/onlyoffice.gpg
-          sudo chown root:root /tmp/onlyoffice.gpg
-          sudo mv /tmp/onlyoffice.gpg /usr/share/keyrings/onlyoffice.gpg
+          sudo yum install https://download.onlyoffice.com/repo/centos/main/noarch/onlyoffice-repo.noarch.rpm -y
+          sudo yum install xorg-x11-font-utils -y
 
-          echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" | sudo tee /etc/apt/sources.list.d/onlyoffice.list
+          sudo curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | sudo bash
+          ERLANG_LATEST_VERSION=$(curl -s https://api.github.com/repos/rabbitmq/erlang-rpm/releases | sed -n 's/.*"tag_name":\s*"v\([^"]*\)".*/\1/p' | head -1)
+          REV=9
+          sudo rpm -ivh https://github.com/rabbitmq/erlang-rpm/releases/latest/download/erlang-${ERLANG_LATEST_VERSION}-1.el${REV}.aarch64.rpm
+          
+          sudo yum install rabbitmq-server -y
+          sudo systemctl enable --now rabbitmq-server
 
-          sudo apt-get update && \
-          echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections && \
-          sudo apt-get install ttf-mscorefonts-installer -y
+          sudo yum install onlyoffice-documentserver-ee -y
 
-          echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
-          sudo apt-get install onlyoffice-documentserver-ee -y
-          sudo systemctl restart ds-example
+          sudo service nginx start
+          sudo systemctl enable nginx
+
+          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
+
+          sudo firewall-cmd --zone=public --add-port=80/tcp --permanent
+          sudo firewall-cmd --reload
+
+          sudo systemctl start ds-example
           EOF
 
       - name: Update ONLYOFFICE-EE to the NEXT RELEASE and run test example
         run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << 'EOF'
-          echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_UPDATE_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
-          sudo apt-get update
-          sudo apt-get install onlyoffice-documentserver-ee${{ vars.ONLYOFFICE_DEB_VERSION }} -y
-          sudo systemctl restart ds-example
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_UPDATE_VERSION }}.repo
+          sudo dnf update onlyoffice-documentserver-ee${{ vars.ONLYOFFICE_RPM_VERSION }} -y
+          sudo systemctl restart ds-converter ds-docservice ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
 
-          sudo apt-get install jq -y
+          sudo dnf install jq -y
 
           echo "Installed packages:"
           echo "-------------------------------------"
-          sudo dpkg-query -l | grep onlyoffice-documentserver
+          sudo rpm -qa | grep onlyoffice-documentserver
           echo "-------------------------------------"
           echo "api.js from server:"
           echo "-------------------------------------"
@@ -144,7 +184,7 @@ jobs:
           echo "-------------------------------------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
-          echo "check WOPI enabled(must be data except 404 Not Found):"
+          echo "check WOPI enabled(must be data instead 404 Not Found):"
           echo "-------------------------------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -158,7 +198,7 @@ jobs:
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i "s#\"url\": \"https://doc-linux.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../config_chrome_linux.json
+          sed -i "s#\"url\": \"https://doc-linux.teamlab.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
           sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
           cat ../config_chrome_linux.json
           python3 run.py --prcache
@@ -168,7 +208,7 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-          sed -i "s#\"url\": \"https://doc-linux.teamlab.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../providers/wopi/config.json
+          sed -i "s#\"url\": \"https://doc-linux.teamlab.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../providers/wopi/config.json
           cat ../config_chrome_linux.json
           cat ../providers/wopi/config.json
           python3 run.py --prcache
@@ -176,20 +216,21 @@ jobs:
 
       - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
-          echo onlyoffice-documentserver-de onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections && \
-          echo onlyoffice-documentserver-de onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
-          printf "n/n" | sudo apt-get install onlyoffice-documentserver-de${{ vars.ONLYOFFICE_DEB_VERSION }} -y && \
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo yum remove onlyoffice-documentserver-ee -y
+          sudo yum install onlyoffice-documentserver-de${{ vars.ONLYOFFICE_RPM_VERSION }} -y
+          sudo service nginx start
+          sudo systemctl enable nginx
+          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
           sudo systemctl restart ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           echo "Installed packages:"
           echo "-------------------------------------"
-          sudo dpkg-query -l | grep onlyoffice-documentserver
+          sudo rpm -qa | grep onlyoffice-documentserver
           echo "-------------------------------------"
           echo "api.js from server:"
           echo "-------------------------------------"
@@ -199,7 +240,7 @@ jobs:
           echo "-------------------------------------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
-          echo "check WOPI enabled(must be data except 404 Not Found):"
+          echo "check WOPI enabled(must be data instead 404 Not Found):"
           echo "-------------------------------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -217,7 +258,7 @@ jobs:
           cat ../config_chrome_linux.json
           python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
-  
+
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -228,20 +269,21 @@ jobs:
 
       - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
-          echo onlyoffice-documentserver onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections && \
-          echo onlyoffice-documentserver onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
-          printf "n/n" | sudo apt-get install onlyoffice-documentserver${{ vars.ONLYOFFICE_DEB_VERSION }} -y && \
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo yum remove onlyoffice-documentserver-de -y
+          sudo yum install onlyoffice-documentserver${{ vars.ONLYOFFICE_RPM_VERSION }} -y
+          sudo service nginx start
+          sudo systemctl enable nginx
+          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
           sudo systemctl restart ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           echo "Installed packages:"
           echo "-------------------------------------"
-          sudo dpkg-query -l | grep onlyoffice-documentserver
+          sudo rpm -qa | grep onlyoffice-documentserver
           echo "-------------------------------------"
           echo "api.js from server:"
           echo "-------------------------------------"
@@ -251,7 +293,7 @@ jobs:
           echo "-------------------------------------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
-          echo "check WOPI enabled(must be data except 404 Not Found):"
+          echo "check WOPI enabled(must be data instead 404 Not Found):"
           echo "-------------------------------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -269,7 +311,7 @@ jobs:
           cat ../config_chrome_linux.json
           python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
-  
+
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -278,5 +320,7 @@ jobs:
           python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
 
-      - name: Delete Droplet
-        run: doctl compute droplet delete deb-x64-check --force
+      - name: Delete EC2 Instance
+        run: |
+          aws ec2 terminate-instances --instance-ids ${{ env.INSTANCE_ID }}
+          aws ec2 wait instance-terminated --instance-ids ${{ env.INSTANCE_ID }}

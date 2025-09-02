@@ -1,21 +1,13 @@
-name: RPM dev x64
+name: release RPM x64
 
 on:
-  schedule:
-    - cron: '0 12 * * 3'  # Wednesday 15:00 Mosсow time (UTC+3)
-#  push:
-#    branches:
-#      - main
-#  pull_request:
-#    branches:
-#      - main
   workflow_dispatch:
 
 jobs:
-  test-install:
+  test-install-rpm-in-repo:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install prerequisites for puppeteer tests
@@ -55,19 +47,19 @@ jobs:
 
       - name: Create Droplet
         run: |
-          doctl compute droplet create rpm-x64-check \
+          doctl compute droplet create check-rpm-in-repo \
             --region fra1 \
             --size s-2vcpu-4gb \
             --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
             --image centos-stream-9-x64 \
             --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
             --wait
-          IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep rpm-x64-check | awk '{print $2}')
+          IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep check-rpm-in-repo | awk '{print $2}')
           echo "DROPLET_IP=$IP" >> $GITHUB_ENV
 
       - name: Wait for SSH to be Ready
         run: sleep 180
-
+  
       - name: Add SSH Key
         run: |
           mkdir -p ~/.ssh
@@ -80,15 +72,10 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
           sudo dnf -y clean all
-          sudo dnf -y update
-          sudo dnf install wget -y
+          sudo dnf upgrade -y
           EOF
-          doctl compute droplet-action reboot $(doctl compute droplet list --format ID,Name | grep rpm-x64-check | awk '{print $1}')
 
-      - name: Wait for server reboot
-        run: sleep 300
-      
-      - name: Install ONLYOFFICE-EE CURRENT RELEASE and run test example
+      - name: Install ONLYOFFICE-Docs EE and run test example
         run: |
           scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.repo root@${{ env.DROPLET_IP }}:/etc/yum.repos.d/nginx.repo
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
@@ -136,14 +123,6 @@ jobs:
           sudo systemctl start ds-example
           EOF
 
-      - name: Update ONLYOFFICE-EE to the NEXT RELEASE and run test example
-        run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_UPDATE_VERSION }}.repo
-          sudo dnf update onlyoffice-documentserver-ee${{ vars.ONLYOFFICE_RPM_VERSION }} -y
-          sudo systemctl restart ds-converter ds-docservice ds-example
-          EOF
-
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
@@ -162,7 +141,7 @@ jobs:
           echo "-------------------------------------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
-          echo "check WOPI enabled(must be data instead 404 Not Found):"
+          echo "check WOPI enabled(must be data except 404 Not Found):"
           echo "-------------------------------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -194,18 +173,18 @@ jobs:
 
       - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
         run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo dnf remove onlyoffice-documentserver-ee -y
-          sudo dnf install onlyoffice-documentserver-de${{ vars.ONLYOFFICE_RPM_VERSION }} -y
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          sudo yum remove onlyoffice-documentserver-ee -y
+          sudo yum install onlyoffice-documentserver-de -y
           sudo service nginx start
           sudo systemctl enable nginx
           printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
-          sudo systemctl restart ds-example
+          sudo systemctl start ds-example
           EOF
-          
+
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
           echo "Installed packages:"
           echo "-------------------------------------"
           sudo rpm -qa | grep onlyoffice-documentserver
@@ -218,7 +197,7 @@ jobs:
           echo "-------------------------------------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
-          echo "check WOPI enabled(must be data instead 404 Not Found):"
+          echo "check WOPI enabled(must be data except 404 Not Found):"
           echo "-------------------------------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -247,18 +226,18 @@ jobs:
 
       - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo dnf remove onlyoffice-documentserver-de -y
-          sudo dnf install onlyoffice-documentserver${{ vars.ONLYOFFICE_RPM_VERSION }} -y
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          sudo yum remove onlyoffice-documentserver* -y
+          sudo yum install onlyoffice-documentserver -y
           sudo service nginx start
           sudo systemctl enable nginx
           printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
-          sudo systemctl restart ds-example
+          sudo systemctl start ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
           echo "Installed packages:"
           echo "-------------------------------------"
           sudo rpm -qa | grep onlyoffice-documentserver
@@ -271,7 +250,7 @@ jobs:
           echo "-------------------------------------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
-          echo "check WOPI enabled(must be data instead 404 Not Found):"
+          echo "check WOPI enabled(must be data except 404 Not Found):"
           echo "-------------------------------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -299,4 +278,4 @@ jobs:
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
 
       - name: Delete Droplet
-        run: doctl compute droplet delete rpm-x64-check --force
+        run: doctl compute droplet delete check-rpm-in-repo --force

@@ -1,4 +1,4 @@
-name: check Docker DEB release arm64
+name: release Docker DEB arm64
 
 on:
   workflow_dispatch:

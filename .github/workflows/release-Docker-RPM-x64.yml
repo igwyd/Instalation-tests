@@ -1,21 +1,28 @@
-name: check RPM release x64
+name: release Docker RPM x64
 
 on:
   workflow_dispatch:
 
 jobs:
-  test-install-rpm-in-repo:
+  check-docker-rpm-x64:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up nodejs
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: Install prerequisites for puppeteer tests
         run: |
           sudo apt-get update
-          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-          sudo apt-get install -y nodejs
-          sudo apt-get install -y python3 python3-pip
           wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo dpkg -i google-chrome-stable_current_amd64.deb
           sudo apt-get install -f -y
@@ -44,22 +51,22 @@ jobs:
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-
+  
       - name: Create Droplet
         run: |
-          doctl compute droplet create check-rpm-in-repo \
+          doctl compute droplet create rpm-docker-x64-check \
             --region fra1 \
             --size s-2vcpu-4gb \
             --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
             --image centos-stream-9-x64 \
             --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
             --wait
-          IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep check-rpm-in-repo | awk '{print $2}')
+          IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep rpm-docker-x64-check | awk '{print $2}')
           echo "DROPLET_IP=$IP" >> $GITHUB_ENV
 
       - name: Wait for SSH to be Ready
         run: sleep 180
-  
+
       - name: Add SSH Key
         run: |
           mkdir -p ~/.ssh
@@ -67,71 +74,58 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
-
+  
       - name: Upgrade RPM packages
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
           sudo dnf -y clean all
-          sudo dnf upgrade -y
+          sudo dnf -y update
+          sudo dnf install wget -y
           EOF
+          doctl compute droplet-action reboot $(doctl compute droplet list --format ID,Name | grep rpm-docker-x64-check | awk '{print $1}')
 
-      - name: Install ONLYOFFICE-Docs EE and run test example
+      - name: Wait for server reboot
+        run: sleep 300
+
+      - name: Install Docker
         run: |
-          scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.repo root@${{ env.DROPLET_IP }}:/etc/yum.repos.d/nginx.repo
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo yum install nginx -y
+          sudo dnf remove docker \
+                  docker-client \
+                  docker-client-latest \
+                  docker-common \
+                  docker-latest \
+                  docker-latest-logrotate \
+                  docker-logrotate \
+                  docker-engine -y
+          sudo dnf -y install dnf-plugins-core
+          sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+          sudo dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+          sudo systemctl enable --now docker
+          sudo docker ps
+          sudo docker compose version
+          sudo docker --version
           EOF
-          scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.conf root@${{ env.DROPLET_IP }}:/etc/nginx/nginx.conf
+
+      - name: Docker run ONLYOFFICE-Docs EE
+        run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo yum install epel-release -y
-
-          sudo yum install postgresql postgresql-server -y
-          sudo service postgresql initdb
-          sudo yum install chkconfig -y
-          sudo chkconfig postgresql on
-          sed -i '86s/\<ident\>/scram-sha-256/;88s/\<ident\>/scram-sha-256/' /var/lib/pgsql/data/pg_hba.conf
-          sed -i "s/^#\?password_encryption *= *.*/password_encryption = 'scram-sha-256'/" /var/lib/pgsql/data/postgresql.conf
-          sudo service postgresql restart
-          cd /tmp
-          sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';"
-          sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;"
-
-          sudo yum -y install redis
-          sudo systemctl enable --now redis
-
-          sudo curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | os=centos dist=9 sudo bash
-          sudo curl -s https://packagecloud.io/install/repositories/rabbitmq/erlang/script.rpm.sh | os=centos dist=9 sudo bash
-          sudo yum install rabbitmq-server -y
-          sudo systemctl enable --now rabbitmq-server
-
-          sudo yum install https://download.onlyoffice.com/repo/centos/main/noarch/onlyoffice-repo.noarch.rpm -y
-
-          sudo yum install cabextract xorg-x11-font-utils -y
-          sudo yum install fontconfig -y
-          sudo rpm -i https://sourceforge.net/projects/mscorefonts2/files/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm
-
-          sudo yum install onlyoffice-documentserver-ee -y
-
-          sudo service nginx start
-          sudo systemctl enable nginx
-
-          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
-
-          sudo firewall-cmd --zone=public --add-port=80/tcp --permanent
-          sudo firewall-cmd --reload
-
-          sudo systemctl start ds-example
+          docker pull onlyoffice/documentserver-ee
+          docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-release onlyoffice/documentserver-ee
+          sleep 90
+          docker exec ds-ee-release supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-
-          sudo dnf install jq -y
+          docker exec ds-ee-release sed -i '70,71 s/^/# /' /etc/nginx/includes/ds-docservice.conf
+          docker exec ds-ee-release service nginx restart
+          sudo apt-get install jq -y
 
           echo "Installed packages:"
           echo "-------------------------------------"
-          sudo rpm -qa | grep onlyoffice-documentserver
+          docker exec ds-ee-release bash -c "dpkg -l | grep onlyoffice"
           echo "-------------------------------------"
           echo "api.js from server:"
           echo "-------------------------------------"
@@ -139,7 +133,7 @@ jobs:
           echo "-------------------------------------"
           echo "info.json from server(packageType must be 1):"
           echo "-------------------------------------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
           echo "check WOPI enabled(must be data except 404 Not Found):"
           echo "-------------------------------------"
@@ -174,20 +168,24 @@ jobs:
       - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo yum remove onlyoffice-documentserver-ee -y
-          sudo yum install onlyoffice-documentserver-de -y
-          sudo service nginx start
-          sudo systemctl enable nginx
-          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
-          sudo systemctl start ds-example
+          docker stop ds-ee-release
+          docker rm ds-ee-release
+          docker rmi onlyoffice/documentserver-ee
+          docker pull onlyoffice/documentserver-de
+          docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-de-release onlyoffice/documentserver-de
+          sleep 90
+          docker exec ds-de-release supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          docker exec ds-de-release sed -i '70,71 s/^/# /' /etc/nginx/includes/ds-docservice.conf
+          docker exec ds-de-release service nginx restart
+
           echo "Installed packages:"
           echo "-------------------------------------"
-          sudo rpm -qa | grep onlyoffice-documentserver
+          docker exec ds-de-release bash -c "dpkg -l | grep onlyoffice"
           echo "-------------------------------------"
           echo "api.js from server:"
           echo "-------------------------------------"
@@ -195,7 +193,7 @@ jobs:
           echo "-------------------------------------"
           echo "info.json from server(packageType must be 2):"
           echo "-------------------------------------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
           echo "check WOPI enabled(must be data except 404 Not Found):"
           echo "-------------------------------------"
@@ -213,7 +211,6 @@ jobs:
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
           cat ../config_chrome_linux.json
-          python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
@@ -221,26 +218,30 @@ jobs:
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
           cat ../config_chrome_linux.json
-          python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
 
       - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo yum remove onlyoffice-documentserver* -y
-          sudo yum install onlyoffice-documentserver -y
-          sudo service nginx start
-          sudo systemctl enable nginx
-          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
-          sudo systemctl start ds-example
+          docker stop ds-de-release
+          docker rm ds-de-release
+          docker rmi onlyoffice/documentserver-de
+          docker pull onlyoffice/documentserver
+          docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-release onlyoffice/documentserver
+          sleep 90
+          docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
+          docker exec ds-release supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          docker exec ds-release sed -i '70,71 s/^/# /' /etc/nginx/includes/ds-docservice.conf
+          docker exec ds-release service nginx restart
+
           echo "Installed packages:"
           echo "-------------------------------------"
-          sudo rpm -qa | grep onlyoffice-documentserver
+          docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
           echo "-------------------------------------"
           echo "api.js from server:"
           echo "-------------------------------------"
@@ -248,7 +249,7 @@ jobs:
           echo "-------------------------------------"
           echo "info.json from server(packageType must be 0):"
           echo "-------------------------------------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
           echo "check WOPI enabled(must be data except 404 Not Found):"
           echo "-------------------------------------"
@@ -266,7 +267,6 @@ jobs:
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
           cat ../config_chrome_linux.json
-          python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
@@ -274,8 +274,7 @@ jobs:
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
           cat ../config_chrome_linux.json
-          python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
 
       - name: Delete Droplet
-        run: doctl compute droplet delete check-rpm-in-repo --force
+        run: doctl compute droplet delete rpm-docker-x64-check --force
