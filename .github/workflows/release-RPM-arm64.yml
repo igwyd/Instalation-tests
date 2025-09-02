@@ -1,4 +1,4 @@
-name: check RPM release arm64
+name: release RPM arm64
 
 on:
   workflow_dispatch:
