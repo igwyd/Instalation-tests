@@ -88,7 +88,7 @@ jobs:
 
       - name: Upgrade server and reboot
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           sudo dnf -y update
           EOF
           aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
@@ -98,7 +98,7 @@ jobs:
 
       - name: Install Docker
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
           sudo apt-get update
           sudo apt-get install ca-certificates curl
@@ -118,7 +118,7 @@ jobs:
 
       - name: Docker run ONLYOFFICE-Docs EE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           docker pull onlyoffice/documentserver-ee
           docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-release onlyoffice/documentserver-ee
           sleep 90
@@ -127,7 +127,7 @@ jobs:
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }}  << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }}  << 'EOF'
           docker exec ds-ee-release sed -i '70,71 s/^/# /' /etc/nginx/includes/ds-docservice.conf
           docker exec ds-ee-release service nginx restart
           sudo apt-get install jq -y
@@ -174,7 +174,7 @@ jobs:
 
       - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           docker stop ds-ee-release
           docker rm ds-ee-release
           docker rmi onlyoffice/documentserver-ee
@@ -186,7 +186,7 @@ jobs:
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           docker exec ds-de-release sed -i '70,71 s/^/# /' /etc/nginx/includes/ds-docservice.conf
           docker exec ds-de-release service nginx restart
 
@@ -229,7 +229,7 @@ jobs:
 
       - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           docker stop ds-de-release
           docker rm ds-de-release
           docker rmi onlyoffice/documentserver-de
@@ -242,7 +242,7 @@ jobs:
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           docker exec ds-release sed -i '70,71 s/^/# /' /etc/nginx/includes/ds-docservice.conf
           docker exec ds-release service nginx restart
 
