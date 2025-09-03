@@ -198,20 +198,18 @@ jobs:
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i "s#\"url\": \"https://doc-linux.teamlab.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
+          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "http://${{ env.EC2_IP }}/example"#' ../config_chrome_linux.json
           sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
           cat ../config_chrome_linux.json
-          python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-          sed -i "s#\"url\": \"https://doc-linux.teamlab.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../providers/wopi/config.json
+          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "http://${{ env.EC2_IP }}/example"#' ../providers/wopi/config.json
           cat ../config_chrome_linux.json
           cat ../providers/wopi/config.json
-          python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
 
       - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
@@ -256,7 +254,6 @@ jobs:
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
           cat ../config_chrome_linux.json
-          python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
@@ -264,7 +261,6 @@ jobs:
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
           cat ../config_chrome_linux.json
-          python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
 
       - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
@@ -309,7 +305,6 @@ jobs:
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
           cat ../config_chrome_linux.json
-          python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
@@ -317,7 +312,6 @@ jobs:
           cd Dep.Tests/puppeteer/engine
           sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
           cat ../config_chrome_linux.json
-          python3 run.py --prcache
           python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
 
       - name: Delete EC2 Instance
