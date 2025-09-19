@@ -16,6 +16,7 @@ jobs:
           APP_USER_PASSWORD: onlyoffice
         ports:
           - 1521:1521
+
       onlyoffice:
         image: onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DOCKER_VERSION }}
         env:
@@ -28,6 +29,8 @@ jobs:
         ports:
           - 80:80
           - 443:443
+        command: >
+          sh -c 'sleep 300 && /app/ds/run-document-server.sh'
 
     steps:
       - uses: actions/checkout@v4
