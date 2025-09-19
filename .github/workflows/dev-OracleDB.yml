@@ -4,8 +4,38 @@ on:
   workflow_dispatch:
 
 jobs:
-  check-docker-deb-x64:
+  oracle-test:
     runs-on: ubuntu-latest
+    services:
+      oracledb:
+        image: container-registry.oracle.com/database/enterprise:21.3.0.0
+        env:
+          ORACLE_SID: onlydb
+          ORACLE_PDB: onlyoffice
+          ORACLE_PWD: onlyoffice
+          ORACLE_EDITION: standart
+          ENABLE_ARCHIVELOG: "true"
+        ports:
+          - 1521:1521
+      onlyoffice:
+        image: onlyoffice/documentserver-ee:9.0.4
+        env:
+          DB_TYPE: oracle
+          DB_HOST: oracledb
+          DB_PORT: 1521
+          DB_NAME: onlyoffice
+          DB_USER: SYSTEM
+          DB_PWD: onlyoffice
+        ports:
+          - 80:80
+          - 443:443
+
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Run tests in a container
+        run: |
+          docker run --rm \
+            --network ${{ job.services.onlyoffice.network }} \
+            curlimages/curl:8.9.1 \
+            curl -vk http://onlyoffice
