@@ -8,23 +8,22 @@ jobs:
     runs-on: ubuntu-latest
     services:
       oracledb:
-        image: container-registry.oracle.com/database/enterprise:21.3.0.0
+        image: gvenzl/oracle-xe:21-slim
         env:
-          ORACLE_SID: onlydb
-          ORACLE_PDB: onlyoffice
-          ORACLE_PWD: onlyoffice
-          ORACLE_EDITION: standart
-          ENABLE_ARCHIVELOG: "true"
+          ORACLE_PASSWORD: admin
+          ORACLE_DATABASE: onlyoffice
+          APP_USER: onlyoffice
+          APP_USER_PASSWORD: onlyoffice
         ports:
           - 1521:1521
       onlyoffice:
-        image: onlyoffice/documentserver-ee:9.0.4
+        image: onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DOCKER_VERSION }}
         env:
           DB_TYPE: oracle
           DB_HOST: oracledb
           DB_PORT: 1521
           DB_NAME: onlyoffice
-          DB_USER: SYSTEM
+          DB_USER: onlyoffice
           DB_PWD: onlyoffice
         ports:
           - 80:80
