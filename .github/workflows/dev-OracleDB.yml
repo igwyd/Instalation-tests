@@ -1,0 +1,11 @@
+name: dev OracleDB load test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-docker-deb-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
