@@ -70,7 +70,7 @@ jobs:
           echo "-------------------------------------"
           echo "info.json from server(packageType must be 1):"
           echo "-------------------------------------"
-          curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
           echo "check WOPI enabled(must be data except 404 Not Found):"
           echo "-------------------------------------"
@@ -124,7 +124,7 @@ jobs:
           echo "-------------------------------------"
           echo "info.json from server(packageType must be 2):"
           echo "-------------------------------------"
-          curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
           echo "check WOPI enabled(must be data except 404 Not Found):"
           echo "-------------------------------------"
@@ -176,7 +176,7 @@ jobs:
           echo "-------------------------------------"
           echo "info.json from server(packageType must be 0):"
           echo "-------------------------------------"
-          curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
           echo "check WOPI enabled(must be data except 404 Not Found):"
           echo "-------------------------------------"
