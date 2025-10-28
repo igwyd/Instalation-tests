@@ -140,7 +140,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << 'EOF'
           sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
-          sudo dnf update onlyoffice-documentserver-ee${{ vars.ONLYOFFICE_RPM_VERSION }} -y
+          sudo dnf update onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
           sudo systemctl restart ds-converter ds-docservice ds-example
           EOF
 
@@ -194,7 +194,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << 'EOF'
           sudo dnf remove onlyoffice-documentserver-ee -y
-          sudo dnf install onlyoffice-documentserver-de${{ vars.ONLYOFFICE_RPM_VERSION }} -y
+          sudo dnf install onlyoffice-documentserver-de-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
           sudo service nginx start
           sudo systemctl enable nginx
           printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
@@ -245,7 +245,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << 'EOF'
           sudo dnf remove onlyoffice-documentserver-de -y
-          sudo dnf install onlyoffice-documentserver${{ vars.ONLYOFFICE_RPM_VERSION }} -y
+          sudo dnf install onlyoffice-documentserver-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
           sudo service nginx start
           sudo systemctl enable nginx
           printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
