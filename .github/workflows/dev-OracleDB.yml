@@ -41,11 +41,10 @@ jobs:
         run: sleep 300
 
       - name: Define ONLYOFFICE container name
-        id: set-name
         run: |
-          CONTAINER_NAME="${GITHUB_JOB}_onlyoffice_1"
-          echo "Container name is: $CONTAINER_NAME"
-          echo "container_name=$CONTAINER_NAME" >> $GITHUB_OUTPUT
+          ONLYOFFICE_CONTAINER_NAME=$(docker ps -a --filter "ancestor=onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}" --format "{{.Names}}")
+          echo "Container name: $ONLYOFFICE_CONTAINER_NAME"
+          echo "ONLYOFFICE_CONTAINER_NAME=$ONLYOFFICE_CONTAINER_NAME" >> $GITHUB_ENV
 
       - name: Run test in a container
         run: |
@@ -56,8 +55,8 @@ jobs:
 
       - name: Add document, dummy_end_points and license for tests
         run: |
-          docker exec ${{ steps.set-name.outputs.container_name }} wget -O /var/www/onlyoffice/documentserver/sample.zip https://nct2.onlyoffice.com/s/y-3qCyC7GkMcYv8
-          docker exec ${{ steps.set-name.outputs.container_name }} unzip /var/www/onlyoffice/documentserver/sample.zip -d /var/www/onlyoffice/documentserver/
+          docker exec $ONLYOFFICE_CONTAINER_NAME wget -O /var/www/onlyoffice/documentserver/sample.zip https://nct2.onlyoffice.com/s/y-3qCyC7GkMcYv8
+          docker exec $ONLYOFFICE_CONTAINER_NAME unzip /var/www/onlyoffice/documentserver/sample.zip -d /var/www/onlyoffice/documentserver/
           printf '{
             "wopi": {
               "dummy" : {
@@ -66,19 +65,19 @@ jobs:
               }
             }
           }\n' > local-production-linux.json
-          docker cp local-production-linux.json ${{ steps.set-name.outputs.container_name }}:/etc/onlyoffice/documentserver/local-production-linux.json
-          docker exec ${{ steps.set-name.outputs.container_name }} supervisorctl restart ds:docservice
-          docker exec ${{ steps.set-name.outputs.container_name }} supervisorctl restart ds:converter
+          docker cp local-production-linux.json $ONLYOFFICE_CONTAINER_NAME:/etc/onlyoffice/documentserver/local-production-linux.json
+          docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:docservice
+          docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:converter
           
           echo "${{ secrets.LICENSE_KEY }}" > license.lic
-          docker cp license.lic ${{ steps.set-name.outputs.container_name }}:/var/www/onlyoffice/Data/license.lic
+          docker cp license.lic $ONLYOFFICE_CONTAINER_NAME:/var/www/onlyoffice/Data/license.lic
 
           echo '--- JSON  ---'
-          docker exec ${{ steps.set-name.outputs.container_name }} cat /etc/onlyoffice/documentserver/local-production-linux.json
+          docker exec $ONLYOFFICE_CONTAINER_NAME cat /etc/onlyoffice/documentserver/local-production-linux.json
           echo '--- Sample.docx in documentserver ---'
-          docker exec ${{ steps.set-name.outputs.container_name }} ls /var/www/onlyoffice/documentserver/
+          docker exec $ONLYOFFICE_CONTAINER_NAME ls /var/www/onlyoffice/documentserver/
           echo '--- license ---'
-          docker exec ${{ steps.set-name.outputs.container_name }} ls /var/www/onlyoffice/Data/
+          docker exec $ONLYOFFICE_CONTAINER_NAME ls /var/www/onlyoffice/Data/
 
       - name: Install pre-requisites for Load test
         run: |
