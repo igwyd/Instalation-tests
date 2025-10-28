@@ -30,12 +30,53 @@ jobs:
           - 80:80
 
     steps:
-      - name: Wait for Oracle DB
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Wait for Oracle DB and ONLYOFFICE to be ready
         run: sleep 300
 
-      - name: Run tests in a container
+      - name: Define ONLYOFFICE container name
+        id: set-name
+        run: |
+          CONTAINER_NAME="${GITHUB_JOB}_onlyoffice_1"
+          echo "Container name is: $CONTAINER_NAME"
+          echo "container_name=$CONTAINER_NAME" >> $GITHUB_OUTPUT
+
+      - name: Run test in a container
         run: |
           docker run --rm \
             --network ${{ job.services.onlyoffice.network }} \
             curlimages/curl:8.9.1 \
-            curl -vk http://onlyoffice
+            curl -vk http://onlyoffice/healthcheck
+
+      - name: Add document, dummy_end_points and license for tests
+        run: |
+          docker exec ${{ steps.set-name.outputs.container_name }} wget -O /var/www/onlyoffice/documentserver/sample.zip https://nct2.onlyoffice.com/s/y-3qCyC7GkMcYv8
+          docker exec ${{ steps.set-name.outputs.container_name }} unzip /var/www/onlyoffice/documentserver/sample.zip -d /var/www/onlyoffice/documentserver/
+          printf '{
+            "wopi": {
+              "dummy" : {
+                "enable": true,
+                "sampleFilePath": "/var/www/onlyoffice/documentserver/sample.docx"
+              }
+            }
+          }\n' > local-production-linux.json
+          docker cp local-production-linux.json ${{ steps.set-name.outputs.container_name }}:/etc/onlyoffice/documentserver/local-production-linux.json
+          docker exec ${{ steps.set-name.outputs.container_name }} supervisorctl restart ds:docservice
+          docker exec ${{ steps.set-name.outputs.container_name }} supervisorctl restart ds:converter
+          
+          echo "${{ secrets.LICENSE_KEY }}" > license.lic
+          docker cp license.lic ${{ steps.set-name.outputs.container_name }}:/var/www/onlyoffice/Data/license.lic
+
+          echo '--- JSON  ---'
+          docker exec ${{ steps.set-name.outputs.container_name }} cat /etc/onlyoffice/documentserver/local-production-linux.json
+          echo '--- Sample.docx in documentserver ---'
+          docker exec ${{ steps.set-name.outputs.container_name }} ls /var/www/onlyoffice/documentserver/
+          echo '--- license ---'
+          docker exec ${{ steps.set-name.outputs.container_name }} ls /var/www/onlyoffice/Data/
+
+      - name: Install pre-requisites for Load test
+        run: |
+          git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
+          cd document-server-stress-testing/K6/
