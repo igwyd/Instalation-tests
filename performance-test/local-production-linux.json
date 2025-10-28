@@ -1,0 +1,8 @@
+{
+    "wopi": {
+        "dummy" : {
+            "enable": true,
+            "sampleFilePath": "/var/www/onlyoffice/documentserver/sample.docx"
+        }
+    }
+}
