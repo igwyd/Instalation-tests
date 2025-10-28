@@ -18,7 +18,7 @@ jobs:
           - 1521:1521
 
       onlyoffice:
-        image: onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DOCKER_VERSION }}
+        image: onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
         env:
           DB_TYPE: oracle
           DB_HOST: oracledb
