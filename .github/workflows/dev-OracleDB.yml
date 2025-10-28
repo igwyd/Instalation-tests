@@ -26,6 +26,8 @@ jobs:
           DB_NAME: onlyoffice
           DB_USER: onlyoffice
           DB_PWD: onlyoffice
+          WOPI_ENABLED: true
+          JWT_SECRET: MYSECRET
         ports:
           - 80:80
 
@@ -57,14 +59,6 @@ jobs:
         run: |
           docker exec $ONLYOFFICE_CONTAINER_NAME wget -O /var/www/onlyoffice/documentserver/sample.zip https://nct2.onlyoffice.com/s/y-3qCyC7GkMcYv8
           docker exec $ONLYOFFICE_CONTAINER_NAME unzip /var/www/onlyoffice/documentserver/sample.zip -d /var/www/onlyoffice/documentserver/
-          printf '{
-            "wopi": {
-              "dummy" : {
-                "enable": true,
-                "sampleFilePath": "/var/www/onlyoffice/documentserver/sample.docx"
-              }
-            }
-          }\n' > local-production-linux.json
           docker cp performance-test/local-production-linux.json $ONLYOFFICE_CONTAINER_NAME:/etc/onlyoffice/documentserver/local-production-linux.json
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:docservice
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:converter
