@@ -33,6 +33,10 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: docker containers status
+        run: |
+          docker ps -a
+
       - name: Wait for Oracle DB and ONLYOFFICE to be ready
         run: sleep 300
 
