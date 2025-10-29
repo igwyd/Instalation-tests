@@ -77,3 +77,26 @@ jobs:
         run: |
           git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
           cd document-server-stress-testing/K6/
+
+          sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "onlyoffice"|' save-changes-document-random-close.json
+          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "http://onlyoffice/wopi/files/docid/contents"|' save-changes-document-random-close.json
+          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "http://onlyoffice/dummyCallback"|' save-changes-document-random-close.json
+          sed -i 's|"jwtSecret": ""|"jwtSecret": "MYSECRET"|' save-changes-document-random-close.json
+
+          echo "------ Updated json ------"
+          cat save-changes-document-random-close.json
+
+      - name: Run K6 load test
+        working-directory: document-server-stress-testing/K6
+        run: |
+          docker run --rm \
+            --network ${{ job.services.onlyoffice.network }} \
+            -v "$(pwd)":/k6 \
+            grafana/k6 run /k6/save-changes-document-random-close.js \
+            --log-output=file=/k6/k6.log \
+            -s "1m:100" -s "9m:100"
+
+      - name: Show k6 log
+        working-directory: document-server-stress-testing/K6
+        run: |
+          cat k6.log
