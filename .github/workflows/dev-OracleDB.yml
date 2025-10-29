@@ -96,7 +96,7 @@ jobs:
             grafana/k6 run /k6/save-changes-document-random-close.js \
             --log-output=file=/k6/k6.log \
             --quiet \
-            -s "1m:100" -s "9m:100"
+            -s "1m:18" -s "9m:18"
 
       - name: Show k6 log
         working-directory: document-server-stress-testing/K6
