@@ -1,4 +1,4 @@
-name: dev OracleDB load test
+name: dev DB Oracle load test
 
 on:
   workflow_dispatch:
