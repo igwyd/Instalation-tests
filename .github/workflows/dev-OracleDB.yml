@@ -63,8 +63,7 @@ jobs:
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:docservice
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:converter
           
-          echo "${{ secrets.LICENSE_KEY }}" > license.lic
-          docker cp license.lic $ONLYOFFICE_CONTAINER_NAME:/var/www/onlyoffice/Data/license.lic
+
 
           echo '--- JSON  ---'
           docker exec $ONLYOFFICE_CONTAINER_NAME cat /etc/onlyoffice/documentserver/local-production-linux.json
