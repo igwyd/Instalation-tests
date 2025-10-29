@@ -94,7 +94,6 @@ jobs:
             --network ${{ job.services.onlyoffice.network }} \
             -v "$(pwd)":/k6 \
             grafana/k6 run /k6/save-changes-document-random-close.js \
-            --log-output=file=/k6/k6.log \
             --quiet \
             -s "1m:18" -s "9m:18"
 
