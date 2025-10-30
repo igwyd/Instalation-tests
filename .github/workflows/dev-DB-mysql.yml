@@ -1,0 +1,106 @@
+name: dev DB mysql load test
+
+on:
+  schedule:
+    - cron: '0 12 * * 3'  # Wednesday 15:00 Mosсow time (UTC+3)
+  workflow_dispatch:
+
+jobs:
+  mysql-test:
+    runs-on: ubuntu-latest
+    services:
+      mysqldb:
+        image: mysql:latest
+        env:
+          MYSQL_ROOT_PASSWORD: onlyoffice
+          MYSQL_DATABASE: onlyoffice
+          MYSQL_USER: onlyoffice
+          MYSQL_PASSWORD: onlyoffice
+        ports:
+          - 3306:3306
+
+      onlyoffice:
+        image: onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
+        env:
+          DB_TYPE: mysql
+          DB_HOST: mysqldb
+          DB_PORT: 3306
+          DB_NAME: onlyoffice
+          DB_USER: onlyoffice
+          DB_PWD: onlyoffice
+          WOPI_ENABLED: true
+          JWT_SECRET: MYSECRET
+        ports:
+          - 80:80
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: docker containers status
+        run: |
+          docker ps -a
+
+      - name: Wait for mysql DB and ONLYOFFICE to be ready
+        run: sleep 180
+
+      - name: Define ONLYOFFICE container name
+        run: |
+          ONLYOFFICE_CONTAINER_NAME=$(docker ps -a --filter "ancestor=onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}" --format "{{.Names}}")
+          echo "Container name: $ONLYOFFICE_CONTAINER_NAME"
+          echo "ONLYOFFICE_CONTAINER_NAME=$ONLYOFFICE_CONTAINER_NAME" >> $GITHUB_ENV
+
+      - name: Run test in a container
+        run: |
+          docker run --rm \
+            --network ${{ job.services.onlyoffice.network }} \
+            curlimages/curl:8.9.1 \
+            curl -vk http://onlyoffice/healthcheck
+
+      - name: Add document, dummy_end_points and license for tests
+        run: |
+          docker exec $ONLYOFFICE_CONTAINER_NAME wget -O /var/www/onlyoffice/documentserver/sample.zip https://nct2.onlyoffice.com/s/y-3qCyC7GkMcYv8
+          docker exec $ONLYOFFICE_CONTAINER_NAME unzip /var/www/onlyoffice/documentserver/sample.zip -d /var/www/onlyoffice/documentserver/
+          docker cp performance-test/local-production-linux.json $ONLYOFFICE_CONTAINER_NAME:/etc/onlyoffice/documentserver/local-production-linux.json
+          docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:docservice
+          docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:converter
+          
+          cat <<'EOF' > license.lic
+          ${{ secrets.LICENSE_KEY }}
+          EOF
+          docker cp license.lic $ONLYOFFICE_CONTAINER_NAME:/var/www/onlyoffice/Data/license.lic
+
+          echo '--- JSON  ---'
+          docker exec $ONLYOFFICE_CONTAINER_NAME cat /etc/onlyoffice/documentserver/local-production-linux.json
+          echo '--- Sample.docx in documentserver ---'
+          docker exec $ONLYOFFICE_CONTAINER_NAME ls /var/www/onlyoffice/documentserver/
+          echo '--- license ---'
+          docker exec $ONLYOFFICE_CONTAINER_NAME ls /var/www/onlyoffice/Data/
+
+      - name: Install pre-requisites for Load test
+        run: |
+          git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
+          cd document-server-stress-testing/K6/
+
+          sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "onlyoffice"|' save-changes-document-random-close.json
+          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "http://onlyoffice/wopi/files/docid/contents"|' save-changes-document-random-close.json
+          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "http://onlyoffice/dummyCallback"|' save-changes-document-random-close.json
+          sed -i 's|"jwtSecret": ""|"jwtSecret": "MYSECRET"|' save-changes-document-random-close.json
+
+          echo "------ Updated json ------"
+          cat save-changes-document-random-close.json
+
+      - name: Run K6 load test
+        working-directory: document-server-stress-testing/K6
+        run: |
+          docker run --rm \
+            -u "$(id -u):$(id -g)" \
+            --network ${{ job.services.onlyoffice.network }} \
+            -v "$(pwd)":/k6 \
+            grafana/k6 run /k6/save-changes-document-random-close.js \
+            --quiet \
+            -s "1m:500" -s "9m:500"
+
+      - name: Documentserver logs
+        run: |
+          docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
