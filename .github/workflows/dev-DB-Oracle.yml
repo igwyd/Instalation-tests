@@ -1,6 +1,8 @@
 name: dev DB Oracle load test
 
 on:
+  schedule:
+    - cron: '0 12 * * 3'  # Wednesday 15:00 Mosсow time (UTC+3)
   workflow_dispatch:
 
 jobs:
