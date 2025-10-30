@@ -9,7 +9,7 @@ Tested version **<!-- onlyoffice-version-start -->v9.2.0-25<!-- onlyoffice-versi
 Tested version **<!-- onlyoffice-version-start -->v9.2.0-25<!-- onlyoffice-version-end -->** \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-arm64.yml/badge.svg?branch=main)  
-### Tests with Oracle DB
+### Load tests with DataBases
 Tested version **<!-- onlyoffice-version-start -->v9.2.0-25<!-- onlyoffice-version-end -->** \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OracleDB.yml/badge.svg?branch=main)  
 ## Release
