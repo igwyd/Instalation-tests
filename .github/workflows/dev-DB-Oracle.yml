@@ -100,3 +100,7 @@ jobs:
             grafana/k6 run /k6/save-changes-document-random-close.js \
             --quiet \
             -s "1m:500" -s "9m:500"
+
+      - name: Documentserver logs
+        run: |
+          docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
