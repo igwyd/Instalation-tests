@@ -1,4 +1,4 @@
-name: dev DB postgre load test
+name: dev DB postgres load test
 
 on:
   schedule:
@@ -6,11 +6,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  postgre-test:
+  postgres-test:
     runs-on: ubuntu-latest
     services:
-      postgredb:
-        image: postgre:latest
+      postgresdb:
+        image: postgres:latest
         env:
           POSTGRES_DB: onlyoffice
           POSTGRES_USER: onlyoffice
@@ -21,8 +21,8 @@ jobs:
       onlyoffice:
         image: onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
         env:
-          DB_TYPE: postgre
-          DB_HOST: postgredb
+          DB_TYPE: postgres
+          DB_HOST: postgresdb
           DB_PORT: 3306
           DB_NAME: onlyoffice
           DB_USER: onlyoffice
@@ -40,7 +40,7 @@ jobs:
         run: |
           docker ps -a
 
-      - name: Wait for postgre DB and ONLYOFFICE to be ready
+      - name: Wait for postgres DB and ONLYOFFICE to be ready
         run: sleep 180
 
       - name: Define ONLYOFFICE container name
