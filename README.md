@@ -13,6 +13,7 @@ Tested version **<!-- onlyoffice-version-start -->v9.2.0-25<!-- onlyoffice-versi
 Tested version **<!-- onlyoffice-version-start -->v9.2.0-25<!-- onlyoffice-version-end -->** \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-Oracle.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mysql.yml/badge.svg?branch=main)  
+![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mssql.yml/badge.svg?branch=main)  
 ## Release
 ### Check DEB version in current release repo, installation guide from helpcenter 
 Test DEB package installation ONLYOFFICE-Docs EE, DE and CE from released repo. \
