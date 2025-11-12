@@ -2,15 +2,15 @@
 ONLYOFFICE-Docs installation checks
 ## Develop
 ### DEB installation, install from manual (Scheduled every wednesday at 15:00 UTC+3)
-Tested version **<!-- onlyoffice-version-start -->v9.2.0-54<!-- onlyoffice-version-end -->** \
+Tested version **<!-- onlyoffice-version-start -->v9.2.0-62<!-- onlyoffice-version-end -->** \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-arm64.yml/badge.svg?branch=main)  
 ### RPM installation, install from manual (Scheduled every wednesday at 15:00 UTC+3)
-Tested version **<!-- onlyoffice-version-start -->v9.2.0-54<!-- onlyoffice-version-end -->** \
+Tested version **<!-- onlyoffice-version-start -->v9.2.0-62<!-- onlyoffice-version-end -->** \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-arm64.yml/badge.svg?branch=main)  
 ### Load tests with DataBases (Scheduled every wednesday at 15:00 UTC+3)
-Tested version **<!-- onlyoffice-version-start -->v9.2.0-54<!-- onlyoffice-version-end -->** \
+Tested version **<!-- onlyoffice-version-start -->v9.2.0-62<!-- onlyoffice-version-end -->** \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-Oracle.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mysql.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mssql.yml/badge.svg?branch=main)  
