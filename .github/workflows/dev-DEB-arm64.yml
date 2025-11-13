@@ -428,7 +428,7 @@ jobs:
 
       - name: Update ONLYOFFICE-EE to the DEV
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
           sudo apt-get update
           sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y
