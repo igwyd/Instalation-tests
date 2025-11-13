@@ -66,7 +66,7 @@ jobs:
       - name: Change EC2_IP on the PROXY
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
-          sudo sed -i "s/server [0-9.]*;/server 54.234.188.198;/" /etc/nginx/sites-enabled/oods_default_and_ds-vpath
+          sudo sed -i "s/server [0-9.:]*;/server 127.0.0.1:8080;/" /etc/nginx/sites-enabled/oods_default_and_ds-vpath
           sudo systemctl reload nginx
           head /etc/nginx/sites-enabled/oods_default_and_ds-vpath
           EOF
@@ -74,8 +74,35 @@ jobs:
       - name: Docker run ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
-          docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
-          docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-release onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
-          sleep 90
-          docker exec ds-ee-release supervisorctl start all
+          sudo docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
+          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
+          sleep 120
+          sudo docker exec ds-ee-dev supervisorctl start all
+          echo "-------------------------------------"
+          curl -s https://oods.div-proxy.qa-onlyoffice.net/healthcheck
+          echo "-------------------------------------"
+          EOF
+
+      - name: Change Redis unix.sock configuration
+        run: |
+          scp -o StrictHostKeyChecking=no redis/redis-unix-sock/local-production-linux.json ubuntu@$54.234.188.198:/home/ubuntu/redis-unix-sock/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@$54.234.188.198 << 'EOF'
+          sudo docker exec ds-ee-dev bash -c "
+            sed -i 's/^port .*/port 0/' /etc/redis/redis.conf
+            echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf
+            echo 'unixsocketperm 777' >> /etc/redis/redis.conf
+            service redis-server restart
+          "
+          echo "-------------------------------------"
+          sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping
+          echo "-------------------------------------"
+
+
+          sudo docker cp /home/ubuntu/redis-unix-sock/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
+          sudo docker exec ds-ee-dev supervisorctl restart all
+          echo "-------------------------------------"
+          curl -s https://oods.div-proxy.qa-onlyoffice.net/healthcheck
+          echo "-------------------------------------"
+          rm /home/ubuntu/redis-unix-sock/local-production-linux.json
           EOF
