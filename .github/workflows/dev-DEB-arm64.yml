@@ -92,7 +92,7 @@ jobs:
       - name: Change EC2_IP on the PROXY
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
-          sudo sed -i "s/server [0-9.]*;/server ${{ env.EC2_IP }};/" /etc/nginx/sites-enabled/oods_default_and_ds-vpath
+          sudo sed -i "s/server [0-9.:]*;/server ${{ env.EC2_IP }};/" /etc/nginx/sites-enabled/oods_default_and_ds-vpath
           sudo systemctl reload nginx
           head /etc/nginx/sites-enabled/oods_default_and_ds-vpath
           EOF
