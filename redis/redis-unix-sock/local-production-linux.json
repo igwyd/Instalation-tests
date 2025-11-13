@@ -1,0 +1,11 @@
+{
+    "services": {
+        "CoAuthoring": {
+            "redis": {
+                "name": "redis",
+                "host": "/run/redis/redis-server.sock",
+                "port": 0
+            }
+        }
+    }
+}

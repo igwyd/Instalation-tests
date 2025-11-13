@@ -1,0 +1,14 @@
+{
+    "services": {
+        "CoAuthoring": {
+            "redis": {
+                "name": "ioredis",
+                "host": "",
+                "port": 0,
+                "iooptions": {
+                    "path": "/run/redis/redis-server.sock"
+                }
+            }
+        }
+    }
+}
