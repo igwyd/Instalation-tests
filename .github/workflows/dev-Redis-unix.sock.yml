@@ -82,28 +82,25 @@ jobs:
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
           sleep 120
           sudo docker exec ds-ee-dev supervisorctl start all
-          echo "-------------------------------------"
+          echo "---------- ds healthcheck -----------"
           curl -s https://oods.div-proxy.qa-onlyoffice.net/healthcheck
+          echo
           echo "-------------------------------------"
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
-          echo "Installed packages:"
-          echo "-------------------------------------"
+          echo "-------"Installed packages:"-----_--"
           sudo docker exec ds-ee-dev dpkg-query -l | grep onlyoffice-documentserver
           echo "-------------------------------------"
-          echo "api.js from server:"
-          echo "-------------------------------------"
+          echo "--------"api.js from server:"--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "-------------------------------------"
-          echo "info.json from server(packageType must be 1):"
-          echo "-------------------------------------"
+          echo "-------packageType must be 1:--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
-          echo "check WOPI enabled(must be data except 404 Not Found):"
-          echo "-------------------------------------"
+          echo "---------check WOPI enabled----------"
           output=$(curl -s http://127.0.0.1:8080/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
@@ -111,8 +108,7 @@ jobs:
             echo "$output"
           fi
           echo "-------------------------------------"
-          echo "check WOPI HTTPS(must be data except 404 Not Found):"
-          echo "-------------------------------------"
+          echo "---------check WOPI enabled----------"
           output=$(curl -s https://oods.div-proxy.qa-onlyoffice.net/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
@@ -131,8 +127,10 @@ jobs:
             echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf
             echo 'unixsocketperm 777' >> /etc/redis/redis.conf
             pkill -f 'redis-server'
-            service 'redis-server' start
           "
+          sleep 10
+          sudo docker exec ds-ee-dev service redis-server start
+
           echo "------------ Redis ping -------------"
           sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping
           echo "-------------------------------------"
@@ -146,6 +144,7 @@ jobs:
           sleep 10
           echo "---------- ds healthcheck -----------"
           curl -s https://oods.div-proxy.qa-onlyoffice.net/healthcheck
+          echo
           echo "-------------------------------------"
           rm /home/ubuntu/redis-unix-sock/local-production-linux.json
           EOF
@@ -191,8 +190,9 @@ jobs:
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
           sleep 120
           sudo docker exec ds-ee-dev supervisorctl start all
-          echo "-------------------------------------"
+          echo "---------- ds healthcheck -----------"
           curl -s https://oods.div-proxy.qa-onlyoffice.net/healthcheck
+          echo
           echo "-------------------------------------"
           EOF
 
@@ -205,8 +205,10 @@ jobs:
             echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf
             echo 'unixsocketperm 777' >> /etc/redis/redis.conf
             pkill -f 'redis-server'
-            service 'redis-server' start
           "
+          sleep 10
+          sudo docker exec ds-ee-dev service redis-server start
+
           echo "------------ Redis ping -------------"
           sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping
           echo "-------------------------------------"
@@ -220,6 +222,7 @@ jobs:
           sleep 10
           echo "---------- ds healthcheck -----------"
           curl -s https://oods.div-proxy.qa-onlyoffice.net/healthcheck
+          echo
           echo "-------------------------------------"
           rm /home/ubuntu/ioredis-unix-sock/local-production-linux.json
           EOF
