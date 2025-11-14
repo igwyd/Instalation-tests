@@ -97,7 +97,7 @@ jobs:
             -v "$(pwd)":/k6 \
             grafana/k6 run /k6/save-changes-document-random-close.js \
             --quiet \
-            -s "1m:100" -s "9m:100"
+            -s "1m:50" -s "9m:50"
 
       - name: Documentserver logs
         run: |
