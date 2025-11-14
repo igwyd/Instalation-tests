@@ -168,11 +168,12 @@ jobs:
           python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
           python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
 
-      - name: Logs work with REDIS
-        run: sudo docker logs -f ds-ee-dev
-
-      - name: Delete container ONLYOFFICE-Docs EE
-        run: sudo docker rm -fv ds-ee-dev
+      - name: Logs work with REDIS and remove container
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
+          sudo docker logs -n 1000 ds-ee-dev
+          sudo docker rm -fv ds-ee-dev
+          EOF
 
       - name: Docker run ONLYOFFICE-Docs EE for test IOREDIS
         run: |
@@ -231,8 +232,9 @@ jobs:
           python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
           python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
 
-      - name: Logs work with IOREDIS
-        run: sudo docker logs -f ds-ee-dev
-
-      - name: Delete container ONLYOFFICE-Docs EE
-        run: sudo docker rm -fv ds-ee-dev
+      - name: Logs work with IOREDIS and remove container
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
+          sudo docker logs -n 1000 ds-ee-dev
+          sudo docker rm -fv ds-ee-dev
+          EOF
