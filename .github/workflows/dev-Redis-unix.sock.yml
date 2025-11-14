@@ -124,17 +124,21 @@ jobs:
             sed -i 's/^port .*/port 0/' /etc/redis/redis.conf
             echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf
             echo 'unixsocketperm 777' >> /etc/redis/redis.conf
-            service redis-server restart
+            pkill -f 'redis-server'
+            service 'redis-server' start
           "
-          echo "-------------------------------------"
+          echo "------------ Redis ping -------------"
           sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping
+          echo "-------------------------------------"
+          echo "------------ Redis ps -------------"
+          sudo docker exec ds-ee-dev ps -aux | grep -i redis
           echo "-------------------------------------"
 
           sudo docker cp /home/ubuntu/redis-unix-sock/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
           sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
           sudo docker exec ds-ee-dev supervisorctl restart all
           sleep 10
-          echo "-------------------------------------"
+          echo "---------- ds healthcheck -----------"
           curl -s https://oods.div-proxy.qa-onlyoffice.net/healthcheck
           echo "-------------------------------------"
           rm /home/ubuntu/redis-unix-sock/local-production-linux.json
@@ -194,14 +198,21 @@ jobs:
             sed -i 's/^port .*/port 0/' /etc/redis/redis.conf
             echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf
             echo 'unixsocketperm 777' >> /etc/redis/redis.conf
-            service redis-server restart
+            pkill -f 'redis-server'
+            service 'redis-server' start
           "
+          echo "------------ Redis ping -------------"
+          sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping
+          echo "-------------------------------------"
+          echo "------------ Redis ps -------------"
+          sudo docker exec ds-ee-dev ps -aux | grep -i redis
+          echo "-------------------------------------"
 
           sudo docker cp /home/ubuntu/ioredis-unix-sock/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
           sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
           sudo docker exec ds-ee-dev supervisorctl restart all
           sleep 10
-          echo "-------------------------------------"
+          echo "---------- ds healthcheck -----------"
           curl -s https://oods.div-proxy.qa-onlyoffice.net/healthcheck
           echo "-------------------------------------"
           rm /home/ubuntu/ioredis-unix-sock/local-production-linux.json
@@ -239,7 +250,7 @@ jobs:
           sudo docker rm -fv ds-ee-dev
           EOF
 
-      - name: Clean docker
+      - name: Clean docker data
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
           sudo docker system prune -af
