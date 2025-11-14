@@ -133,6 +133,7 @@ jobs:
           sudo docker cp /home/ubuntu/redis-unix-sock/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
           sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
           sudo docker exec ds-ee-dev supervisorctl restart all
+          sleep 10
           echo "-------------------------------------"
           curl -s https://oods.div-proxy.qa-onlyoffice.net/healthcheck
           echo "-------------------------------------"
@@ -199,6 +200,7 @@ jobs:
           sudo docker cp /home/ubuntu/ioredis-unix-sock/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
           sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
           sudo docker exec ds-ee-dev supervisorctl restart all
+          sleep 10
           echo "-------------------------------------"
           curl -s https://oods.div-proxy.qa-onlyoffice.net/healthcheck
           echo "-------------------------------------"
