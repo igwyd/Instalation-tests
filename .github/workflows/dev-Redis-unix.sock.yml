@@ -69,6 +69,12 @@ jobs:
           head /etc/nginx/sites-enabled/oods_default_and_ds-vpath
           EOF
 
+      - name: Clean docker data before testing
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
+          sudo docker system prune -af
+          EOF
+
       - name: Docker run ONLYOFFICE-Docs EE for test REDIS
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
@@ -250,7 +256,7 @@ jobs:
           sudo docker rm -fv ds-ee-dev
           EOF
 
-      - name: Clean docker data
+      - name: Clean docker data after testing
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
           sudo docker system prune -af
