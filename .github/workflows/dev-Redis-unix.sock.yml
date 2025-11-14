@@ -71,7 +71,7 @@ jobs:
           head /etc/nginx/sites-enabled/oods_default_and_ds-vpath
           EOF
 
-      - name: Docker run ONLYOFFICE-Docs EE
+      - name: Docker run ONLYOFFICE-Docs EE for test REDIS
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
           sudo docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
@@ -83,10 +83,47 @@ jobs:
           echo "-------------------------------------"
           EOF
 
-      - name: Change Redis unix.sock configuration
+      - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
-          scp -o StrictHostKeyChecking=no redis/redis-unix-sock/local-production-linux.json ubuntu@$54.234.188.198:/home/ubuntu/redis-unix-sock/local-production-linux.json
-          ssh -o StrictHostKeyChecking=no ubuntu@$54.234.188.198 << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
+          echo "Installed packages:"
+          echo "-------------------------------------"
+          sudo docker exec ds-ee-dev dpkg-query -l | grep onlyoffice-documentserver
+          echo "-------------------------------------"
+          echo "api.js from server:"
+          echo "-------------------------------------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "-------------------------------------"
+          echo "info.json from server(packageType must be 1):"
+          echo "-------------------------------------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------------------------------"
+          echo "check WOPI enabled(must be data except 404 Not Found):"
+          echo "-------------------------------------"
+          sudo docker exec ds-ee-dev bash -c "
+            output=$(curl -s http://127.0.0.1/hosting/discovery)
+            if echo "$output" | grep -q 'value='; then
+              echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
+            else
+              echo "$output"
+            fi
+          "
+          echo "-------------------------------------"
+          echo "check WOPI HTTPS(must be data except 404 Not Found):"
+          echo "-------------------------------------"
+          output=$(curl -s https://oods.div-proxy.qa-onlyoffice.net/hosting/discovery)
+          if echo "$output" | grep -q 'value='; then
+            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
+          else
+            echo "$output"
+          fi
+          echo "-------------------------------------"
+          EOF
+
+      - name: Change REDIS unix.sock configuration
+        run: |
+          scp -o StrictHostKeyChecking=no redis/redis-unix-sock/local-production-linux.json ubuntu@54.234.188.198:/home/ubuntu/redis-unix-sock/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
           sudo docker exec ds-ee-dev bash -c "
             sed -i 's/^port .*/port 0/' /etc/redis/redis.conf
             echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf
@@ -97,7 +134,6 @@ jobs:
           sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping
           echo "-------------------------------------"
 
-
           sudo docker cp /home/ubuntu/redis-unix-sock/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
           sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
           sudo docker exec ds-ee-dev supervisorctl restart all
@@ -106,3 +142,99 @@ jobs:
           echo "-------------------------------------"
           rm /home/ubuntu/redis-unix-sock/local-production-linux.json
           EOF
+
+      - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "https://oods.div-proxy.qa-onlyoffice.net/example"#' ../config_chrome_linux.json
+          sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+
+      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "https://oods.div-proxy.qa-onlyoffice.net/example"#' ../providers/wopi/config.json
+          cat ../config_chrome_linux.json
+          cat ../providers/wopi/config.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+
+      - name: Logs work with REDIS
+        run: sudo docker logs -f ds-ee-dev
+
+      - name: Delete container ONLYOFFICE-Docs EE
+        run: sudo docker rm -fv ds-ee-dev
+
+      - name: Docker run ONLYOFFICE-Docs EE for test IOREDIS
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
+          sudo docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
+          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
+          sleep 120
+          sudo docker exec ds-ee-dev supervisorctl start all
+          echo "-------------------------------------"
+          curl -s https://oods.div-proxy.qa-onlyoffice.net/healthcheck
+          echo "-------------------------------------"
+          EOF
+
+      - name: Change IOREDIS unix.sock configuration
+        run: |
+          scp -o StrictHostKeyChecking=no redis/ioredis-unix-sock/local-production-linux.json ubuntu@54.234.188.198:/home/ubuntu/ioredis-unix-sock/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
+          sudo docker exec ds-ee-dev bash -c "
+            sed -i 's/^port .*/port 0/' /etc/redis/redis.conf
+            echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf
+            echo 'unixsocketperm 777' >> /etc/redis/redis.conf
+            service redis-server restart
+          "
+
+          sudo docker cp /home/ubuntu/ioredis-unix-sock/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
+          sudo docker exec ds-ee-dev supervisorctl restart all
+          echo "-------------------------------------"
+          curl -s https://oods.div-proxy.qa-onlyoffice.net/healthcheck
+          echo "-------------------------------------"
+          rm /home/ubuntu/ioredis-unix-sock/local-production-linux.json
+          EOF
+
+      - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+
+      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
+          cat ../providers/wopi/config.json
+          python3 run.py --prcache
+          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+
+      - name: Logs work with IOREDIS
+        run: sudo docker logs -f ds-ee-dev
+
+      - name: Delete container ONLYOFFICE-Docs EE
+        run: sudo docker rm -fv ds-ee-dev
