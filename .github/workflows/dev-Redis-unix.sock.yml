@@ -238,3 +238,9 @@ jobs:
           sudo docker logs -n 1000 ds-ee-dev
           sudo docker rm -fv ds-ee-dev
           EOF
+
+      - name: Clean docker
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
+          sudo docker system prune -af
+          EOF
