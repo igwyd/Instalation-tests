@@ -100,14 +100,12 @@ jobs:
           echo "-------------------------------------"
           echo "check WOPI enabled(must be data except 404 Not Found):"
           echo "-------------------------------------"
-          sudo docker exec ds-ee-dev bash -c "
-            output=$(curl -s http://127.0.0.1/hosting/discovery)
-            if echo "$output" | grep -q 'value='; then
-              echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-            else
-              echo "$output"
-            fi
-          "
+          output=$(curl -s http://127.0.0.1:8080/hosting/discovery)
+          if echo "$output" | grep -q 'value='; then
+            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
+          else
+            echo "$output"
+          fi
           echo "-------------------------------------"
           echo "check WOPI HTTPS(must be data except 404 Not Found):"
           echo "-------------------------------------"
