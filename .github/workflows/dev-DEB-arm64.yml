@@ -435,7 +435,7 @@ jobs:
           sudo systemctl restart ds-example
           EOF
 
-      - name: Info about installed Package, must be ONLYOFFICE-Docs EE RELEASE
+      - name: Info about installed Package, must be ONLYOFFICE-Docs EE DEV
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "Installed packages:"
