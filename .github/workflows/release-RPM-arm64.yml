@@ -49,7 +49,7 @@ jobs:
       - name: Create EC2 Instance
         run: |
           INSTANCE_ID=$(aws ec2 run-instances \
-            --image-id ami-09373db3d247551a0 \
+            --image-id ami-04db3c91a597912d6 \
             --instance-type t4g.medium \
             --key-name demin \
             --security-groups AllPortsOpened \
