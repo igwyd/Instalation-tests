@@ -171,7 +171,7 @@ jobs:
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "https://${{ env.EC2_IP }}/example"#' ../config_chrome_linux.json
+          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "http://${{ env.EC2_IP }}/example"#' ../config_chrome_linux.json
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"

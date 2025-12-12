@@ -145,7 +145,7 @@ jobs:
       - name: Smoke puppeteer API tests
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "https://127.0.0.1/example"#' ../config_chrome_linux.json
+          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "http://127.0.0.1/example"#' ../config_chrome_linux.json
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
