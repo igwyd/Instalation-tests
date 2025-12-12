@@ -89,14 +89,6 @@ jobs:
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
 
-      - name: Change EC2_IP on the PROXY
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
-          sudo sed -i "s/server [0-9.:]*;/server ${{ env.EC2_IP }};/" /etc/nginx/sites-enabled/oods_default_and_ds-vpath
-          sudo systemctl reload nginx
-          head /etc/nginx/sites-enabled/oods_default_and_ds-vpath
-          EOF
-
       - name: Upgrade DEB packages
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
@@ -138,7 +130,9 @@ jobs:
           echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
           sudo apt-get update
           sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y
-          sudo systemctl restart ds-example
+          sleep 30
+          sudo systemctl start ds-example
+          sleep 10
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
@@ -147,20 +141,16 @@ jobs:
 
           sudo apt-get install jq -y
 
-          echo "Installed packages:"
-          echo "-------------------------------------"
+          echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "-------------------------------------"
-          echo "api.js from server:"
-          echo "-------------------------------------"
+          echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "-------------------------------------"
-          echo "info.json from server(packageType must be 1):"
-          echo "-------------------------------------"
+          echo "--------packageType must be 1--------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
-          echo "check WOPI local enabled(must be data except 404 Not Found):"
-          echo "-------------------------------------"
+          echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
@@ -168,9 +158,8 @@ jobs:
             echo "$output"
           fi
           echo "-------------------------------------"
-          echo "check WOPI HTTPS(must be data except 404 Not Found):"
-          echo "-------------------------------------"
-          output=$(curl -s https://oods.div-proxy.qa-onlyoffice.net/hosting/discovery)
+          echo "------------WOPI external------------"
+          output=$(curl -s https://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -182,29 +171,21 @@ jobs:
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "https://oods.div-proxy.qa-onlyoffice.net/example"#' ../config_chrome_linux.json
-          sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
-          cat ../config_chrome_linux.json
+          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "https://${{ env.EC2_IP }}/example"#' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
           python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "https://oods.div-proxy.qa-onlyoffice.net/example"#' ../providers/wopi/config.json
-          cat ../config_chrome_linux.json
-          cat ../providers/wopi/config.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
           python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
       - name: Remove ONLYOFFICE-Docs EE
         run: |
@@ -231,20 +212,16 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
-          echo "Installed packages:"
-          echo "-------------------------------------"
+          echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "-------------------------------------"
-          echo "api.js from server:"
-          echo "-------------------------------------"
+          echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "-------------------------------------"
-          echo "info.json from server(packageType must be 2):"
-          echo "-------------------------------------"
+          echo "--------packageType must be 2--------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
-          echo "check WOPI enabled(must be data except 404 Not Found):"
-          echo "-------------------------------------"
+          echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
@@ -252,9 +229,8 @@ jobs:
             echo "$output"
           fi
           echo "-------------------------------------"
-          echo "check WOPI HTTPS(must be data except 404 Not Found):"
-          echo "-------------------------------------"
-          output=$(curl -s https://oods.div-proxy.qa-onlyoffice.net/hosting/discovery)
+          echo "------------WOPI external------------"
+          output=$(curl -s https://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -266,26 +242,20 @@ jobs:
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
-          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
           python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
           python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
       - name: Remove ONLYOFFICE-Docs DE
         run: |
@@ -312,20 +282,16 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
-          echo "Installed packages:"
-          echo "-------------------------------------"
+          echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "-------------------------------------"
-          echo "api.js from server:"
-          echo "-------------------------------------"
+          echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "-------------------------------------"
-          echo "info.json from server(packageType must be 0):"
-          echo "-------------------------------------"
+          echo "--------packageType must be 0--------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
-          echo "check WOPI enabled(must be data except 404 Not Found):"
-          echo "-------------------------------------"
+          echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
@@ -333,9 +299,8 @@ jobs:
             echo "$output"
           fi
           echo "-------------------------------------"
-          echo "check WOPI HTTPS(must be data except 404 Not Found):"
-          echo "-------------------------------------"
-          output=$(curl -s https://oods.div-proxy.qa-onlyoffice.net/hosting/discovery)
+          echo "------------WOPI external------------"
+          output=$(curl -s https://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -347,26 +312,20 @@ jobs:
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
-          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
           python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
           python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
       - name: Remove ONLYOFFICE-Docs CE
         run: |
@@ -394,20 +353,20 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE RELEASE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
-          echo "Installed packages:"
+          echo "------------JWT settings-------------"
+          jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
+          jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
           echo "-------------------------------------"
+          echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "-------------------------------------"
-          echo "api.js from server:"
-          echo "-------------------------------------"
+          echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "-------------------------------------"
-          echo "info.json from server(packageType must be 1):"
-          echo "-------------------------------------"
+          echo "--------packageType must be 1--------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
-          echo "check WOPI enabled(must be data except 404 Not Found):"
-          echo "-------------------------------------"
+          echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
@@ -415,9 +374,8 @@ jobs:
             echo "$output"
           fi
           echo "-------------------------------------"
-          echo "check WOPI HTTPS(must be data except 404 Not Found):"
-          echo "-------------------------------------"
-          output=$(curl -s https://oods.div-proxy.qa-onlyoffice.net/hosting/discovery)
+          echo "------------WOPI external------------"
+          output=$(curl -s https://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -438,20 +396,20 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE DEV
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
-          echo "Installed packages:"
+          echo "------------JWT settings-------------"
+          jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
+          jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
           echo "-------------------------------------"
+          echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "-------------------------------------"
-          echo "api.js from server:"
-          echo "-------------------------------------"
+          echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "-------------------------------------"
-          echo "info.json from server(packageType must be 1):"
-          echo "-------------------------------------"
+          echo "--------packageType must be 1--------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------------------------------"
-          echo "check WOPI enabled(must be data except 404 Not Found):"
-          echo "-------------------------------------"
+          echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
@@ -459,9 +417,8 @@ jobs:
             echo "$output"
           fi
           echo "-------------------------------------"
-          echo "check WOPI HTTPS(must be data except 404 Not Found):"
-          echo "-------------------------------------"
-          output=$(curl -s https://oods.div-proxy.qa-onlyoffice.net/hosting/discovery)
+          echo "------------WOPI external------------"
+          output=$(curl -s https://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -470,29 +427,26 @@ jobs:
           echo "-------------------------------------"
           EOF
 
+
+
+
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
-          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
           python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
           python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
       - name: Delete EC2 Instance
         run: |
