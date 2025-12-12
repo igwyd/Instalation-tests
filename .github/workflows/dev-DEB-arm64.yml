@@ -159,7 +159,7 @@ jobs:
           fi
           echo "-------------------------------------"
           echo "------------WOPI external------------"
-          output=$(curl -s https://${{ env.EC2_IP }}/hosting/discovery)
+          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -230,7 +230,7 @@ jobs:
           fi
           echo "-------------------------------------"
           echo "------------WOPI external------------"
-          output=$(curl -s https://${{ env.EC2_IP }}/hosting/discovery)
+          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -300,7 +300,7 @@ jobs:
           fi
           echo "-------------------------------------"
           echo "------------WOPI external------------"
-          output=$(curl -s https://${{ env.EC2_IP }}/hosting/discovery)
+          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -375,7 +375,7 @@ jobs:
           fi
           echo "-------------------------------------"
           echo "------------WOPI external------------"
-          output=$(curl -s https://${{ env.EC2_IP }}/hosting/discovery)
+          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -418,7 +418,7 @@ jobs:
           fi
           echo "-------------------------------------"
           echo "------------WOPI external------------"
-          output=$(curl -s https://${{ env.EC2_IP }}/hosting/discovery)
+          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
