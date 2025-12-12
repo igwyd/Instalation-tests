@@ -56,6 +56,10 @@ jobs:
             curlimages/curl:8.9.1 \
             curl -vk http://onlyoffice/healthcheck
 
+      - name: Documentserver logs 1
+        run: |
+          docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
+
       - name: Add document, dummy_end_points and license for tests
         run: |
           docker exec $ONLYOFFICE_CONTAINER_NAME wget -O /var/www/onlyoffice/documentserver/sample.zip https://nct2.onlyoffice.com/s/y-3qCyC7GkMcYv8
@@ -76,6 +80,10 @@ jobs:
           docker exec $ONLYOFFICE_CONTAINER_NAME ls /var/www/onlyoffice/documentserver/
           echo '--- license ---'
           docker exec $ONLYOFFICE_CONTAINER_NAME ls /var/www/onlyoffice/Data/
+
+      - name: Documentserver logs 2
+        run: |
+          docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
 
       - name: Install pre-requisites for Load test
         run: |
