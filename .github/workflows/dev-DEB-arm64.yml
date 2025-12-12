@@ -427,9 +427,6 @@ jobs:
           echo "-------------------------------------"
           EOF
 
-
-
-
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
