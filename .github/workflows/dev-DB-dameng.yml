@@ -140,6 +140,7 @@ jobs:
           git submodule update --init puppeteer/files
           cd puppeteer/engine
           npm install
+          npm audit fix
           cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
 
       - name: Smoke puppeteer API tests
@@ -147,9 +148,8 @@ jobs:
           cd Dep.Tests/puppeteer/engine
           sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "http://127.0.0.1/example"#' ../config_chrome_linux.json
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --prcache
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
 
       - name: Documentserver logs PUPPETEER TEST
