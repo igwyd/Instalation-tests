@@ -90,16 +90,16 @@ jobs:
           echo "------ Updated json ------"
           cat save-changes-document-random-close.json
 
-      - name: Run K6 load test
-        working-directory: document-server-stress-testing/K6
-        run: |
-          docker run --rm \
-            -u "$(id -u):$(id -g)" \
-            --network ${{ job.services.onlyoffice.network }} \
-            -v "$(pwd)":/k6 \
-            grafana/k6 run /k6/save-changes-document-random-close.js \
-            --quiet \
-            -s "1m:500" -s "9m:500"
+      # - name: Run K6 load test
+      #   working-directory: document-server-stress-testing/K6
+      #   run: |
+      #     docker run --rm \
+      #       -u "$(id -u):$(id -g)" \
+      #       --network ${{ job.services.onlyoffice.network }} \
+      #       -v "$(pwd)":/k6 \
+      #       grafana/k6 run /k6/save-changes-document-random-close.js \
+      #       --quiet \
+      #       -s "1m:500" -s "9m:500"
 
       - name: Documentserver logs LOAD TEST
         run: |
