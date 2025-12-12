@@ -55,7 +55,21 @@ jobs:
           cd puppeteer/engine
           npm install
           cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
+          
+      - name: cat JSON 1
+        run: |
+          cat Dep.Tests/puppeteer/config_chrome_linux.json
 
+      - name: Define ONLYOFFICE container name
+        run: |
+          ONLYOFFICE_CONTAINER_NAME=$(docker ps -a --filter "ancestor=onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}" --format "{{.Names}}")
+          echo "Container name: $ONLYOFFICE_CONTAINER_NAME"
+          echo "ONLYOFFICE_CONTAINER_NAME=$ONLYOFFICE_CONTAINER_NAME" >> $GITHUB_ENV
+
+
+
+
+          
       - name: cat JSON
         run: |
           cat Dep.Tests/puppeteer/config_chrome_linux.json
