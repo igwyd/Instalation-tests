@@ -56,10 +56,6 @@ jobs:
             curlimages/curl:8.9.1 \
             curl -vk http://onlyoffice/healthcheck
 
-      - name: Documentserver logs 1
-        run: |
-          docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
-
       - name: Add document, dummy_end_points and license for tests
         run: |
           docker exec $ONLYOFFICE_CONTAINER_NAME wget -O /var/www/onlyoffice/documentserver/sample.zip https://nct2.onlyoffice.com/s/y-3qCyC7GkMcYv8
@@ -69,8 +65,11 @@ jobs:
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:converter
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl start ds:example
 
-      - name: INFO for tests
-        run: |
+          cat <<'EOF' > license.lic
+          ${{ secrets.LICENSE_KEY }}
+          EOF
+          docker cp license.lic $ONLYOFFICE_CONTAINER_NAME:/var/www/onlyoffice/Data/license.lic
+
           echo '--- JSON  ---'
           docker exec $ONLYOFFICE_CONTAINER_NAME cat /etc/onlyoffice/documentserver/local-production-linux.json
           echo '--- Sample.docx in documentserver ---'
@@ -78,11 +77,7 @@ jobs:
           echo '--- license ---'
           docker exec $ONLYOFFICE_CONTAINER_NAME ls /var/www/onlyoffice/Data/
 
-      - name: Documentserver logs 2
-        run: |
-          docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
-
-      - name: Install pre-requisites for Load test
+      - name: Install pre-requisites for LOAD test
         run: |
           git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
           cd document-server-stress-testing/K6/
@@ -95,16 +90,16 @@ jobs:
           echo "------ Updated json ------"
           cat save-changes-document-random-close.json
 
-      # - name: Run K6 load test
-      #   working-directory: document-server-stress-testing/K6
-      #   run: |
-      #     docker run --rm \
-      #       -u "$(id -u):$(id -g)" \
-      #       --network ${{ job.services.onlyoffice.network }} \
-      #       -v "$(pwd)":/k6 \
-      #       grafana/k6 run /k6/save-changes-document-random-close.js \
-      #       --quiet \
-      #       -s "1m:500" -s "9m:500"
+      - name: Run K6 LOAD test
+        working-directory: document-server-stress-testing/K6
+        run: |
+          docker run --rm \
+            -u "$(id -u):$(id -g)" \
+            --network ${{ job.services.onlyoffice.network }} \
+            -v "$(pwd)":/k6 \
+            grafana/k6 run /k6/save-changes-document-random-close.js \
+            --quiet \
+            -s "1m:500" -s "9m:500"
 
       - name: Documentserver logs LOAD TEST
         run: |
