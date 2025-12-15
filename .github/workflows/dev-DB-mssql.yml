@@ -7,7 +7,7 @@ on:
 
 jobs:
   mssql-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       mssqldb:
         image: mcr.microsoft.com/mssql/server:2022-latest
@@ -99,6 +99,64 @@ jobs:
             --quiet \
             -s "1m:50" -s "9m:50"
 
-      - name: Documentserver logs
+      - name: Documentserver logs LOAD TEST
+        run: |
+          docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+  
+      - name: Set up nodejs
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install prerequisites for puppeteer tests
+        run: |
+          sudo apt-get update
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i google-chrome-stable_current_amd64.deb
+          sudo apt-get install -f -y
+          google-chrome --version
+          python3 --version
+          pip3 --version
+          node -v
+          npm -v
+
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GIT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
+          ssh-keyscan git.onlyoffice.com >> ~/.ssh/known_hosts
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          git clone git@git.onlyoffice.com:ONLYOFFICE-QA/Dep.Tests.git
+          cd Dep.Tests
+          sed -i 's/url=https:\/\/github.com\/ONLYOFFICE-data\/pp-files.git/url = git@github.com:ONLYOFFICE-data\/pp-files.git/' .gitmodules
+          git submodule update --init puppeteer/files
+          cd puppeteer/engine
+          npm install
+          npm audit fix
+          cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
+
+      - name: Get runner IP
+        id: runner_ip
+        run: |
+          IP=$(ip route get 1 | awk '{print $7}')
+          echo "RUNNER_IP=$IP" >> $GITHUB_ENV
+          echo "Runner IP is $IP"
+
+      - name: Smoke puppeteer API tests
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${RUNNER_IP}/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
+          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
+
+      - name: Documentserver logs PUPPETEER TEST
         run: |
           docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
