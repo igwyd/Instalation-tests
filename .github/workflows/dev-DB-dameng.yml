@@ -67,6 +67,7 @@ jobs:
           docker cp performance-test/local-production-linux.json $ONLYOFFICE_CONTAINER_NAME:/etc/onlyoffice/documentserver/local-production-linux.json
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:docservice
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:converter
+          docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl start ds:example
 
       - name: INFO for tests
         run: |
