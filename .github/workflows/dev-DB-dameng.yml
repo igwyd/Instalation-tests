@@ -70,11 +70,6 @@ jobs:
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl start ds:example
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl status all
 
-          cat <<'EOF' > license.lic
-          ${{ secrets.LICENSE_KEY }}
-          EOF
-          docker cp license.lic $ONLYOFFICE_CONTAINER_NAME:/var/www/onlyoffice/Data/license.lic
-
           echo '--- JSON  ---'
           docker exec $ONLYOFFICE_CONTAINER_NAME cat /etc/onlyoffice/documentserver/local-production-linux.json
           echo '--- Sample.docx in documentserver ---'
