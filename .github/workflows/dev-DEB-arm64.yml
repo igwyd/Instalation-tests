@@ -141,7 +141,7 @@ jobs:
 
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -vk http://${{ env.EC2_IP }}/healthcheck
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -207,7 +207,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "-------------healthcheck-------------"
-          curl -vk http://${{ env.EC2_IP }}/healthcheck
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -272,7 +272,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "-------------healthcheck-------------"
-          curl -vk http://${{ env.EC2_IP }}/healthcheck
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -341,7 +341,7 @@ jobs:
           jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
           jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
           echo "-------------healthcheck--------------"
-          curl -vk http://${{ env.EC2_IP }}/healthcheck
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -380,7 +380,7 @@ jobs:
           jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
           jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
           echo "-------------healthcheck--------------"
-          curl -vk http://${{ env.EC2_IP }}/healthcheck
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"

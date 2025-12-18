@@ -58,7 +58,7 @@ jobs:
         run: |
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -vk http://127.0.0.1/healthcheck
+          curl -s http://127.0.0.1/healthcheck; echo
           echo "---------Installed packages----------"
           docker exec ds-ee-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
@@ -103,7 +103,7 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         run: |
           echo "-------------healthcheck-------------"
-          curl -vk http://127.0.0.1/healthcheck
+          curl -s http://127.0.0.1/healthcheck; echo
           echo "---------Installed packages----------"
           docker exec ds-de-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
@@ -148,7 +148,7 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
         run: |
           echo "-------------healthcheck-------------"
-          curl -vk http://127.0.0.1/healthcheck
+          curl -s http://127.0.0.1/healthcheck; echo
           echo "---------Installed packages----------"
           docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"

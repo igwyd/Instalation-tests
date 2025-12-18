@@ -54,7 +54,7 @@ jobs:
           docker run --rm \
             --network ${{ job.services.onlyoffice.network }} \
             curlimages/curl:8.9.1 \
-            curl -vk http://onlyoffice/healthcheck
+            curl -s http://onlyoffice/healthcheck; echo
 
       - name: Add document, dummy_end_points and license for tests
         run: |
