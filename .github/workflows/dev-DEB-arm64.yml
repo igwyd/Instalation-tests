@@ -140,16 +140,14 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
 
           sudo apt-get install jq -y
-
+          echo "-------------healthcheck--------------"
+          curl -vk http://${{ env.EC2_IP }}/healthcheck
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
-          echo "-------------------------------------"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "-------------------------------------"
           echo "--------packageType must be 1--------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
-          echo "-------------------------------------"
           echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -157,7 +155,6 @@ jobs:
           else
             echo "$output"
           fi
-          echo "-------------------------------------"
           echo "------------WOPI external------------"
           output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -165,25 +162,20 @@ jobs:
           else
             echo "$output"
           fi
-          echo "-------------------------------------"
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
           sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "http://${{ env.EC2_IP }}/example"#' ../config_chrome_linux.json
-          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
           python3 run.py --prcache
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
           python3 run.py --prcache
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
@@ -212,15 +204,14 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          echo "-------------healthcheck--------------"
+          curl -vk http://${{ env.EC2_IP }}/healthcheck
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
-          echo "-------------------------------------"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "-------------------------------------"
           echo "--------packageType must be 2--------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
-          echo "-------------------------------------"
           echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -228,7 +219,6 @@ jobs:
           else
             echo "$output"
           fi
-          echo "-------------------------------------"
           echo "------------WOPI external------------"
           output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -236,24 +226,19 @@ jobs:
           else
             echo "$output"
           fi
-          echo "-------------------------------------"
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
         run: |
           cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
           python3 run.py --prcache
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
         run: |
           cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
           python3 run.py --prcache
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
@@ -284,13 +269,10 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
-          echo "-------------------------------------"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "-------------------------------------"
           echo "--------packageType must be 0--------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
-          echo "-------------------------------------"
           echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -298,7 +280,6 @@ jobs:
           else
             echo "$output"
           fi
-          echo "-------------------------------------"
           echo "------------WOPI external------------"
           output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -306,24 +287,19 @@ jobs:
           else
             echo "$output"
           fi
-          echo "-------------------------------------"
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
         run: |
           cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
           python3 run.py --prcache
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
         run: |
           cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
           python3 run.py --prcache
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
@@ -356,16 +332,14 @@ jobs:
           echo "------------JWT settings-------------"
           jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
           jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
-          echo "-------------------------------------"
+          echo "-------------healthcheck--------------"
+          curl -vk http://${{ env.EC2_IP }}/healthcheck
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
-          echo "-------------------------------------"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "-------------------------------------"
           echo "--------packageType must be 1--------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
-          echo "-------------------------------------"
           echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -373,7 +347,6 @@ jobs:
           else
             echo "$output"
           fi
-          echo "-------------------------------------"
           echo "------------WOPI external------------"
           output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -381,7 +354,6 @@ jobs:
           else
             echo "$output"
           fi
-          echo "-------------------------------------"
           EOF
 
       - name: Update ONLYOFFICE-EE to the DEV
@@ -393,22 +365,20 @@ jobs:
           sudo systemctl restart ds-example
           EOF
 
-      - name: Info about installed Package, must be ONLYOFFICE-Docs EE DEV
+      - name: Info about installed Package, must be ONLYOFFICE-Docs EE DEV and JWT has not been modified
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "------------JWT settings-------------"
           jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
           jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
-          echo "-------------------------------------"
+          echo "-------------healthcheck--------------"
+          curl -vk http://${{ env.EC2_IP }}/healthcheck
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
-          echo "-------------------------------------"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "-------------------------------------"
           echo "--------packageType must be 1--------"
           curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
-          echo "-------------------------------------"
           echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -416,7 +386,6 @@ jobs:
           else
             echo "$output"
           fi
-          echo "-------------------------------------"
           echo "------------WOPI external------------"
           output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -424,24 +393,19 @@ jobs:
           else
             echo "$output"
           fi
-          echo "-------------------------------------"
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
           python3 run.py --prcache
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
           python3 run.py --prcache
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
