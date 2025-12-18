@@ -132,11 +132,11 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://127.0.0.1/healthcheck; echo
           echo "---------Installed packages----------"
-          docker exec ds-ee-release bash -c "dpkg -l | grep onlyoffice"
+          sudo docker exec ds-ee-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 1--------"
-          docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -181,11 +181,11 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://127.0.0.1/healthcheck; echo
           echo "---------Installed packages----------"
-          docker exec ds-de-release bash -c "dpkg -l | grep onlyoffice"
+          sudo docker exec ds-de-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 2--------"
-          docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -230,11 +230,11 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://127.0.0.1/healthcheck; echo
           echo "---------Installed packages----------"
-          docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
+          sudo docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 0--------"
-          docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then

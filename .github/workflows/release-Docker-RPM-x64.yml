@@ -110,10 +110,10 @@ jobs:
       - name: Docker run ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          docker pull onlyoffice/documentserver-ee
-          docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-release onlyoffice/documentserver-ee
+          sudo docker pull onlyoffice/documentserver-ee
+          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-release onlyoffice/documentserver-ee
           sleep 90
-          docker exec ds-ee-release supervisorctl start all
+          sudo docker exec ds-ee-release supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
@@ -123,11 +123,11 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://127.0.0.1/healthcheck; echo
           echo "---------Installed packages----------"
-          docker exec ds-ee-release bash -c "dpkg -l | grep onlyoffice"
+          sudo docker exec ds-ee-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 1--------"
-          docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -157,13 +157,13 @@ jobs:
       - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          docker stop ds-ee-release
-          docker rm ds-ee-release
-          docker rmi onlyoffice/documentserver-ee
-          docker pull onlyoffice/documentserver-de
-          docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-de-release onlyoffice/documentserver-de
+          sudo docker stop ds-ee-release
+          sudo docker rm ds-ee-release
+          sudo docker rmi onlyoffice/documentserver-ee
+          sudo docker pull onlyoffice/documentserver-de
+          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-de-release onlyoffice/documentserver-de
           sleep 90
-          docker exec ds-de-release supervisorctl start all
+          sudo docker exec ds-de-release supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
@@ -172,11 +172,11 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://127.0.0.1/healthcheck; echo
           echo "---------Installed packages----------"
-          docker exec ds-de-release bash -c "dpkg -l | grep onlyoffice"
+          sudo docker exec ds-de-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 2--------"
-          docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
@@ -205,14 +205,14 @@ jobs:
       - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          docker stop ds-de-release
-          docker rm ds-de-release
-          docker rmi onlyoffice/documentserver-de
-          docker pull onlyoffice/documentserver
-          docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-release onlyoffice/documentserver
+          sudo docker stop ds-de-release
+          sudo docker rm ds-de-release
+          sudo docker rmi onlyoffice/documentserver-de
+          sudo docker pull onlyoffice/documentserver
+          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-release onlyoffice/documentserver
           sleep 90
-          docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
-          docker exec ds-release supervisorctl start all
+          sudo docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
+          sudo docker exec ds-release supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
@@ -221,11 +221,11 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://127.0.0.1/healthcheck; echo
           echo "---------Installed packages----------"
-          docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
+          sudo docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 0--------"
-          docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
