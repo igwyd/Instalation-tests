@@ -57,45 +57,38 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
           sudo apt-get install jq -y
-
-          echo "Installed packages:"
-          echo "-------------------------------------"
+          echo "-------------healthcheck-------------"
+          curl -vk http://127.0.0.1/healthcheck
+          echo "---------Installed packages----------"
           docker exec ds-ee-release bash -c "dpkg -l | grep onlyoffice"
-          echo "-------------------------------------"
-          echo "api.js from server:"
-          echo "-------------------------------------"
+          echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "-------------------------------------"
-          echo "info.json from server(packageType must be 1):"
-          echo "-------------------------------------"
+          echo "--------packageType must be 1--------"
           docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
-          echo "-------------------------------------"
-          echo "check WOPI enabled(must be data except 404 Not Found):"
-          echo "-------------------------------------"
+          echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
             echo "$output"
           fi
-          echo "-------------------------------------"
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "http://127.0.0.1/example"#' ../config_chrome_linux.json
-          sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
-          cat ../config_chrome_linux.json
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://127.0.0.1/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "http://127.0.0.1/example"#' ../providers/wopi/config.json
-          cat ../config_chrome_linux.json
-          cat ../providers/wopi/config.json
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
       - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
         run: |
@@ -109,42 +102,37 @@ jobs:
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         run: |
-
-          echo "Installed packages:"
-          echo "-------------------------------------"
+          echo "-------------healthcheck-------------"
+          curl -vk http://127.0.0.1/healthcheck
+          echo "---------Installed packages----------"
           docker exec ds-de-release bash -c "dpkg -l | grep onlyoffice"
-          echo "-------------------------------------"
-          echo "api.js from server:"
-          echo "-------------------------------------"
+          echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "-------------------------------------"
-          echo "info.json from server(packageType must be 2):"
-          echo "-------------------------------------"
+          echo "--------packageType must be 2--------"
           docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
-          echo "-------------------------------------"
-          echo "check WOPI enabled(must be data except 404 Not Found):"
-          echo "-------------------------------------"
+          echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
             echo "$output"
           fi
-          echo "-------------------------------------"
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
-          cat ../config_chrome_linux.json
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-          cat ../config_chrome_linux.json
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
       - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
         run: |
@@ -159,39 +147,34 @@ jobs:
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
         run: |
-
-          echo "Installed packages:"
-          echo "-------------------------------------"
+          echo "-------------healthcheck-------------"
+          curl -vk http://127.0.0.1/healthcheck
+          echo "---------Installed packages----------"
           docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
-          echo "-------------------------------------"
-          echo "api.js from server:"
-          echo "-------------------------------------"
+          echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "-------------------------------------"
-          echo "info.json from server(packageType must be 0):"
-          echo "-------------------------------------"
+          echo "--------packageType must be 0--------"
           docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
-          echo "-------------------------------------"
-          echo "check WOPI enabled(must be data except 404 Not Found):"
-          echo "-------------------------------------"
+          echo "-------------WOPI local--------------"
           output=$(curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
             echo "$output"
           fi
-          echo "-------------------------------------"
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
-          cat ../config_chrome_linux.json
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-          cat ../config_chrome_linux.json
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi

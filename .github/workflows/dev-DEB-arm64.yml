@@ -140,7 +140,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
 
           sudo apt-get install jq -y
-          echo "-------------healthcheck--------------"
+          echo "-------------healthcheck-------------"
           curl -vk http://${{ env.EC2_IP }}/healthcheck
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
@@ -167,16 +167,18 @@ jobs:
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "http://${{ env.EC2_IP }}/example"#' ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          python3 run.py --prcache
+          echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          python3 run.py --prcache
+          echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
       - name: Remove ONLYOFFICE-Docs EE
@@ -204,7 +206,7 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
-          echo "-------------healthcheck--------------"
+          echo "-------------healthcheck-------------"
           curl -vk http://${{ env.EC2_IP }}/healthcheck
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
@@ -231,15 +233,17 @@ jobs:
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
         run: |
           cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          python3 run.py --prcache
+          echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
         run: |
           cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          python3 run.py --prcache
+          echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
       - name: Remove ONLYOFFICE-Docs DE
@@ -267,6 +271,8 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          echo "-------------healthcheck-------------"
+          curl -vk http://${{ env.EC2_IP }}/healthcheck
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -292,15 +298,17 @@ jobs:
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
         run: |
           cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          python3 run.py --prcache
+          echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
         run: |
           cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          python3 run.py --prcache
+          echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
       - name: Remove ONLYOFFICE-Docs CE
@@ -398,15 +406,17 @@ jobs:
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          python3 run.py --prcache
+          echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
         run: |
           cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
-          python3 run.py --prcache
+          echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
       - name: Delete EC2 Instance
