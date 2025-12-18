@@ -188,7 +188,7 @@ jobs:
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
         run: |
-          ccd Dep.Tests/puppeteer/engine
+          cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
