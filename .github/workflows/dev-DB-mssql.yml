@@ -58,8 +58,8 @@ jobs:
         id: runner_ip
         run: |
           IP=$(ip route get 1 | awk '{print $7}')
-          echo "Runner IP: $RUNNER_IP"
-          echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+          echo "RUNNER_IP=$IP" >> $GITHUB_ENV
+          echo "Runner IP is $IP"
 
       - name: Create onlyoffice DB and tables
         run: |
@@ -74,15 +74,15 @@ jobs:
           sudo apt-get install jq -y
 
           echo "-------------healthcheck-------------"
-          curl -s http://$RUNNER_IP/healthcheck; echo
+          curl -s http://${RUNNER_IP}/healthcheck; echo
           echo "---------Installed packages----------"
           docker exec $ONLYOFFICE_CONTAINER_NAME bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
-          curl -s http://$RUNNER_IP/web-apps/apps/api/documents/api.js | head -n 10
+          curl -s http://${RUNNER_IP}/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 1--------"
           docker exec $ONLYOFFICE_CONTAINER_NAME curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://$RUNNER_IP/hosting/discovery)
+          output=$(curl -s http://${RUNNER_IP}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -178,7 +178,7 @@ jobs:
       - name: Smoke puppeteer API tests
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://$RUNNER_IP/example\"#" ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${RUNNER_IP}/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
