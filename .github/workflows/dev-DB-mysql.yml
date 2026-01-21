@@ -141,7 +141,6 @@ jobs:
           git submodule update --init puppeteer/files
           cd puppeteer/engine
           npm install
-          npm audit fix
           cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
 
       - name: Get runner IP
