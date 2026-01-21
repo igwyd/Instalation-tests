@@ -48,6 +48,20 @@ jobs:
           echo "Container name: $ONLYOFFICE_CONTAINER_NAME"
           echo "ONLYOFFICE_CONTAINER_NAME=$ONLYOFFICE_CONTAINER_NAME" >> $GITHUB_ENV
 
+      - name: Define MSSQL container name
+        run: |
+          MSSQL_CONTAINER_NAME=$(docker ps -a --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest" --format "{{.Names}}")
+          echo "Container name: $MSSQL_CONTAINER_NAME"
+          echo "MSSQL_CONTAINER_NAME=$MSSQL_CONTAINER_NAME" >> $GITHUB_ENV
+
+      - name: Create onlyoffice DB and tables
+        run: |
+          curl -O https://github.com/ONLYOFFICE/server/raw/master/schema/mssql/createdb.sql
+          sudo docker cp ./createdb.sql $MSSQL_CONTAINER_NAME:/
+          sudo docker exec $MSSQL_CONTAINER_NAME /opt/mssql-tools18/bin/sqlcmd -No -S localhost -U sa -P onlYoff1ce -Q "CREATE DATABASE onlyoffice;"
+          sudo docker exec $MSSQL_CONTAINER_NAME /opt/mssql-tools18/bin/sqlcmd -No -S localhost -U sa -P onlYoff1ce -Q "GO"
+          sudo docker exec $MSSQL_CONTAINER_NAME /opt/mssql-tools18/bin/sqlcmd -No -S localhost -U sa -P onlYoff1ce -i /createdb.sql
+
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
           sudo apt-get install jq -y
