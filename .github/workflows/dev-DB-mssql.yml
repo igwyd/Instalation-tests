@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-24.04
     services:
       mssqldb:
-        image: mcr.microsoft.com/mssql/server:2022-latest
+        image: docker.io/igwyd890/mssql-onlyoffice:2025
         env:
           ACCEPT_EULA: Y
-          MSSQL_SA_PASSWORD: onlYoff1ce
+          SA_PASSWORD: onlYoff1ce
         ports:
           - 1433:1433
 
@@ -50,7 +50,7 @@ jobs:
 
       - name: Define MSSQL container name
         run: |
-          MSSQL_CONTAINER_NAME=$(docker ps -a --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest" --format "{{.Names}}")
+          MSSQL_CONTAINER_NAME=$(docker ps -a --filter "ancestor=docker.io/igwyd890/mssql-onlyoffice:2025" --format "{{.Names}}")
           echo "Container name: $MSSQL_CONTAINER_NAME"
           echo "MSSQL_CONTAINER_NAME=$MSSQL_CONTAINER_NAME" >> $GITHUB_ENV
 
@@ -60,14 +60,6 @@ jobs:
           IP=$(ip route get 1 | awk '{print $7}')
           echo "RUNNER_IP=$IP" >> $GITHUB_ENV
           echo "Runner IP is $IP"
-
-      - name: Create onlyoffice DB and tables
-        run: |
-          curl -O https://github.com/ONLYOFFICE/server/raw/master/schema/mssql/createdb.sql
-          sudo docker cp ./createdb.sql $MSSQL_CONTAINER_NAME:/
-          sudo docker exec $MSSQL_CONTAINER_NAME /opt/mssql-tools18/bin/sqlcmd -No -S localhost -U sa -P onlYoff1ce -Q "CREATE DATABASE onlyoffice;"
-          sudo docker exec $MSSQL_CONTAINER_NAME /opt/mssql-tools18/bin/sqlcmd -No -S localhost -U sa -P onlYoff1ce -Q "GO"
-          sudo docker exec $MSSQL_CONTAINER_NAME /opt/mssql-tools18/bin/sqlcmd -No -S localhost -U sa -P onlYoff1ce -i /createdb.sql
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         run: |
