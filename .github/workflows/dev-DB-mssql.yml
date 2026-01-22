@@ -61,20 +61,21 @@ jobs:
           echo "RUNNER_IP=$IP" >> $GITHUB_ENV
           echo "Runner IP is $IP"
 
-      - name: Add document, dummy_end_points and license for tests
+      - name: ADD document, dummy_end_points and license for tests
         run: |
           docker exec $ONLYOFFICE_CONTAINER_NAME wget -O /var/www/onlyoffice/documentserver/sample.zip https://nct2.onlyoffice.com/s/y-3qCyC7GkMcYv8
           docker exec $ONLYOFFICE_CONTAINER_NAME unzip /var/www/onlyoffice/documentserver/sample.zip -d /var/www/onlyoffice/documentserver/
           docker cp performance-test/local-production-linux.json $ONLYOFFICE_CONTAINER_NAME:/etc/onlyoffice/documentserver/local-production-linux.json
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:docservice
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:converter
+          docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl start ds:example
           
           cat <<'EOF' > license.lic
           ${{ secrets.LICENSE_KEY }}
           EOF
           docker cp license.lic $ONLYOFFICE_CONTAINER_NAME:/var/www/onlyoffice/Data/license.lic
 
-      - name: Check document, dummy_end_points and license
+      - name: CHECK document, dummy_end_points and license
         run: |
           echo '--- local-production-linux.json  ---'
           docker exec $ONLYOFFICE_CONTAINER_NAME cat /etc/onlyoffice/documentserver/local-production-linux.json
@@ -83,7 +84,7 @@ jobs:
           echo '--- license ---'
           docker exec $ONLYOFFICE_CONTAINER_NAME ls /var/www/onlyoffice/Data/
 
-      - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+      - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
         run: |
           sudo apt-get install jq -y
 
@@ -103,11 +104,39 @@ jobs:
             echo "$output"
           fi
 
+      - name: Install pre-requisites for LOAD test
+        run: |
+          git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
+          cd document-server-stress-testing/K6/
+
+          sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "onlyoffice"|' save-changes-document-random-close.json
+          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "http://onlyoffice/wopi/files/docid/contents"|' save-changes-document-random-close.json
+          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "http://onlyoffice/dummyCallback"|' save-changes-document-random-close.json
+          sed -i 's|"jwtSecret": ""|"jwtSecret": "MYSECRET"|' save-changes-document-random-close.json
+
+          echo "------ Updated json ------"
+          cat save-changes-document-random-close.json
+
+      - name: Run K6 LOAD test
+        working-directory: document-server-stress-testing/K6
+        run: |
+          docker run --rm \
+            -u "$(id -u):$(id -g)" \
+            --network ${{ job.services.onlyoffice.network }} \
+            -v "$(pwd)":/k6 \
+            grafana/k6 run /k6/save-changes-document-random-close.js \
+            --quiet \
+            -s "1m:50" -s "9m:50"
+
+      - name: Documentserver logs LOAD TEST
+        run: |
+          docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-    
+      
       - name: Set up nodejs
         uses: actions/setup-node@v4
         with:
@@ -150,33 +179,5 @@ jobs:
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
 
       - name: Documentserver logs PUPPETEER TEST
-        run: |
-          docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
-
-      - name: Install pre-requisites for LOAD test
-        run: |
-          git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
-          cd document-server-stress-testing/K6/
-
-          sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "onlyoffice"|' save-changes-document-random-close.json
-          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "http://onlyoffice/wopi/files/docid/contents"|' save-changes-document-random-close.json
-          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "http://onlyoffice/dummyCallback"|' save-changes-document-random-close.json
-          sed -i 's|"jwtSecret": ""|"jwtSecret": "MYSECRET"|' save-changes-document-random-close.json
-
-          echo "------ Updated json ------"
-          cat save-changes-document-random-close.json
-
-      - name: Run K6 LOAD test
-        working-directory: document-server-stress-testing/K6
-        run: |
-          docker run --rm \
-            -u "$(id -u):$(id -g)" \
-            --network ${{ job.services.onlyoffice.network }} \
-            -v "$(pwd)":/k6 \
-            grafana/k6 run /k6/save-changes-document-random-close.js \
-            --quiet \
-            -s "1m:50" -s "9m:50"
-
-      - name: Documentserver logs LOAD TEST
         run: |
           docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
