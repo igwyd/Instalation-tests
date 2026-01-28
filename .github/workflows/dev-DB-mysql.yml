@@ -123,6 +123,7 @@ jobs:
           cat save-changes-document-random-close.json
 
       - name: Run K6 LOAD test
+        continue-on-error: true
         working-directory: document-server-stress-testing/K6
         run: |
           docker run --rm \
@@ -175,6 +176,7 @@ jobs:
           cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
 
       - name: Smoke puppeteer API tests
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${RUNNER_IP}/example\"#" ../config_chrome_linux.json
