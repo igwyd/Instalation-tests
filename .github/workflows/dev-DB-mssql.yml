@@ -114,7 +114,10 @@ jobs:
           sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "http://onlyoffice/dummyCallback"|' save-changes-document-random-close.json
           sed -i 's|"jwtSecret": ""|"jwtSecret": "MYSECRET"|' save-changes-document-random-close.json
 
+      - name: INFO about save-changes-document-random-close.json
+        run: |
           echo "------ Updated json ------"
+          cd document-server-stress-testing/K6/
           cat save-changes-document-random-close.json
 
       - name: Run K6 LOAD test
