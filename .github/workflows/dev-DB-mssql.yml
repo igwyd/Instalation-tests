@@ -1,4 +1,4 @@
-name: dev DB mssql load test
+name: dev DB mssql
 
 on:
   schedule:
@@ -35,7 +35,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: docker containers status
+      - name: docker containers STATUS
         run: |
           docker ps -a
 
