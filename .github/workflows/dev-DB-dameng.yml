@@ -70,7 +70,7 @@ jobs:
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:docservice
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:converter
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl start ds:example
-          
+
           cat <<'EOF' > license.lic
           ${{ secrets.LICENSE_KEY }}
           EOF
@@ -140,7 +140,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-  
+
       - name: Set up nodejs
         uses: actions/setup-node@v4
         with:
