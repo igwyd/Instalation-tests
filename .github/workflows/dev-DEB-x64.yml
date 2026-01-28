@@ -59,7 +59,7 @@ jobs:
         run: |
           INSTANCE_ID=$(aws ec2 run-instances \
             --image-id ami-0b6c6ebed2801a5cb \
-            --instance-type t4.medium \
+            --instance-type t2.medium \
             --key-name demin \
             --security-groups AllPortsOpened \
             --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_dev-deb-x64}]' \
