@@ -1,4 +1,4 @@
-name: dev DB Oracle load test
+name: dev DB Oracle
 
 on:
   schedule:
@@ -37,7 +37,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: docker containers status
+      - name: docker containers STATUS
         run: |
           docker ps -a
 
@@ -50,14 +50,20 @@ jobs:
           echo "Container name: $ONLYOFFICE_CONTAINER_NAME"
           echo "ONLYOFFICE_CONTAINER_NAME=$ONLYOFFICE_CONTAINER_NAME" >> $GITHUB_ENV
 
-      - name: Run test in a container
+      - name: Define ORACLE container name
         run: |
-          docker run --rm \
-            --network ${{ job.services.onlyoffice.network }} \
-            curlimages/curl:8.9.1 \
-            curl -s http://onlyoffice/healthcheck; echo
+          ORACLE_CONTAINER_NAME=$(docker ps -a --filter "ancestor=gvenzl/oracle-xe:21-slim" --format "{{.Names}}")
+          echo "Container name: $ORACLE_CONTAINER_NAME"
+          echo "ORACLE_CONTAINER_NAME=$ORACLE_CONTAINER_NAME" >> $GITHUB_ENV
 
-      - name: Add document, dummy_end_points and license for tests
+      - name: Get runner IP
+        id: runner_ip
+        run: |
+          IP=$(ip route get 1 | awk '{print $7}')
+          echo "RUNNER_IP=$IP" >> $GITHUB_ENV
+          echo "Runner IP is $IP"
+
+      - name: ADD document, dummy_end_points and license for tests
         run: |
           docker exec $ONLYOFFICE_CONTAINER_NAME wget -O /var/www/onlyoffice/documentserver/sample.zip https://nct2.onlyoffice.com/s/y-3qCyC7GkMcYv8
           docker exec $ONLYOFFICE_CONTAINER_NAME unzip /var/www/onlyoffice/documentserver/sample.zip -d /var/www/onlyoffice/documentserver/
@@ -65,18 +71,40 @@ jobs:
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:docservice
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl restart ds:converter
           docker exec $ONLYOFFICE_CONTAINER_NAME supervisorctl start ds:example
-          
+
           cat <<'EOF' > license.lic
           ${{ secrets.LICENSE_KEY }}
           EOF
           docker cp license.lic $ONLYOFFICE_CONTAINER_NAME:/var/www/onlyoffice/Data/license.lic
 
-          echo '--- JSON  ---'
+      - name: CHECK document, dummy_end_points and license
+        run: |
+          echo '--- local-production-linux.json  ---'
           docker exec $ONLYOFFICE_CONTAINER_NAME cat /etc/onlyoffice/documentserver/local-production-linux.json
           echo '--- Sample.docx in documentserver ---'
           docker exec $ONLYOFFICE_CONTAINER_NAME ls /var/www/onlyoffice/documentserver/
           echo '--- license ---'
           docker exec $ONLYOFFICE_CONTAINER_NAME ls /var/www/onlyoffice/Data/
+
+      - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
+        run: |
+          sudo apt-get install jq -y
+
+          echo "-------------healthcheck-------------"
+          curl -s http://${RUNNER_IP}/healthcheck; echo
+          echo "---------Installed packages----------"
+          docker exec $ONLYOFFICE_CONTAINER_NAME bash -c "dpkg -l | grep onlyoffice"
+          echo "---------api.js from server----------"
+          curl -s http://${RUNNER_IP}/web-apps/apps/api/documents/api.js | head -n 10
+          echo "--------packageType must be 1--------"
+          docker exec $ONLYOFFICE_CONTAINER_NAME curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI local--------------"
+          output=$(curl -s http://${RUNNER_IP}/hosting/discovery)
+          if echo "$output" | grep -q 'value='; then
+            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
+          else
+            echo "$output"
+          fi
 
       - name: Install pre-requisites for LOAD test
         run: |
@@ -88,7 +116,10 @@ jobs:
           sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "http://onlyoffice/dummyCallback"|' save-changes-document-random-close.json
           sed -i 's|"jwtSecret": ""|"jwtSecret": "MYSECRET"|' save-changes-document-random-close.json
 
+      - name: INFO about save-changes-document-random-close.json
+        run: |
           echo "------ Updated json ------"
+          cd document-server-stress-testing/K6/
           cat save-changes-document-random-close.json
 
       - name: Run K6 LOAD test
@@ -142,13 +173,6 @@ jobs:
           cd puppeteer/engine
           npm install
           cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
-
-      - name: Get runner IP
-        id: runner_ip
-        run: |
-          IP=$(ip route get 1 | awk '{print $7}')
-          echo "RUNNER_IP=$IP" >> $GITHUB_ENV
-          echo "Runner IP is $IP"
 
       - name: Smoke puppeteer API tests
         run: |
