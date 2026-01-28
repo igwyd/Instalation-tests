@@ -9,10 +9,10 @@ Tested version **<!-- onlyoffice-version-start -->v9.3.0-52<!-- onlyoffice-versi
 Tested version **<!-- onlyoffice-version-start -->v9.3.0-52<!-- onlyoffice-version-end -->** \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-arm64.yml/badge.svg?branch=main)  
-### Test connection to Redis via unix.sock (div-proxy)
+### Tests with Redis (Scheduled every wednesday at 15:00 UTC+3)
 Tested version **<!-- onlyoffice-version-start -->v9.3.0-52<!-- onlyoffice-version-end -->** \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Redis-unix.sock.yml/badge.svg?branch=main)  
-### Load tests with DataBases (Scheduled every wednesday at 15:00 UTC+3)
+### Tests with DataBases (Scheduled every wednesday at 15:00 UTC+3)
 Tested version **<!-- onlyoffice-version-start -->v9.3.0-52<!-- onlyoffice-version-end -->** \
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-Oracle.yml/badge.svg?branch=main)  
 ![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mysql.yml/badge.svg?branch=main)  

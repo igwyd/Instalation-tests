@@ -1,11 +1,13 @@
 name: dev Redis unix.sock
 
 on:
+  schedule:
+    - cron: '0 12 * * 3'  # Wednesday 15:00 Mosсow time (UTC+3)
   workflow_dispatch:
 
 jobs:
   test-dev-Redis-unix-sock:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
