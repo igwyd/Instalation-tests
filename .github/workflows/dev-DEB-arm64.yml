@@ -182,6 +182,12 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
+      - name: Documentserver logs ONLYOFFICE-Docs EE
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          tail -n 1000 -f /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          EOF
+
       - name: Remove ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
@@ -247,6 +253,12 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
+      - name: Documentserver logs ONLYOFFICE-Docs DE
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          tail -n 1000 -f /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          EOF
+
       - name: Remove ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
@@ -311,6 +323,12 @@ jobs:
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
+
+      - name: Documentserver logs ONLYOFFICE-Docs CE
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          tail -n 1000 -f /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          EOF
 
       - name: Remove ONLYOFFICE-Docs CE
         run: |
@@ -419,6 +437,12 @@ jobs:
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
+
+      - name: Documentserver logs ONLYOFFICE-Docs EE after UPGRADE
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          tail -n 1000 -f /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          EOF
 
       - name: Delete EC2 Instance
         run: |
