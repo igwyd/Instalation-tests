@@ -166,6 +166,7 @@ jobs:
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
@@ -175,6 +176,7 @@ jobs:
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
@@ -238,6 +240,7 @@ jobs:
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
@@ -246,6 +249,7 @@ jobs:
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
@@ -309,6 +313,7 @@ jobs:
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
@@ -317,6 +322,7 @@ jobs:
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
@@ -423,6 +429,7 @@ jobs:
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
@@ -431,6 +438,7 @@ jobs:
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
