@@ -170,7 +170,7 @@ jobs:
           cd Dep.Tests/puppeteer/engine
           sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
@@ -178,7 +178,7 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
@@ -241,7 +241,7 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
   
@@ -249,7 +249,7 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
@@ -312,7 +312,7 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
   
@@ -320,7 +320,7 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
@@ -426,7 +426,7 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
   
@@ -434,7 +434,7 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
