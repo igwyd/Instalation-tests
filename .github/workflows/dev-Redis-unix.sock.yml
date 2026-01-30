@@ -154,10 +154,10 @@ jobs:
       - name: Change IOREDIS unix.sock configuration
         run: |
           echo "------------ STOP DS services -------------"
-          sudo docker exec ds-redis-sock supervisorctl stop all
+          sudo docker exec ds-ioredis-sock supervisorctl stop all
 
           echo "------------ Setup unix.sock and STOP redis server -------------"
-          sudo docker exec ds-redis-sock bash -c "
+          sudo docker exec ds-ioredis-sock bash -c "
             sed -i 's/^port .*/port 0/' /etc/redis/redis.conf
             echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf
             echo 'unixsocketperm 777' >> /etc/redis/redis.conf
@@ -165,19 +165,19 @@ jobs:
           "
           sleep 10
           echo "------------ START REDIS server -------------"
-          sudo docker exec ds-redis-sock service redis-server start
+          sudo docker exec ds-ioredis-sock service redis-server start
           echo "------------ Redis ping -------------"
-          sudo docker exec ds-redis-sock redis-cli -s /run/redis/redis-server.sock ping
+          sudo docker exec ds-ioredis-sock redis-cli -s /run/redis/redis-server.sock ping
           echo "------------ Redis ps -------------"
-          sudo docker exec ds-redis-sock ps -aux | grep -i redis
+          sudo docker exec ds-ioredis-sock ps -aux | grep -i redis
           echo "------------ Redis port 6379 must be closed -------------"
-          sudo docker exec ds-redis-sock netstat -tulpn
+          sudo docker exec ds-ioredis-sock netstat -tulpn
 
           echo "------------ Copy DS local-production-linux.json config -------------"
-          sudo docker cp redis/ioredis-unix-sock/local-production-linux.json ds-redis-sock:/etc/onlyoffice/documentserver/local-production-linux.json
-          sudo docker exec ds-redis-sock cat /etc/onlyoffice/documentserver/local-production-linux.json
+          sudo docker cp redis/ioredis-unix-sock/local-production-linux.json ds-ioredis-sock:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo docker exec ds-ioredis-sock cat /etc/onlyoffice/documentserver/local-production-linux.json
           echo "------------ START DS services -------------"
-          sudo docker exec ds-redis-sock supervisorctl start ds:example ds:converter ds:docservice
+          sudo docker exec ds-ioredis-sock supervisorctl start ds:example ds:converter ds:docservice
           sleep 10
           echo "---------- ds healthcheck -----------"
           curl -s http://${RUNNER_IP}/healthcheck; echo
@@ -189,12 +189,12 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://${RUNNER_IP}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo docker exec ds-redis-sock supervisorctl status ds:example ds:converter ds:docservice
+          sudo docker exec ds-ioredis-sock supervisorctl status ds:example ds:converter ds:docservice
           echo "---------Installed packages----------"
-          docker exec ds-ioredis-sock bash -c "dpkg -l | grep onlyoffice"
+          sudo docker exec ds-ioredis-sock bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
           curl -s http://${RUNNER_IP}/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 1--------"
+          echo "--------packageType--------"
           docker exec ds-ioredis-sock curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           output=$(curl -s http://${RUNNER_IP}/hosting/discovery)
