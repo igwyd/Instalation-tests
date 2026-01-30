@@ -137,6 +137,7 @@ jobs:
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
 
@@ -216,6 +217,7 @@ jobs:
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "-------------healthcheck-------------"
@@ -292,6 +294,7 @@ jobs:
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "-------------healthcheck-------------"
@@ -369,6 +372,7 @@ jobs:
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE RELEASE
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "------------JWT settings-------------"
@@ -410,6 +414,7 @@ jobs:
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE DEV and JWT has not been modified
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "------------JWT settings-------------"

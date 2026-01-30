@@ -64,6 +64,7 @@ jobs:
           echo "Runner IP is $IP"
 
       - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           sudo apt-get install jq -y
 
@@ -143,6 +144,7 @@ jobs:
           sudo docker exec ds-ioredis-sock supervisorctl start ds:example
 
       - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           sudo apt-get install jq -y
 

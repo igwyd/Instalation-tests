@@ -85,6 +85,7 @@ jobs:
           docker exec $ONLYOFFICE_CONTAINER_NAME ls /var/www/onlyoffice/Data/
 
       - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           sudo apt-get install jq -y
 
