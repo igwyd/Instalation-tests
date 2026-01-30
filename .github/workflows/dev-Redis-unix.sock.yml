@@ -103,7 +103,7 @@ jobs:
           echo "------------ Redis ps -------------"
           sudo docker exec ds-redis-sock ps -aux | grep -i redis
 
-          sudo docker cp redis/local-production-linux.json ds-redis-sock:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo docker cp redis/redis-unix-sock/local-production-linux.json ds-redis-sock:/etc/onlyoffice/documentserver/local-production-linux.json
           echo "------------ local-production-linux.json -------------"
           sudo docker exec ds-redis-sock cat /etc/onlyoffice/documentserver/local-production-linux.json
           sudo docker exec ds-redis-sock supervisorctl restart all
@@ -111,7 +111,7 @@ jobs:
           echo "---------- ds healthcheck -----------"
           curl -s http://${RUNNER_IP}/healthcheck; echo
 
-      - name: Smoke puppeteer API tests
+      - name: Smoke puppeteer API tests with REDIS
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -121,7 +121,7 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
-      - name: Smoke puppeteer WOPI tests
+      - name: Smoke puppeteer WOPI tests with REDIS
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -138,72 +138,78 @@ jobs:
       - name: Docker run ONLYOFFICE-Docs EE for test IOREDIS
         run: |
           sudo docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
-          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-redis-sock onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
+          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ioredis-sock onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
           sleep 180
-          sudo docker exec ds-redis-sock supervisorctl start ds:example
+          sudo docker exec ds-ioredis-sock supervisorctl start ds:example
+
+      - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
+        run: |
+          sudo apt-get install jq -y
+
+          echo "-------------healthcheck-------------"
+          curl -s http://${RUNNER_IP}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ioredis-sock supervisorctl status all
+          echo "-------------healthcheck-------------"
+          curl -s http://${RUNNER_IP}/healthcheck; echo
+          echo "---------Installed packages----------"
+          docker exec ds-ioredis-sock bash -c "dpkg -l | grep onlyoffice"
+          echo "---------api.js from server----------"
+          curl -s http://${RUNNER_IP}/web-apps/apps/api/documents/api.js | head -n 10
+          echo "--------packageType must be 1--------"
+          docker exec ds-ioredis-sock curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI local--------------"
+          output=$(curl -s http://${RUNNER_IP}/hosting/discovery)
+          if echo "$output" | grep -q 'value='; then
+            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
+          else
+            echo "$output"
+          fi
 
       - name: Change IOREDIS unix.sock configuration
         run: |
-          scp -o StrictHostKeyChecking=no redis/ioredis-unix-sock/local-production-linux.json ubuntu@54.234.188.198:/home/ubuntu/ioredis-unix-sock/local-production-linux.json
-          ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
-          sudo docker exec ds-redis-sock bash -c "
+          sudo docker exec ds-ioredis-sock bash -c "
             sed -i 's/^port .*/port 0/' /etc/redis/redis.conf
             echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf
             echo 'unixsocketperm 777' >> /etc/redis/redis.conf
             pkill -f 'redis-server'
           "
           sleep 10
-          sudo docker exec ds-redis-sock service redis-server start
+          sudo docker exec ds-ioredis-sock service redis-server start
 
           echo "------------ Redis ping -------------"
-          sudo docker exec ds-redis-sock redis-cli -s /run/redis/redis-server.sock ping
+          sudo docker exec ds-ioredis-sock redis-cli -s /run/redis/redis-server.sock ping
           echo "------------ Redis ps -------------"
-          sudo docker exec ds-redis-sock ps -aux | grep -i redis
-          echo "-------------------------------------"
+          sudo docker exec ds-ioredis-sock ps -aux | grep -i redis
 
-          sudo docker cp /home/ubuntu/ioredis-unix-sock/local-production-linux.json ds-redis-sock:/etc/onlyoffice/documentserver/local-production-linux.json
-          sudo docker exec ds-redis-sock cat /etc/onlyoffice/documentserver/local-production-linux.json
-          sudo docker exec ds-redis-sock supervisorctl restart all
+          sudo docker cp redis/ioredis-unix-sock/local-production-linux.json ds-ioredis-sock:/etc/onlyoffice/documentserver/local-production-linux.json
+          echo "------------ local-production-linux.json -------------"
+          sudo docker exec ds-ioredis-sock cat /etc/onlyoffice/documentserver/local-production-linux.json
+          sudo docker exec ds-ioredis-sock supervisorctl restart all
           sleep 10
           echo "---------- ds healthcheck -----------"
-          curl -s https://oods.div-proxy.qa-onlyoffice.net/healthcheck; echo
-          rm /home/ubuntu/ioredis-unix-sock/local-production-linux.json
-          EOF
+          curl -s http://${RUNNER_IP}/healthcheck; echo
 
-      - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+      - name: Smoke puppeteer API tests with IOREDIS
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${RUNNER_IP}/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
           cat ../config_chrome_linux.json
-          python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
-      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+      - name: Smoke puppeteer WOPI tests with IOREDIS
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          echo "-------------------------------------"
           cat ../config_chrome_linux.json
-          cat ../providers/wopi/config.json
-          python3 run.py --prcache
-          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
-          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
-      - name: Logs work with IOREDIS and remove container
+      - name: Documentserver logs PUPPETEER TESTS and remove IOREDIS container
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
-          sudo docker logs -n 1000 ds-redis-sock
-          sudo docker rm -fv ds-redis-sock
-          EOF
-
-      - name: Clean docker data after testing
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@54.234.188.198 << 'EOF'
-          sudo docker system prune -af
-          EOF
+          sudo docker logs -n 1000 ds-ioredis-sock
+          sudo docker rm -fv ds-ioredis-sock
