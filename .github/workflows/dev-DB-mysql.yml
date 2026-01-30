@@ -92,6 +92,8 @@ jobs:
 
           echo "-------------healthcheck-------------"
           curl -s http://${RUNNER_IP}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo supervisorctl status all
           echo "---------Installed packages----------"
           docker exec $ONLYOFFICE_CONTAINER_NAME bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
