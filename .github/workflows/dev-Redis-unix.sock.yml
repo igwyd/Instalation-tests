@@ -22,6 +22,13 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Get runner IP
+        id: runner_ip
+        run: |
+          IP=$(ip route get 1 | awk '{print $7}')
+          echo "RUNNER_IP=$IP" >> $GITHUB_ENV
+          echo "Runner IP is $IP"
+
       - name: Install prerequisites for puppeteer tests
         run: |
           sudo apt-get update
@@ -55,30 +62,53 @@ jobs:
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-redis-sock onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
           sleep 180
           sudo docker exec ds-redis-sock supervisorctl start ds:example
+          echo "-------------healthcheck-------------"
+          curl -s http://${RUNNER_IP}/healthcheck; echo
 
-      - name: Get runner IP
-        id: runner_ip
+      - name: Change REDIS unix.sock configuration
         run: |
-          IP=$(ip route get 1 | awk '{print $7}')
-          echo "RUNNER_IP=$IP" >> $GITHUB_ENV
-          echo "Runner IP is $IP"
+          echo "------------ STOP DS services -------------"
+          sudo docker exec ds-redis-sock supervisorctl stop all
+
+          echo "------------ Setup unix.sock and STOP redis server -------------"
+          sudo docker exec ds-redis-sock bash -c "
+            sed -i 's/^port .*/port 0/' /etc/redis/redis.conf
+            echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf
+            echo 'unixsocketperm 777' >> /etc/redis/redis.conf
+            pkill -f 'redis-server'
+          "
+          sleep 10
+          echo "------------ START REDIS server -------------"
+          sudo docker exec ds-redis-sock service redis-server start
+          echo "------------ Redis ping -------------"
+          sudo docker exec ds-redis-sock redis-cli -s /run/redis/redis-server.sock ping
+          echo "------------ Redis ps -------------"
+          sudo docker exec ds-redis-sock ps -aux | grep -i redis
+          echo "------------ Redis port 6379 must be closed -------------"
+          sudo docker exec ds-redis-sock netstat -tulpn
+
+          echo "------------ Copy DS local-production-linux.json config -------------"
+          sudo docker cp redis/redis-unix-sock/local-production-linux.json ds-redis-sock:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo docker exec ds-redis-sock cat /etc/onlyoffice/documentserver/local-production-linux.json
+          echo "------------ START DS services -------------"
+          sudo docker exec ds-redis-sock supervisorctl start ds:example ds:converter ds:docservice
+          sleep 10
+          echo "---------- ds healthcheck -----------"
+          curl -s http://${RUNNER_IP}/healthcheck; echo
 
       - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
-        continue-on-error: true
         run: |
           sudo apt-get install jq -y
 
           echo "-------------healthcheck-------------"
           curl -s http://${RUNNER_IP}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo docker exec ds-redis-sock supervisorctl status all
-          echo "-------------healthcheck-------------"
-          curl -s http://${RUNNER_IP}/healthcheck; echo
+          sudo docker exec ds-redis-sock supervisorctl status ds:example ds:converter ds:docservice
           echo "---------Installed packages----------"
           docker exec ds-redis-sock bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
           curl -s http://${RUNNER_IP}/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 1--------"
+          echo "--------packageType--------"
           docker exec ds-redis-sock curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           output=$(curl -s http://${RUNNER_IP}/hosting/discovery)
@@ -87,30 +117,6 @@ jobs:
           else
             echo "$output"
           fi
-
-      - name: Change REDIS unix.sock configuration
-        run: |
-          sudo docker exec ds-redis-sock bash -c "
-            sed -i 's/^port .*/port 0/' /etc/redis/redis.conf
-            echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf
-            echo 'unixsocketperm 777' >> /etc/redis/redis.conf
-            pkill -f 'redis-server'
-          "
-          sleep 10
-          sudo docker exec ds-redis-sock service redis-server start
-
-          echo "------------ Redis ping -------------"
-          sudo docker exec ds-redis-sock redis-cli -s /run/redis/redis-server.sock ping
-          echo "------------ Redis ps -------------"
-          sudo docker exec ds-redis-sock ps -aux | grep -i redis
-
-          sudo docker cp redis/redis-unix-sock/local-production-linux.json ds-redis-sock:/etc/onlyoffice/documentserver/local-production-linux.json
-          echo "------------ local-production-linux.json -------------"
-          sudo docker exec ds-redis-sock cat /etc/onlyoffice/documentserver/local-production-linux.json
-          sudo docker exec ds-redis-sock supervisorctl restart all
-          sleep 10
-          echo "---------- ds healthcheck -----------"
-          curl -s http://${RUNNER_IP}/healthcheck; echo
 
       - name: Smoke puppeteer API tests with REDIS
         continue-on-error: true
@@ -142,18 +148,48 @@ jobs:
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ioredis-sock onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
           sleep 180
           sudo docker exec ds-ioredis-sock supervisorctl start ds:example
+          echo "-------------healthcheck-------------"
+          curl -s http://${RUNNER_IP}/healthcheck; echo
+
+      - name: Change IOREDIS unix.sock configuration
+        run: |
+          echo "------------ STOP DS services -------------"
+          sudo docker exec ds-redis-sock supervisorctl stop all
+
+          echo "------------ Setup unix.sock and STOP redis server -------------"
+          sudo docker exec ds-redis-sock bash -c "
+            sed -i 's/^port .*/port 0/' /etc/redis/redis.conf
+            echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf
+            echo 'unixsocketperm 777' >> /etc/redis/redis.conf
+            pkill -f 'redis-server'
+          "
+          sleep 10
+          echo "------------ START REDIS server -------------"
+          sudo docker exec ds-redis-sock service redis-server start
+          echo "------------ Redis ping -------------"
+          sudo docker exec ds-redis-sock redis-cli -s /run/redis/redis-server.sock ping
+          echo "------------ Redis ps -------------"
+          sudo docker exec ds-redis-sock ps -aux | grep -i redis
+          echo "------------ Redis port 6379 must be closed -------------"
+          sudo docker exec ds-redis-sock netstat -tulpn
+
+          echo "------------ Copy DS local-production-linux.json config -------------"
+          sudo docker cp redis/ioredis-unix-sock/local-production-linux.json ds-redis-sock:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo docker exec ds-redis-sock cat /etc/onlyoffice/documentserver/local-production-linux.json
+          echo "------------ START DS services -------------"
+          sudo docker exec ds-redis-sock supervisorctl start ds:example ds:converter ds:docservice
+          sleep 10
+          echo "---------- ds healthcheck -----------"
+          curl -s http://${RUNNER_IP}/healthcheck; echo
 
       - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
-        continue-on-error: true
         run: |
           sudo apt-get install jq -y
 
           echo "-------------healthcheck-------------"
           curl -s http://${RUNNER_IP}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo docker exec ds-ioredis-sock supervisorctl status all
-          echo "-------------healthcheck-------------"
-          curl -s http://${RUNNER_IP}/healthcheck; echo
+          sudo docker exec ds-redis-sock supervisorctl status ds:example ds:converter ds:docservice
           echo "---------Installed packages----------"
           docker exec ds-ioredis-sock bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
@@ -167,30 +203,6 @@ jobs:
           else
             echo "$output"
           fi
-
-      - name: Change IOREDIS unix.sock configuration
-        run: |
-          sudo docker exec ds-ioredis-sock bash -c "
-            sed -i 's/^port .*/port 0/' /etc/redis/redis.conf
-            echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf
-            echo 'unixsocketperm 777' >> /etc/redis/redis.conf
-            pkill -f 'redis-server'
-          "
-          sleep 10
-          sudo docker exec ds-ioredis-sock service redis-server start
-
-          echo "------------ Redis ping -------------"
-          sudo docker exec ds-ioredis-sock redis-cli -s /run/redis/redis-server.sock ping
-          echo "------------ Redis ps -------------"
-          sudo docker exec ds-ioredis-sock ps -aux | grep -i redis
-
-          sudo docker cp redis/ioredis-unix-sock/local-production-linux.json ds-ioredis-sock:/etc/onlyoffice/documentserver/local-production-linux.json
-          echo "------------ local-production-linux.json -------------"
-          sudo docker exec ds-ioredis-sock cat /etc/onlyoffice/documentserver/local-production-linux.json
-          sudo docker exec ds-ioredis-sock supervisorctl restart all
-          sleep 10
-          echo "---------- ds healthcheck -----------"
-          curl -s http://${RUNNER_IP}/healthcheck; echo
 
       - name: Smoke puppeteer API tests with IOREDIS
         continue-on-error: true
