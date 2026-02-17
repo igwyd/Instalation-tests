@@ -145,7 +145,7 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo supervisorctl status all
+          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -198,7 +198,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
-          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice
+          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
       - name: Reboot EC2 Instance
@@ -223,7 +223,7 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo supervisorctl status all
+          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -275,7 +275,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
-          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice
+          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
       - name: Reboot EC2 Instance
@@ -300,7 +300,7 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo supervisorctl status all
+          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -352,7 +352,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
-          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice
+          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
       - name: Reboot EC2 Instance
@@ -381,7 +381,7 @@ jobs:
           echo "-------------healthcheck--------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo supervisorctl status all
+          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -423,7 +423,7 @@ jobs:
           echo "-------------healthcheck--------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo supervisorctl status all
+          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"

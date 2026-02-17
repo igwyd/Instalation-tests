@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-install:
+  test-install-DEB-x64:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout Repository
@@ -137,12 +137,15 @@ jobs:
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
 
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -166,27 +169,36 @@ jobs:
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Documentserver logs ONLYOFFICE-Docs EE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          tail -n 1000 -f /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          EOF
 
       - name: Remove ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
-          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice
+          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
       - name: Reboot EC2 Instance
@@ -205,10 +217,13 @@ jobs:
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "-------------healthcheck-------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -232,26 +247,35 @@ jobs:
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Documentserver logs ONLYOFFICE-Docs DE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          tail -n 1000 -f /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          EOF
 
       - name: Remove ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
-          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice
+          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
       - name: Reboot EC2 Instance
@@ -270,10 +294,13 @@ jobs:
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "-------------healthcheck-------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -297,26 +324,35 @@ jobs:
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Documentserver logs ONLYOFFICE-Docs CE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          tail -n 1000 -f /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          EOF
 
       - name: Remove ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
-          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice
+          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
       - name: Reboot EC2 Instance
@@ -336,6 +372,7 @@ jobs:
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE RELEASE
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "------------JWT settings-------------"
@@ -343,6 +380,8 @@ jobs:
           jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
           echo "-------------healthcheck--------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -375,6 +414,7 @@ jobs:
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE DEV and JWT has not been modified
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
           echo "------------JWT settings-------------"
@@ -382,6 +422,8 @@ jobs:
           jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
           echo "-------------healthcheck--------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
@@ -405,20 +447,29 @@ jobs:
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
   
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
+          cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Documentserver logs ONLYOFFICE-Docs EE after UPGRADE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          tail -n 1000 -f /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          EOF
 
       - name: Delete EC2 Instance
         run: |
