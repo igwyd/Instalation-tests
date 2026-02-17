@@ -93,7 +93,7 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://${RUNNER_IP}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo supervisorctl status all
+          docker exec $ONLYOFFICE_CONTAINER_NAME sudo supervisorctl status all
           echo "---------Installed packages----------"
           docker exec $ONLYOFFICE_CONTAINER_NAME bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
@@ -186,6 +186,15 @@ jobs:
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
+
+      - name: Smoke puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
       - name: Documentserver logs PUPPETEER TEST
         run: |
