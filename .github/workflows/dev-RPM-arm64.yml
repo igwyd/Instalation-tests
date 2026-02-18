@@ -388,7 +388,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           sudo rm -rf /etc/yum.repos.d/onlyoffice-dev-*.repo
           sudo yum install https://download.onlyoffice.com/repo/centos/main/noarch/onlyoffice-repo.noarch.rpm -y
-          sudo dnf install onlyoffice-documentserver-ee.el7 -y
+          sudo dnf install onlyoffice-documentserver-ee -y
           sudo service nginx start
           sudo systemctl enable nginx
           printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
