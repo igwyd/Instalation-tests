@@ -391,7 +391,7 @@ jobs:
           sudo dnf install onlyoffice-documentserver-ee -y
           sudo service nginx start
           sudo systemctl enable nginx
-          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
+          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
           sudo systemctl restart ds-example
           EOF
 
