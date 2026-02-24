@@ -103,7 +103,7 @@ jobs:
       - name: Wait for instance to reboot
         run: sleep 180
 
-      - name: Install ONLYOFFICE-EE and run test example
+      - name: Install ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 ubuntu@${{ env.EC2_IP }} << 'EOF'
           sudo apt-get install postgresql -y && \

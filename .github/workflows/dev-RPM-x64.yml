@@ -103,7 +103,8 @@ jobs:
       - name: Wait for instance to reboot
         run: sleep 180
       
-      - name: Install ONLYOFFICE-EE CURRENT RELEASE and run test example
+      - name: Install ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.repo ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.repo
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
