@@ -79,7 +79,7 @@ jobs:
           echo "EC2_IP=$IP" >> $GITHUB_ENV
 
       - name: Wait for SSH to be Ready
-        run: sleep 180
+        run: sleep 60
 
       - name: Add SSH Key
         run: |
@@ -101,7 +101,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Wait for instance to reboot
-        run: sleep 180
+        run: sleep 120
       
       - name: Install ONLYOFFICE-Docs EE
         continue-on-error: true
@@ -164,28 +164,18 @@ jobs:
           echo "-------------healthcheck-------------"
           sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
+          sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
           sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 1--------"
+          echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(sudo curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          output=$(sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
-          echo "------------- DS-example -------------"
+          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
           sudo systemctl start ds-example
           sudo systemctl status ds-example
           EOF
@@ -227,7 +217,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Wait for instance to reboot
-        run: sleep 120
+        run: sleep 60
 
       - name: Install ONLYOFFICE-Docs DE
         run: |
@@ -245,28 +235,18 @@ jobs:
           echo "-------------healthcheck-------------"
           sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
+          sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
           sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 2--------"
+          echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(sudo curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          output=$(sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
-          echo "------------- DS-example -------------"
+          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
           sudo systemctl start ds-example
           sudo systemctl status ds-example
           EOF
@@ -307,7 +287,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
   
       - name: Wait for instance to reboot
-        run: sleep 120
+        run: sleep 60
 
       - name: Install ONLYOFFICE-Docs CE
         run: |
@@ -325,28 +305,18 @@ jobs:
           echo "-------------healthcheck-------------"
           sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
+          sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
           sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 0--------"
+          echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(sudo curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          output=$(sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
-          echo "------------- DS-example -------------"
+          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
           sudo systemctl start ds-example
           sudo systemctl status ds-example
           EOF
@@ -387,7 +357,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
   
       - name: Wait for instance to reboot
-        run: sleep 120
+        run: sleep 60
 
       - name: Install ONLYOFFICE-Docs EE RELEASE for testing UPGRADE
         run: |
@@ -404,34 +374,21 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
-          echo "------------JWT settings-------------"
-          sudo jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
-          sudo jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
-          echo "-------------healthcheck--------------"
+          echo "-------------healthcheck-------------"
           sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
+          sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
           sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 1--------"
+          echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(sudo curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          output=$(sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
-          echo "------------- DS-example -------------"
+          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
           sudo systemctl start ds-example
           sudo systemctl status ds-example
           EOF
@@ -450,34 +407,21 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
-          echo "------------JWT settings-------------"
-          sudo jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
-          sudo jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
-          echo "-------------healthcheck--------------"
+          echo "-------------healthcheck-------------"
           sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
+          sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
           sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 1--------"
+          echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(sudo curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          output=$(sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
-          echo "------------- DS-example -------------"
+          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
           sudo systemctl start ds-example
           sudo systemctl status ds-example
           EOF
