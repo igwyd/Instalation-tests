@@ -131,8 +131,6 @@ jobs:
           echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
           sudo apt-get update
           sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y
-          sleep 30
-          sudo systemctl start ds-example
           sleep 10
           EOF
 
@@ -166,6 +164,9 @@ jobs:
           else
             echo "$output"
           fi
+          echo "------------- DS-example -------------"
+          sudo systemctl start ds-example
+          sudo systemctl status ds-example
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
@@ -213,7 +214,6 @@ jobs:
           echo onlyoffice-documentserver-de onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections && \
           echo onlyoffice-documentserver-de onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
           printf "n/n" | sudo apt-get install onlyoffice-documentserver-de=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y && \
-          sudo systemctl restart ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
@@ -244,6 +244,9 @@ jobs:
           else
             echo "$output"
           fi
+          echo "------------- DS-example -------------"
+          sudo systemctl start ds-example
+          sudo systemctl status ds-example
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
@@ -290,7 +293,6 @@ jobs:
           echo onlyoffice-documentserver onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections && \
           echo onlyoffice-documentserver onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
           printf "n/n" | sudo apt-get install onlyoffice-documentserver=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y && \
-          sudo systemctl restart ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
@@ -321,6 +323,9 @@ jobs:
           else
             echo "$output"
           fi
+          echo "------------- DS-example -------------"
+          sudo systemctl start ds-example
+          sudo systemctl status ds-example
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
@@ -368,7 +373,6 @@ jobs:
           echo onlyoffice-documentserver-ee onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections && \
           echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
           printf "n/n" | sudo apt-get install onlyoffice-documentserver-ee -y && \
-          sudo systemctl restart ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE RELEASE
@@ -402,6 +406,9 @@ jobs:
           else
             echo "$output"
           fi
+          echo "------------- DS-example -------------"
+          sudo systemctl start ds-example
+          sudo systemctl status ds-example
           EOF
 
       - name: Update ONLYOFFICE-EE to the DEV
@@ -410,7 +417,6 @@ jobs:
           echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
           sudo apt-get update
           sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y
-          sudo systemctl restart ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE DEV and JWT has not been modified
@@ -444,6 +450,9 @@ jobs:
           else
             echo "$output"
           fi
+          echo "------------- DS-example -------------"
+          sudo systemctl start ds-example
+          sudo systemctl status ds-example
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
