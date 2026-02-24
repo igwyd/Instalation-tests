@@ -162,24 +162,24 @@ jobs:
 
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 1--------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
+          output=$(sudo curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
             echo "$output"
           fi
           echo "------------WOPI external------------"
-          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
+          output=$(sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -243,24 +243,24 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
-          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 2--------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
+          output=$(sudo curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
             echo "$output"
           fi
           echo "------------WOPI external------------"
-          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
+          output=$(sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -323,24 +323,24 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
-          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 0--------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
+          output=$(sudo curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
             echo "$output"
           fi
           echo "------------WOPI external------------"
-          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
+          output=$(sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -408,24 +408,24 @@ jobs:
           sudo jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
           sudo jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
           echo "-------------healthcheck--------------"
-          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 1--------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
+          output=$(sudo curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
             echo "$output"
           fi
           echo "------------WOPI external------------"
-          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
+          output=$(sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
@@ -454,24 +454,24 @@ jobs:
           sudo jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
           sudo jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
           echo "-------------healthcheck--------------"
-          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 1--------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
+          output=$(sudo curl -s http://127.0.0.1/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
             echo "$output"
           fi
           echo "------------WOPI external------------"
-          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
+          output=$(sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery)
           if echo "$output" | grep -q 'value='; then
             echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
           else
