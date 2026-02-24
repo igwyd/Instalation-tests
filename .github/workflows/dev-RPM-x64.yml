@@ -458,7 +458,7 @@ jobs:
           echo "-------------DS services-------------"
           sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
-          sudo dpkg-query -l | grep onlyoffice-documentserver
+          sudo rpm -qa | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 1--------"

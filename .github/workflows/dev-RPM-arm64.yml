@@ -405,8 +405,8 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           echo "------------JWT settings-------------"
-          jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
-          jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
+          sudo jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
+          sudo jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
           echo "-------------healthcheck--------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
@@ -451,14 +451,14 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           echo "------------JWT settings-------------"
-          jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
-          jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
+          sudo jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
+          sudo jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
           echo "-------------healthcheck--------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
           echo "---------Installed packages----------"
-          sudo dpkg-query -l | grep onlyoffice-documentserver
+          sudo rpm -qa | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType must be 1--------"
