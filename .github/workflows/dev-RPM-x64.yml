@@ -91,7 +91,7 @@ jobs:
 
       - name: Upgrade RPM packages
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf -y clean all
           sudo dnf -y update
           sudo dnf install wget -y
@@ -107,12 +107,12 @@ jobs:
         continue-on-error: true
         run: |
           scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.repo ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.repo
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo cp /home/ec2-user/nginx.repo /etc/yum.repos.d/nginx.repo
           sudo yum install nginx -y
           EOF
           scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.conf ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.conf
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo cp /home/ec2-user/nginx.conf /etc/nginx/nginx.conf
           sudo yum install epel-release -y
 
@@ -158,7 +158,7 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
 
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
@@ -212,13 +212,13 @@ jobs:
       - name: Documentserver logs ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
 
       - name: Remove ONLYOFFICE-Docs EE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf remove onlyoffice-documentserver-ee -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
@@ -231,7 +231,7 @@ jobs:
 
       - name: Install ONLYOFFICE-Docs DE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf install onlyoffice-documentserver-de-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
           sudo service nginx start
           sudo systemctl enable nginx
@@ -241,7 +241,7 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
@@ -292,13 +292,13 @@ jobs:
       - name: Documentserver logs ONLYOFFICE-Docs DE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
 
       - name: Remove ONLYOFFICE-Docs DE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf remove onlyoffice-documentserver-de -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
@@ -311,7 +311,7 @@ jobs:
 
       - name: Install ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf install onlyoffice-documentserver-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
           sudo service nginx start
           sudo systemctl enable nginx
@@ -321,7 +321,7 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
@@ -372,13 +372,13 @@ jobs:
       - name: Documentserver logs ONLYOFFICE-Docs CE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
 
       - name: Remove ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf remove onlyoffice-documentserver -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
@@ -391,7 +391,7 @@ jobs:
 
       - name: Install ONLYOFFICE-Docs EE RELEASE for testing UPGRADE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo rm -rf /etc/yum.repos.d/onlyoffice-dev-*.repo
           sudo yum install https://download.onlyoffice.com/repo/centos/main/noarch/onlyoffice-repo.noarch.rpm -y
           sudo dnf install onlyoffice-documentserver-ee -y
@@ -403,7 +403,7 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE RELEASE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           echo "------------JWT settings-------------"
           jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
           jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
@@ -438,7 +438,7 @@ jobs:
 
       - name: Update ONLYOFFICE-EE to the DEV
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
           sudo yum upgrade onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
           sudo service nginx start
@@ -449,7 +449,7 @@ jobs:
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE DEV and JWT has not been modified
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           echo "------------JWT settings-------------"
           jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
           jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
@@ -503,7 +503,7 @@ jobs:
       - name: Documentserver logs ONLYOFFICE-Docs EE after UPGRADE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
 
