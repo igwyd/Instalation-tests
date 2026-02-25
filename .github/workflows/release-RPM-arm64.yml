@@ -104,16 +104,14 @@ jobs:
       - name: Install ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
-          scp -o StrictHostKeyChecking=no rpm-check-configs-arm/nginx.repo ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.repo
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo mv /home/ec2-user/nginx.repo /etc/yum.repos.d/nginx.repo
-          sudo chown root:root /etc/yum.repos.d/nginx.repo
+          scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.repo ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.repo
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          sudo cp /home/ec2-user/nginx.repo /etc/yum.repos.d/nginx.repo
           sudo yum install nginx -y
           EOF
-          scp -o StrictHostKeyChecking=no rpm-check-configs-arm/nginx.conf ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.conf
+          scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.conf ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.conf
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
-          sudo mv /home/ec2-user/nginx.conf /etc/nginx/nginx.conf
-          sudo chown root:root /etc/nginx/nginx.conf
+          sudo cp /home/ec2-user/nginx.conf /etc/nginx/nginx.conf
 
           sudo yum install epel-release -y
 
