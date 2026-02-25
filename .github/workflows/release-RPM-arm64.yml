@@ -142,9 +142,7 @@ jobs:
           sudo yum install fontconfig -y
           sudo rpm -i https://sourceforge.net/projects/mscorefonts2/files/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm
 
-          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
-
-          sudo yum install onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
+          sudo yum install onlyoffice-documentserver-ee -y
 
           sudo service nginx start
           sudo systemctl enable nginx
