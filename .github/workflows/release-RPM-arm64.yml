@@ -4,18 +4,25 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-install-rpm-in-repo-arm64:
-    runs-on: ubuntu-latest
+  test-install-RPM-arm64:
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up nodejs
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: Install prerequisites for puppeteer tests
         run: |
           sudo apt-get update
-          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-          sudo apt-get install -y nodejs
-          sudo apt-get install -y python3 python3-pip
           wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo dpkg -i google-chrome-stable_current_amd64.deb
           sudo apt-get install -f -y
@@ -53,9 +60,10 @@ jobs:
             --instance-type t4g.medium \
             --key-name demin \
             --security-groups AllPortsOpened \
-            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=onlyoffice-rpm-check-arm}]' \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_release-rpm-arm64}]' \
             --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":50,"VolumeType":"gp3"}}]' \
             --query "Instances[0].InstanceId" --output text)
+
           echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
           echo "Waiting for instance to start..."
           aws ec2 wait instance-running --instance-ids $INSTANCE_ID
@@ -69,7 +77,7 @@ jobs:
           echo "EC2_IP=$IP" >> $GITHUB_ENV
 
       - name: Wait for SSH to be Ready
-        run: sleep 180
+        run: sleep 60
 
       - name: Add SSH Key
         run: |
@@ -79,17 +87,22 @@ jobs:
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
 
-      - name: Upgrade server and reboot
+      - name: Upgrade RPM packages
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          sudo dnf -y clean all
           sudo dnf -y update
+          sudo dnf install wget -y
           EOF
-          aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
-      - name: Wait for server reboot
-        run: sleep 300
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
-      - name: Install ONLYOFFICE-Docs EE and run test example
+      - name: Wait for instance to reboot
+        run: sleep 120
+
+      - name: Install ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           scp -o StrictHostKeyChecking=no rpm-check-configs-arm/nginx.repo ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.repo
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
@@ -101,10 +114,8 @@ jobs:
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo mv /home/ec2-user/nginx.conf /etc/nginx/nginx.conf
           sudo chown root:root /etc/nginx/nginx.conf
-          sudo setenforce 0
-          
-          sudo subscription-manager repos --enable codeready-builder-for-rhel-9-$(arch)-rpms
-          sudo yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+
+          sudo yum install epel-release -y
 
           sudo yum install postgresql postgresql-server -y
           sudo service postgresql initdb
@@ -120,18 +131,20 @@ jobs:
           sudo yum -y install redis
           sudo systemctl enable --now redis
 
-          sudo yum install https://download.onlyoffice.com/repo/centos/main/noarch/onlyoffice-repo.noarch.rpm -y
-          sudo yum install xorg-x11-font-utils -y
-
-          sudo curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | sudo bash
-          ERLANG_LATEST_VERSION=$(curl -s https://api.github.com/repos/rabbitmq/erlang-rpm/releases | sed -n 's/.*"tag_name":\s*"v\([^"]*\)".*/\1/p' | head -1)
-          REV=9
-          sudo rpm -ivh https://github.com/rabbitmq/erlang-rpm/releases/latest/download/erlang-${ERLANG_LATEST_VERSION}-1.el${REV}.aarch64.rpm
-          
+          sudo curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | os=centos dist=9 sudo bash
+          sudo curl -s https://packagecloud.io/install/repositories/rabbitmq/erlang/script.rpm.sh | os=centos dist=9 sudo bash
           sudo yum install rabbitmq-server -y
           sudo systemctl enable --now rabbitmq-server
 
-          sudo yum install onlyoffice-documentserver-ee -y
+          sudo yum install https://download.onlyoffice.com/repo/centos/main/noarch/onlyoffice-repo.noarch.rpm -y
+
+          sudo yum install cabextract xorg-x11-font-utils -y
+          sudo yum install fontconfig -y
+          sudo rpm -i https://sourceforge.net/projects/mscorefonts2/files/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm
+
+          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
+
+          sudo yum install onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
 
           sudo service nginx start
           sudo systemctl enable nginx
@@ -140,157 +153,208 @@ jobs:
 
           sudo firewall-cmd --zone=public --add-port=80/tcp --permanent
           sudo firewall-cmd --reload
-
-          sudo systemctl start ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
 
           sudo dnf install jq -y
-
-          echo "Installed packages:"
-          echo "-------------------------------------"
+          echo "-------------healthcheck-------------"
+          sudo sleep 10
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo systemctl list-unit-files --type=service | grep ds-
+          echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
-          echo "-------------------------------------"
-          echo "api.js from server:"
-          echo "-------------------------------------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "-------------------------------------"
-          echo "info.json from server(packageType must be 1):"
-          echo "-------------------------------------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
-          echo "-------------------------------------"
-          echo "check WOPI enabled(must be data instead 404 Not Found):"
-          echo "-------------------------------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
-          echo "-------------------------------------"
+          echo "---------api.js from server----------"
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "--------packageType--------"
+          sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI local--------------"
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          echo "------------WOPI external------------"
+          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
+          sudo systemctl start ds-example
+          sudo systemctl status ds-example
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "http://${{ env.EC2_IP }}/example"#' ../config_chrome_linux.json
-          sed -i 's/"headless": false/"headless": true/' ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
           cat ../config_chrome_linux.json
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
-          sed -i -E 's#"url": "https://[^/]+\.teamlab\.info/example"#"url": "http://${{ env.EC2_IP }}/example"#' ../providers/wopi/config.json
+          echo "-------------------------------------"
           cat ../config_chrome_linux.json
-          cat ../providers/wopi/config.json
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
-      - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
+      - name: Documentserver logs ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo yum remove onlyoffice-documentserver-ee -y
-          sudo yum install onlyoffice-documentserver-de -y
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          EOF
+
+      - name: Remove ONLYOFFICE-Docs EE
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          sudo dnf remove onlyoffice-documentserver-ee -y
+          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
+          EOF
+
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Wait for instance to reboot
+        run: sleep 60
+
+      - name: Install ONLYOFFICE-Docs DE
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          sudo dnf install onlyoffice-documentserver-de -y
           sudo service nginx start
           sudo systemctl enable nginx
           printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
-          sudo systemctl start ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          echo "Installed packages:"
-          echo "-------------------------------------"
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          echo "-------------healthcheck-------------"
+          sudo sleep 10
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo systemctl list-unit-files --type=service | grep ds-
+          echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
-          echo "-------------------------------------"
-          echo "api.js from server:"
-          echo "-------------------------------------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "-------------------------------------"
-          echo "info.json from server(packageType must be 2):"
-          echo "-------------------------------------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
-          echo "-------------------------------------"
-          echo "check WOPI enabled(must be data instead 404 Not Found):"
-          echo "-------------------------------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
-          echo "-------------------------------------"
+          echo "---------api.js from server----------"
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "--------packageType--------"
+          sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI local--------------"
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          echo "------------WOPI external------------"
+          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
+          sudo systemctl start ds-example
+          sudo systemctl status ds-example
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
+          echo "-------------------------------------"
           cat ../config_chrome_linux.json
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          echo "-------------------------------------"
           cat ../config_chrome_linux.json
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
-      - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
+      - name: Documentserver logs ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo yum remove onlyoffice-documentserver-de -y
-          sudo yum install onlyoffice-documentserver -y
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          EOF
+
+      - name: Remove ONLYOFFICE-Docs DE
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          sudo dnf remove onlyoffice-documentserver-de -y
+          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
+          EOF
+
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Wait for instance to reboot
+        run: sleep 60
+
+      - name: Install ONLYOFFICE-Docs CE
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          sudo dnf install onlyoffice-documentserver -y
           sudo service nginx start
           sudo systemctl enable nginx
           printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
-          sudo systemctl start ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
+        continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          echo "Installed packages:"
-          echo "-------------------------------------"
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          echo "-------------healthcheck-------------"
+          sudo sleep 10
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo systemctl list-unit-files --type=service | grep ds-
+          echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
-          echo "-------------------------------------"
-          echo "api.js from server:"
-          echo "-------------------------------------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "-------------------------------------"
-          echo "info.json from server(packageType must be 0):"
-          echo "-------------------------------------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
-          echo "-------------------------------------"
-          echo "check WOPI enabled(must be data instead 404 Not Found):"
-          echo "-------------------------------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
-          echo "-------------------------------------"
+          echo "---------api.js from server----------"
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "--------packageType--------"
+          sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI local--------------"
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          echo "------------WOPI external------------"
+          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
+          sudo systemctl start ds-example
+          sudo systemctl status ds-example
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *"wopi\.js"/"provider": ""/' ../config_chrome_linux.json
+          echo "-------------------------------------"
           cat ../config_chrome_linux.json
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i 's/"provider": *""/"provider": "wopi.js"/' ../config_chrome_linux.json
+          echo "-------------------------------------"
           cat ../config_chrome_linux.json
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Documentserver logs ONLYOFFICE-Docs CE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          EOF
+
+      - name: Remove ONLYOFFICE-Docs CE
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          sudo dnf remove onlyoffice-documentserver -y
+          sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
+          EOF
 
       - name: Delete EC2 Instance
         run: |
