@@ -184,7 +184,7 @@ jobs:
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
       - name: Smoke puppeteer WOPI tests
         continue-on-error: true
@@ -193,7 +193,7 @@ jobs:
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
       - name: Documentserver logs PUPPETEER TEST
         run: |
