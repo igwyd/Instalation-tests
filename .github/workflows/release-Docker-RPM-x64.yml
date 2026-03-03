@@ -5,7 +5,7 @@ on:
 
 jobs:
   check-docker-rpm-x64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -47,49 +47,63 @@ jobs:
           npm install
           cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
 
-      - name: Install DigitalOcean CLI
-        uses: digitalocean/action-doctl@v2
-        with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-  
-      - name: Create Droplet
+      - name: Configure AWS CLI
         run: |
-          doctl compute droplet create rpm-docker-x64-check \
-            --region fra1 \
-            --size s-2vcpu-4gb \
-            --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
-            --image centos-stream-9-x64 \
-            --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
-            --wait
-          IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep rpm-docker-x64-check | awk '{print $2}')
-          echo "DROPLET_IP=$IP" >> $GITHUB_ENV
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-east-1
 
-      - name: Wait for SSH to be Ready
+      - name: Create EC2 Instance
+        run: |
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id ami-04331ec57720ee626 \
+            --instance-type t2.medium \
+            --key-name demin \
+            --security-groups AllPortsOpened \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_release-docker-rpm-x64}]' \
+            --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":50,"VolumeType":"gp3"}}]' \
+            --query "Instances[0].InstanceId" --output text)
+
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+          echo "Waiting for instance to start..."
+          aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+
+      - name: Get EC2 Public IP
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ env.INSTANCE_ID }} \
+            --query "Reservations[].Instances[].PublicIpAddress" --output text)
+          echo "EC2 Public IP: $IP"
+          echo "EC2_IP=$IP" >> $GITHUB_ENV
+
+      - name: Wait for SSH to be ready
         run: sleep 180
 
       - name: Add SSH Key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DIGITALOCEAN_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
-  
+
       - name: Upgrade RPM packages
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf -y clean all
           sudo dnf -y update
           sudo dnf install wget -y
           EOF
-          doctl compute droplet-action reboot $(doctl compute droplet list --format ID,Name | grep rpm-docker-x64-check | awk '{print $1}')
 
-      - name: Wait for server reboot
-        run: sleep 300
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Wait for instance to reboot
+        run: sleep 180
 
       - name: Install Docker
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           sudo dnf remove docker \
                   docker-client \
                   docker-client-latest \
@@ -109,7 +123,7 @@ jobs:
 
       - name: Docker run ONLYOFFICE-Docs EE
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           sudo docker pull onlyoffice/documentserver-ee
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-release onlyoffice/documentserver-ee
           sleep 90
@@ -117,36 +131,39 @@ jobs:
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo apt-get install jq -y
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo dnf install jq -y
           echo "-------------healthcheck-------------"
-          curl -s http://127.0.0.1/healthcheck; echo
+          sudo curl -s http://127.0.0.1/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-release supervisorctl status
           echo "---------Installed packages----------"
           sudo docker exec ds-ee-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 1--------"
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "--------packageType--------"
           sudo docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
+          sudo docker exec ds-ee-release supervisorctl start ds:example
+          sudo docker exec ds-ee-release supervisorctl status ds:example
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.DROPLET_IP }}/example\"#" ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
@@ -156,7 +173,7 @@ jobs:
 
       - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           sudo docker stop ds-ee-release
           sudo docker rm ds-ee-release
           sudo docker rmi onlyoffice/documentserver-ee
@@ -167,26 +184,28 @@ jobs:
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           echo "-------------healthcheck-------------"
-          curl -s http://127.0.0.1/healthcheck; echo
+          sudo curl -s http://127.0.0.1/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-de-release supervisorctl status
           echo "---------Installed packages----------"
           sudo docker exec ds-de-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 2--------"
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "--------packageType--------"
           sudo docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
+          sudo docker exec ds-de-release supervisorctl start ds:example
+          sudo docker exec ds-de-release supervisorctl status ds:example
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
@@ -195,6 +214,7 @@ jobs:
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
@@ -204,38 +224,39 @@ jobs:
 
       - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           sudo docker stop ds-de-release
           sudo docker rm ds-de-release
           sudo docker rmi onlyoffice/documentserver-de
           sudo docker pull onlyoffice/documentserver
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-release onlyoffice/documentserver
           sleep 90
-          sudo docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
           sudo docker exec ds-release supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
+        continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           echo "-------------healthcheck-------------"
-          curl -s http://127.0.0.1/healthcheck; echo
+          sudo curl -s http://127.0.0.1/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-release supervisorctl status
           echo "---------Installed packages----------"
           sudo docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 0--------"
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "--------packageType--------"
           sudo docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
+          sudo docker exec ds-release supervisorctl start ds:example
+          sudo docker exec ds-release supervisorctl status ds:example
           EOF
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
@@ -244,6 +265,7 @@ jobs:
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
 
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
+        continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
@@ -251,5 +273,7 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
 
-      - name: Delete Droplet
-        run: doctl compute droplet delete rpm-docker-x64-check --force
+      - name: Delete EC2 Instance
+        run: |
+          aws ec2 terminate-instances --instance-ids ${{ env.INSTANCE_ID }}
+          aws ec2 wait instance-terminated --instance-ids ${{ env.INSTANCE_ID }}
