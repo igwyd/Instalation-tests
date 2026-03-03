@@ -1,37 +1,59 @@
-# Installation tests
-ONLYOFFICE-Docs installation checks
-## Develop
-### DEB installation, install from manual (Scheduled every wednesday at 15:00 UTC+3)
-Tested version **<!-- onlyoffice-version-start -->v9.3.1-8<!-- onlyoffice-version-end -->** \
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64.yml/badge.svg?branch=main)  
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-arm64.yml/badge.svg?branch=main)  
-### RPM installation, install from manual (Scheduled every wednesday at 15:00 UTC+3)
-Tested version **<!-- onlyoffice-version-start -->v9.3.1-8<!-- onlyoffice-version-end -->** \
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64.yml/badge.svg?branch=main)  
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-arm64.yml/badge.svg?branch=main)  
-### Tests with Redis (Scheduled every wednesday at 15:00 UTC+3)
-Tested version **<!-- onlyoffice-version-start -->v9.3.1-8<!-- onlyoffice-version-end -->** \
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Redis-unix.sock.yml/badge.svg?branch=main)  
-### Tests with DataBases (Scheduled every wednesday at 15:00 UTC+3)
-Tested version **<!-- onlyoffice-version-start -->v9.3.1-8<!-- onlyoffice-version-end -->** \
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-Oracle.yml/badge.svg?branch=main)  
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mysql.yml/badge.svg?branch=main)  
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mssql.yml/badge.svg?branch=main)  
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-postgres.yml/badge.svg?branch=main)  
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-dameng.yml/badge.svg?branch=main)  
+# ONLYOFFICE Docs — Installation Tests
+
+Automated installation testing of ONLYOFFICE Docs packages via GitHub Actions.
+
+## Dev builds
+
+Pre-release builds from S3 dev repo. Scheduled every Wednesday at 15:00 UTC+3.
+
+Tested version: **<!-- onlyoffice-version-start -->v9.3.1-8<!-- onlyoffice-version-end -->**
+
+### Package installation
+
+| Test | x64 | arm64 |
+|------|-----|-------|
+| DEB (Ubuntu) | ![dev-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64.yml/badge.svg?branch=main) | ![dev-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-arm64.yml/badge.svg?branch=main) |
+| RPM (CentOS 9) | ![dev-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64.yml/badge.svg?branch=main) | ![dev-RPM-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-arm64.yml/badge.svg?branch=main) |
+
+### Backend tests
+
+| Test | Status |
+|------|--------|
+| Unix socket (redis + ioredis) | ![dev-Redis](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Redis-unix.sock.yml/badge.svg?branch=main) |
+
+### Databases
+
+| Database | Status |
+|----------|--------|
+| PostgreSQL | ![postgres](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-postgres.yml/badge.svg?branch=main) |
+| MySQL | ![mysql](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mysql.yml/badge.svg?branch=main) |
+| MSSQL | ![mssql](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mssql.yml/badge.svg?branch=main) |
+| Oracle | ![oracle](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-Oracle.yml/badge.svg?branch=main) |
+| Dameng | ![dameng](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-dameng.yml/badge.svg?branch=main) |
+
+
 ## Release
-### Check DEB version in current release repo, installation guide from helpcenter 
-Test DEB package installation ONLYOFFICE-Docs EE, DE and CE from released repo. \
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/release-DEB-x64.yml/badge.svg?branch=main)  
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/release-DEB-arm64.yml/badge.svg?branch=main)
-### Check RPM version in current release repo, installation guide from helpcenter  
-Test RPM package installation ONLYOFFICE-Docs EE, DE and CE from released repo. \
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/release-RPM-x64.yml/badge.svg?branch=main)  
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/release-RPM-arm64.yml/badge.svg?branch=main)  
-### Check Docker version current release
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-x64.yml/badge.svg?branch=main) \
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-RPM-x64.yml/badge.svg?branch=main) \
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-arm64.yml/badge.svg?branch=main) 
-## Common
-### Compile from source
-![GitHub Actions Status](https://github.com/igwyd/Instalation-tests/actions/workflows/Compile.yml/badge.svg?branch=main)  
+
+Official public repos. Triggered manually via `workflow_dispatch`.
+
+### Package installation
+
+| Test | x64 | arm64 |
+|------|-----|-------|
+| DEB (Ubuntu) | ![release-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-DEB-x64.yml/badge.svg?branch=main) | ![release-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-DEB-arm64.yml/badge.svg?branch=main) |
+| RPM (CentOS 9) | ![release-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-RPM-x64.yml/badge.svg?branch=main) | ![release-RPM-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-RPM-arm64.yml/badge.svg?branch=main) |
+
+### Docker
+
+| Test | x64 | arm64 |
+|------|-----|-------|
+| DEB-based image | ![docker-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-x64.yml/badge.svg?branch=main) | ![docker-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-arm64.yml/badge.svg?branch=main) |
+| RPM-based image | ![docker-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-RPM-x64.yml/badge.svg?branch=main) | |
+
+---
+
+## Other
+
+| Test | Status |
+|------|--------|
+| Compile from source | ![compile](https://github.com/igwyd/Instalation-tests/actions/workflows/Compile.yml/badge.svg?branch=main) |
