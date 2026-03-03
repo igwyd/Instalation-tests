@@ -104,11 +104,12 @@ jobs:
         run: sleep 180
 
       - name: Install ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 ubuntu@${{ env.EC2_IP }} << EOF
-          sudo apt-get install postgresql -y && \
-          sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';" && \
-          sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;" && \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo apt-get install postgresql -y
+          sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';"
+          sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;"
           echo onlyoffice-documentserver-ee onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
 
           sudo apt-get install redis-server -y
@@ -123,16 +124,16 @@ jobs:
 
           echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" | sudo tee /etc/apt/sources.list.d/onlyoffice.list
 
-          sudo apt-get update && \
-          echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections && \
+          sudo apt-get update
+          echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
           sudo apt-get install ttf-mscorefonts-installer -y
 
-          echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
+          echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
           echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
           sudo apt-get update
           sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y
-          sleep 10
           EOF
+
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         continue-on-error: true
@@ -141,30 +142,21 @@ jobs:
 
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo sleep 10
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
+          sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 1--------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "--------packageType--------"
+          sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
-          echo "------------- DS-example -------------"
+          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
           sudo systemctl start ds-example
           sudo systemctl status ds-example
           EOF
@@ -192,13 +184,13 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
 
       - name: Remove ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
+          sudo apt-get purge onlyoffice-documentserver-ee -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
@@ -211,9 +203,9 @@ jobs:
       - name: Install ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          echo onlyoffice-documentserver-de onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections && \
-          echo onlyoffice-documentserver-de onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
-          printf "n/n" | sudo apt-get install onlyoffice-documentserver-de=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y && \
+          echo onlyoffice-documentserver-de onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
+          echo onlyoffice-documentserver-de onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
+          sudo apt-get install onlyoffice-documentserver-de=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
@@ -221,30 +213,21 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
-          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo sleep 10
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
+          sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 2--------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "--------packageType--------"
+          sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
-          echo "------------- DS-example -------------"
+          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
           sudo systemctl start ds-example
           sudo systemctl status ds-example
           EOF
@@ -257,7 +240,7 @@ jobs:
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
-  
+
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
         continue-on-error: true
         run: |
@@ -271,28 +254,28 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
 
       - name: Remove ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
+          sudo apt-get purge onlyoffice-documentserver-de -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
       - name: Reboot EC2 Instance
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
-  
+
       - name: Wait for instance to reboot
         run: sleep 120
 
       - name: Install ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          echo onlyoffice-documentserver onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections && \
-          echo onlyoffice-documentserver onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
-          printf "n/n" | sudo apt-get install onlyoffice-documentserver=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y && \
+          echo onlyoffice-documentserver onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
+          echo onlyoffice-documentserver onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
+          sudo apt-get install onlyoffice-documentserver=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
@@ -300,30 +283,21 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
-          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo sleep 10
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
+          sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 0--------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "--------packageType--------"
+          sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
-          echo "------------- DS-example -------------"
+          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
           sudo systemctl start ds-example
           sudo systemctl status ds-example
           EOF
@@ -336,7 +310,7 @@ jobs:
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
-  
+
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
         continue-on-error: true
         run: |
@@ -350,19 +324,19 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
 
       - name: Remove ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
+          sudo apt-get purge onlyoffice-documentserver -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
       - name: Reboot EC2 Instance
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
-  
+
       - name: Wait for instance to reboot
         run: sleep 120
 
@@ -370,9 +344,9 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           sudo rm -rf /etc/apt/sources.list.d/onlyoffice-dev.list
-          echo onlyoffice-documentserver-ee onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections && \
-          echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections && \
-          printf "n/n" | sudo apt-get install onlyoffice-documentserver-ee -y && \
+          echo onlyoffice-documentserver-ee onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
+          echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
+          sudo apt-get install onlyoffice-documentserver-ee -y
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE RELEASE
@@ -380,33 +354,24 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           echo "------------JWT settings-------------"
-          jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
-          jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
-          echo "-------------healthcheck--------------"
-          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
+          sudo jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
+          echo "-------------healthcheck-------------"
+          sudo sleep 10
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
+          sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 1--------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "--------packageType--------"
+          sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
-          echo "------------- DS-example -------------"
+          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
           sudo systemctl start ds-example
           sudo systemctl status ds-example
           EOF
@@ -424,33 +389,24 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           echo "------------JWT settings-------------"
-          jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
-          jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
-          echo "-------------healthcheck--------------"
-          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
+          sudo jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
+          echo "-------------healthcheck-------------"
+          sudo sleep 10
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo systemctl status ds-converter ds-docservice ds-example ds-adminpanel ds-metrics
+          sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
           echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 1--------"
-          curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
+          echo "--------packageType--------"
+          sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          output=$(curl -s http://${{ env.EC2_IP }}/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
-          echo "------------- DS-example -------------"
+          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
           sudo systemctl start ds-example
           sudo systemctl status ds-example
           EOF
@@ -463,7 +419,7 @@ jobs:
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
-  
+
       - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
@@ -477,7 +433,7 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
 
       - name: Delete EC2 Instance
