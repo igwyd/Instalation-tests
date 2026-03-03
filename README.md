@@ -50,8 +50,6 @@ Official public repos. Triggered manually via `workflow_dispatch`.
 | DEB-based image | ![docker-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-x64.yml/badge.svg?branch=main) | ![docker-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-arm64.yml/badge.svg?branch=main) |
 | RPM-based image | ![docker-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-RPM-x64.yml/badge.svg?branch=main) | |
 
----
-
 ## Other
 
 | Test | Status |
