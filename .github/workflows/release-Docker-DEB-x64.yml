@@ -55,23 +55,24 @@ jobs:
           docker exec ds-ee-release supervisorctl start all
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
           curl -s http://127.0.0.1/healthcheck; echo
+          echo "-------------DS services-------------"
+          docker exec ds-ee-release supervisorctl status
           echo "---------Installed packages----------"
           docker exec ds-ee-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 1--------"
+          echo "--------packageType--------"
           docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
+          docker exec ds-ee-release supervisorctl start ds:example
+          docker exec ds-ee-release supervisorctl status ds:example
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
         continue-on-error: true
@@ -103,22 +104,23 @@ jobs:
           docker exec ds-de-release supervisorctl start all
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
+        continue-on-error: true
         run: |
           echo "-------------healthcheck-------------"
           curl -s http://127.0.0.1/healthcheck; echo
+          echo "-------------DS services-------------"
+          docker exec ds-de-release supervisorctl status
           echo "---------Installed packages----------"
           docker exec ds-de-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 2--------"
+          echo "--------packageType--------"
           docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
+          docker exec ds-de-release supervisorctl start ds:example
+          docker exec ds-de-release supervisorctl status ds:example
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
         continue-on-error: true
@@ -150,22 +152,23 @@ jobs:
           docker exec ds-release supervisorctl start all
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
+        continue-on-error: true
         run: |
           echo "-------------healthcheck-------------"
           curl -s http://127.0.0.1/healthcheck; echo
+          echo "-------------DS services-------------"
+          docker exec ds-release supervisorctl status
           echo "---------Installed packages----------"
           docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
           echo "---------api.js from server----------"
           curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
-          echo "--------packageType must be 0--------"
+          echo "--------packageType--------"
           docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          output=$(curl -s http://127.0.0.1/hosting/discovery)
-          if echo "$output" | grep -q 'value='; then
-            echo "$output" | grep -o 'value="[^"]*"' | head -n 5 | cut -c1-100
-          else
-            echo "$output"
-          fi
+          curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          echo "-------------DS-example-------------"
+          docker exec ds-release supervisorctl start ds:example
+          docker exec ds-release supervisorctl status ds:example
 
       - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
         continue-on-error: true
