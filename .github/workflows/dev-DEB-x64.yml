@@ -190,7 +190,7 @@ jobs:
       - name: Remove ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          sudo apt-get purge onlyoffice-documentserver-ee -y
+          printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
@@ -260,7 +260,7 @@ jobs:
       - name: Remove ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          sudo apt-get purge onlyoffice-documentserver-de -y
+          printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
@@ -330,7 +330,7 @@ jobs:
       - name: Remove ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          sudo apt-get purge onlyoffice-documentserver -y
+          printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
