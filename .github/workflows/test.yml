@@ -10,61 +10,58 @@ jobs:
     runs-on: ubuntu-22.04
 
     strategy:
+      fail-fast: false
       matrix:
-        os:
-          - debian11
-          - debian12
-          - rhel9
+        include:
+          - distr: debian
+            os: bullseye64
+            name: "Debian 11"
 
-    name: Test ${{ matrix.os }}
+          - distr: debian
+            os: bookworm64
+            name: "Debian 12"
+
+          - distr: onlyoffice
+            os: base-rhel9
+            name: "RHEL 9"
+
+    name: Test ${{ matrix.name }}
 
     steps:
+
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/local/lib/android || true
 
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install Vagrant + VirtualBox
+      - name: Set up Vagrant and VirtualBox
         run: |
-          echo "----- OS INFO -----"
-          sudo cat /etc/os-release
-          echo "-------------------"
-          sudo apt-get update
-          sudo apt-get install -y vagrant virtualbox
-
-      - name: Set box name
-        run: |
-          if [ "${{ matrix.os }}" = "debian11" ]; then
-            echo "BOX=debian/bullseye64" >> $GITHUB_ENV
-          fi
-
-          if [ "${{ matrix.os }}" = "debian12" ]; then
-            echo "BOX=debian/bookworm64" >> $GITHUB_ENV
-          fi
-
-          if [ "${{ matrix.os }}" = "rhel9" ]; then
-            echo "BOX=generic/rhel9" >> $GITHUB_ENV
-          fi
-
-      - name: Create Vagrantfile dynamically
-        run: |
-          cat > ./Install-os/Vagrantfile <<EOF
-          Vagrant.configure("2") do |config|
-            config.vm.box = ENV['BOX']
-
-            config.vm.provider "virtualbox" do |vb|
-              vb.memory = "4096"
-              vb.cpus = 2
-            end
-
-            config.vm.provision "shell", inline: <<-SHELL
-              set -e
-              curl -O https://download.onlyoffice.com/docs/docs-enterprise-install.sh
-              chmod +x docs-enterprise-install.sh
-              printf "n\n" | sudo bash docs-enterprise-install.sh
-            SHELL
-          end
-          EOF
+          gpg --keyserver keyserver.ubuntu.com --recv-keys A2F683C52980AECF && gpg --export A2F683C52980AECF > /usr/share/keyrings/virtualbox.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/virtualbox.gpg] https://download.virtualbox.org/virtualbox/debian $(. /etc/os-release && echo $UBUNTU_CODENAME) contrib" | sudo tee /etc/apt/sources.list.d/virtualbox.list
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt-get update -y
+          sudo apt-get install -y vagrant
+          curl -fsSL "https://download.virtualbox.org/virtualbox/7.1.12/virtualbox-7.1_7.1.12-169651~Ubuntu~jammy_amd64.deb" -o /tmp/vbox.deb && sudo apt-get install -y /tmp/vbox.deb
 
       - name: Start VM
-        working-directory: ./Install-os
-        run: vagrant up
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 2
+          timeout_minutes: 25
+          command: |
+            set -eux
+            cd Install-os
+              DISTR='${{ matrix.distr }}' \
+              OS='${{ matrix.os }}' \
+              RAM='4096' \
+              CPU='2' \
+              timeout --signal=SIGTERM --kill-after=60s 24m \
+              vagrant up
+          on_retry_command: |
+            echo "RUN CLEAN UP: Destroy vagrant and one more try"
+            cd Install-os
+            sleep 10
+            vagrant destroy --force
