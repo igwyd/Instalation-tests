@@ -4,20 +4,66 @@ on:
   workflow_dispatch:
 
 jobs:
-  debian11:
-    name: Test Docs with Debian 11
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo test
 
-  debian12:
-    name: Test Docs with Debian 12
-    runs-on: ubuntu-latest
-    steps:
-      - run: ./test.sh1
+  install-test:
 
-  rhel9:
-    name: Test Docs with RHEL 9
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
+    strategy:
+      matrix:
+        os:
+          - debian11
+          - debian12
+          - rhel9
+
+    name: Test ${{ matrix.os }}
+
     steps:
-      - run: echo test
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Vagrant + VirtualBox
+        run: |
+          echo "----- OS INFO -----"
+          sudo cat /etc/os-release
+          echo "-------------------"
+          sudo apt-get update
+          sudo apt-get install -y vagrant virtualbox
+
+      - name: Set box name
+        run: |
+          if [ "${{ matrix.os }}" = "debian11" ]; then
+            echo "BOX=debian/bullseye64" >> $GITHUB_ENV
+          fi
+
+          if [ "${{ matrix.os }}" = "debian12" ]; then
+            echo "BOX=debian/bookworm64" >> $GITHUB_ENV
+          fi
+
+          if [ "${{ matrix.os }}" = "rhel9" ]; then
+            echo "BOX=generic/rhel9" >> $GITHUB_ENV
+          fi
+
+      - name: Create Vagrantfile dynamically
+        run: |
+          cat > ./Install-os/Vagrantfile <<EOF
+          Vagrant.configure("2") do |config|
+            config.vm.box = ENV['BOX']
+
+            config.vm.provider "virtualbox" do |vb|
+              vb.memory = "4096"
+              vb.cpus = 2
+            end
+
+            config.vm.provision "shell", inline: <<-SHELL
+              set -e
+              curl -O https://download.onlyoffice.com/docs/docs-enterprise-install.sh
+              chmod +x docs-enterprise-install.sh
+              printf "n\n" | sudo bash docs-enterprise-install.sh
+            SHELL
+          end
+          EOF
+
+      - name: Start VM
+        run: vagrant up

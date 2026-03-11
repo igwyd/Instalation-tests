@@ -1,0 +1,22 @@
+Vagrant.configure("2") do |config|
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "4096"
+    vb.cpus = 2
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+    set -e
+
+    echo "Downloading ONLYOFFICE installer..."
+
+    curl -O https://download.onlyoffice.com/docs/docs-enterprise-install.sh
+
+    chmod +x docs-enterprise-install.sh
+
+    echo "Running installer..."
+
+    sudo bash docs-enterprise-install.sh
+  SHELL
+
+end
