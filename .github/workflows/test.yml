@@ -21,8 +21,8 @@ jobs:
             os: bookworm64
             name: "Debian 12"
 
-          - distr: onlyoffice
-            os: base-rhel9
+          - distr: generic
+            os: rhel9
             name: "RHEL 9"
 
     name: Test ${{ matrix.name }}
