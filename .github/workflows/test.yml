@@ -66,4 +66,5 @@ jobs:
           EOF
 
       - name: Start VM
+        working-directory: ./Install-os
         run: vagrant up
