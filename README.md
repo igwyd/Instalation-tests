@@ -9,12 +9,22 @@ Pre-release builds from S3 dev repo. Scheduled every Wednesday at 15:00 UTC+3.
 Tested version: **<!-- onlyoffice-version-start -->v9.3.1-8<!-- onlyoffice-version-end -->**
 
 ### Package installation
-* Install from helpcenter guide and run all tests 
+- Install from helpcenter guide and run all tests 
 
 | Test | x64 | arm64 |
 |------|-----|-------|
 | DEB (Ubuntu 24.04) | ![dev-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64.yml/badge.svg?branch=main) | ![dev-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-arm64.yml/badge.svg?branch=main) |
 | RPM (CentOS 9) | ![dev-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64.yml/badge.svg?branch=main) | ![dev-RPM-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-arm64.yml/badge.svg?branch=main) |
+
+- Check installation on supported OS
+
+
+| OS | Status |
+|---|---|
+| Debian 11 | ![debian11](https://github.com/igwyd/Instalation-tests/actions/workflows/test.yml/badge.svg?branch=main&job=debian11) |
+| Debian 12 | ![Debian12](https://github.com/igwyd/Instalation-tests/actions/workflows/test.yml/badge.svg?branch=main&job=debian12) |
+| RHEL 9 | ![rhel9](https://github.com/igwyd/Instalation-tests/actions/workflows/test.yml/badge.svg?branch=main&job=rhel9) |
+
 
 ### Backend tests
 
