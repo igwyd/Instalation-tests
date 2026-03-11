@@ -22,8 +22,8 @@ Vagrant.configure("2") do |config|
       sudo dnf install -y curl
     fi
 
-    curl -O https://download.onlyoffice.com/docs/docs-enterprise-install.sh
-    chmod +x docs-enterprise-install.sh
-    printf "n\\n" | sudo bash docs-enterprise-install.sh
+    curl -O https://download.onlyoffice.com/docs/docs-install.sh
+    chmod +x docs-install.sh
+    printf "n\\n" | sudo bash docs-install.sh
   SHELL
 end
