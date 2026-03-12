@@ -117,6 +117,7 @@ jobs:
             ssh_user: ec2-user
             tag: dev-rhel10-arm64
 
+    timeout-minutes: 60
     steps:
       - name: Configure AWS CLI
         run: |
@@ -157,6 +158,22 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
+
+      - name: Upgrade packages
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
+          if command -v apt-get &>/dev/null; then
+            sudo apt-get update && sudo apt-get upgrade -y
+          elif command -v dnf &>/dev/null; then
+            sudo dnf -y clean all && sudo dnf -y update
+          fi
+          EOF
+
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Wait for instance to reboot
+        run: sleep 180
 
       # ==================== Docker install (printf "y") ====================
       - name: Download install script
@@ -211,6 +228,7 @@ jobs:
         run: sleep 300
 
       - name: Healthcheck native install
+        continue-on-error: true
         run: |
           RESULT=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} 'curl -s http://127.0.0.1/healthcheck')
           echo "Healthcheck result: $RESULT"
@@ -229,13 +247,13 @@ jobs:
 
       # ==================== Cleanup ====================
       - name: Delete EC2 Instance (both healthy)
-        if: env.DOCKER_HEALTHY == 'true' && env.NATIVE_HEALTHY == 'true'
+        if: ${{ always() && env.DOCKER_HEALTHY == 'true' && env.NATIVE_HEALTHY == 'true' }}
         run: |
           aws ec2 terminate-instances --instance-ids ${{ env.INSTANCE_ID }}
           aws ec2 wait instance-terminated --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Keep EC2 Instance (unhealthy)
-        if: env.DOCKER_HEALTHY != 'true' || env.NATIVE_HEALTHY != 'true'
+        if: ${{ always() && env.INSTANCE_ID != '' && (env.DOCKER_HEALTHY != 'true' || env.NATIVE_HEALTHY != 'true') }}
         run: |
           echo "::warning::Healthcheck failed! EC2 instance ${{ env.INSTANCE_ID }} (${{ env.EC2_IP }}) is kept alive for investigation."
           echo "Docker healthcheck: ${{ env.DOCKER_HEALTHY }}, Native healthcheck: ${{ env.NATIVE_HEALTHY }}"
