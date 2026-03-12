@@ -1,0 +1,176 @@
+name: dev OS RHEL 9
+
+on:
+  schedule:
+    - cron: '0 14 * * 3'  # Wednesday 17:00 Moscow time (UTC+3)
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    name: RHEL 9 ${{ matrix.arch }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            ami: ami-0d8d3b1122e36c000
+            instance_type: t2.medium
+            tag: dev-rhel9-x64
+
+          - arch: arm64
+            ami: ami-0734d5fad59e3ba53
+            instance_type: t4g.medium
+            tag: dev-rhel9-arm64
+
+    steps:
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-east-1
+
+      - name: Create EC2 Instance
+        run: |
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id ${{ matrix.ami }} \
+            --instance-type ${{ matrix.instance_type }} \
+            --key-name demin \
+            --security-groups AllPortsOpened \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_${{ matrix.tag }}}]' \
+            --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":50,"VolumeType":"gp3"}}]' \
+            --query "Instances[0].InstanceId" --output text)
+
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+          echo "Waiting for instance to start..."
+          aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+
+      - name: Get EC2 Public IP
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ env.INSTANCE_ID }} \
+            --query "Reservations[].Instances[].PublicIpAddress" --output text)
+          echo "EC2 Public IP: $IP"
+          echo "EC2_IP=$IP" >> $GITHUB_ENV
+
+      - name: Wait for SSH to be Ready
+        run: sleep 180
+
+      - name: Add SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Upgrade packages
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo dnf -y clean all && sudo dnf -y update
+          EOF
+
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Wait for instance to reboot
+        run: sleep 180
+
+      # ==================== Docker install (printf "y") ====================
+      - name: Download install script
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          curl -O https://download.onlyoffice.com/docs/docs-enterprise-install.sh
+          sudo chmod +x docs-enterprise-install.sh
+          EOF
+
+      - name: Install ONLYOFFICE Docs in Docker
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          printf "y\n" | sudo bash docs-enterprise-install.sh --documentimage onlyoffice/4testing-documentserver-ee --documentversion ${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
+          EOF
+
+      - name: Wait for Docker install to start
+        run: sleep 300
+
+      - name: Healthcheck Docker install
+        continue-on-error: true
+        run: |
+          RESULT=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} 'curl -s http://127.0.0.1/healthcheck')
+          echo "Healthcheck result: $RESULT"
+          if [ "$RESULT" = "true" ]; then
+            echo "DOCKER_HEALTHY=true" >> $GITHUB_ENV
+          else
+            echo "DOCKER_HEALTHY=false" >> $GITHUB_ENV
+          fi
+
+      - name: Documentserver logs Docker install
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo docker logs $(sudo docker ps -q --filter "name=onlyoffice") 2>&1 | tail -n 1000 || true
+          EOF
+
+      - name: Remove Docker containers
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo docker rm -f $(sudo docker ps -aq) 2>/dev/null || true
+          sudo docker system prune -af 2>/dev/null || true
+          EOF
+
+      # ==================== Native install (printf "n") ====================
+      - name: Add dev repo
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
+          EOF
+
+      - name: Install ONLYOFFICE Docs natively
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          printf "n\n" | sudo bash docs-enterprise-install.sh
+          EOF
+
+      - name: Wait for native install to start
+        run: sleep 10
+
+      - name: Healthcheck native install
+        continue-on-error: true
+        run: |
+          RESULT=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} 'curl -s http://127.0.0.1/healthcheck')
+          echo "Healthcheck result: $RESULT"
+          if [ "$RESULT" = "true" ]; then
+            echo "NATIVE_HEALTHY=true" >> $GITHUB_ENV
+          else
+            echo "NATIVE_HEALTHY=false" >> $GITHUB_ENV
+          fi
+
+      - name: Documentserver logs native install
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
+          EOF
+
+      # ==================== Cleanup ====================
+      - name: Delete EC2 Instance (both healthy)
+        if: ${{ always() && env.DOCKER_HEALTHY == 'true' && env.NATIVE_HEALTHY == 'true' }}
+        run: |
+          aws ec2 terminate-instances --instance-ids ${{ env.INSTANCE_ID }}
+          aws ec2 wait instance-terminated --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Keep EC2 Instance (unhealthy)
+        if: ${{ always() && env.INSTANCE_ID != '' && (env.DOCKER_HEALTHY != 'true' || env.NATIVE_HEALTHY != 'true') }}
+        run: |
+          echo "::warning::Healthcheck failed! EC2 instance ${{ env.INSTANCE_ID }} (${{ env.EC2_IP }}) is kept alive for investigation."
+          echo "Docker healthcheck: ${{ env.DOCKER_HEALTHY }}, Native healthcheck: ${{ env.NATIVE_HEALTHY }}"
+          echo "Instance: ${{ env.INSTANCE_ID }}, IP: ${{ env.EC2_IP }}, Tag: ${{ matrix.tag }}"
+
+      - name: Fail job if healthcheck failed
+        if: ${{ always() && (env.DOCKER_HEALTHY != 'true' || env.NATIVE_HEALTHY != 'true') }}
+        run: |
+          echo "::error::Docker healthy: ${{ env.DOCKER_HEALTHY }}, Native healthy: ${{ env.NATIVE_HEALTHY }}"
+          exit 1

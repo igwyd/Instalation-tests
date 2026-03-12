@@ -4,26 +4,28 @@ Automated installation testing of ONLYOFFICE Docs packages via GitHub Actions.
 
 ## Dev builds
 
-Pre-release builds from S3 dev repo. Scheduled every Wednesday at 15:00 UTC+3.
+Pre-release builds from S3 dev repo.
 
 Tested version: **<!-- onlyoffice-version-start -->v9.4.0-11<!-- onlyoffice-version-end -->**
 
 ### Package installation
-- Install from helpcenter guide and run all tests 
+- Install from helpcenter guide and run all tests (Scheduled every Wednesday at 15:00 UTC+3)
 
 | Test | x64 | arm64 |
 |------|-----|-------|
 | DEB (Ubuntu 24.04) | ![dev-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64.yml/badge.svg?branch=main) | ![dev-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-arm64.yml/badge.svg?branch=main) |
 | RPM (CentOS 9) | ![dev-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64.yml/badge.svg?branch=main) | ![dev-RPM-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-arm64.yml/badge.svg?branch=main) |
 
-- Check installation on supported OS
+- Check installation on supported OS (Scheduled every Wednesday at 17:00 UTC+3)
 
-
-| OS | Status |
+| OS | x64/arm64 |
 |---|---|
-| Debian 11 | ![debian11](https://github.com/igwyd/Instalation-tests/actions/workflows/test.yml/badge.svg?branch=main&job=debian11) |
-| Debian 12 | ![Debian12](https://github.com/igwyd/Instalation-tests/actions/workflows/test.yml/badge.svg?branch=main&job=debian12) |
-| RHEL 9 | ![rhel9](https://github.com/igwyd/Instalation-tests/actions/workflows/test.yml/badge.svg?branch=main&job=rhel9) |
+| Ubuntu 22.04 | ![ubuntu2204](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-ubuntu2204.yml/badge.svg?branch=main) |
+| Debian 12 | ![debian12](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-debian12.yml/badge.svg?branch=main) |
+| Debian 13 | ![debian13](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-debian13.yml/badge.svg?branch=main) |
+| CentOS 10 stream | ![centos10](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-centos10.yml/badge.svg?branch=main) |
+| RHEL 9 | ![rhel9](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-rhel9.yml/badge.svg?branch=main) |
+| RHEL 10 | ![rhel10](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-rhel10.yml/badge.svg?branch=main) |
 
 
 ### Backend tests
