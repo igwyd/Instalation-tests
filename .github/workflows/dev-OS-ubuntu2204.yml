@@ -106,6 +106,19 @@ jobs:
             echo "DOCKER_HEALTHY=false" >> $GITHUB_ENV
           fi
 
+      - name: Check version Docker install
+        continue-on-error: true
+        run: |
+          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          ACTUAL=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} 'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") dpkg-query -W onlyoffice-documentserver-ee' | awk '{print $2}')
+          echo "Expected version: $EXPECTED"
+          echo "Actual version: $ACTUAL"
+          if [ "$ACTUAL" = "$EXPECTED" ]; then
+            echo "DOCKER_VERSION_OK=true" >> $GITHUB_ENV
+          else
+            echo "DOCKER_VERSION_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: Documentserver logs Docker install
         continue-on-error: true
         run: |
@@ -156,6 +169,19 @@ jobs:
             echo "NATIVE_HEALTHY=false" >> $GITHUB_ENV
           fi
 
+      - name: Check version native install
+        continue-on-error: true
+        run: |
+          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          ACTUAL=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} 'dpkg-query -W onlyoffice-documentserver-ee' | awk '{print $2}')
+          echo "Expected version: $EXPECTED"
+          echo "Actual version: $ACTUAL"
+          if [ "$ACTUAL" = "$EXPECTED" ]; then
+            echo "NATIVE_VERSION_OK=true" >> $GITHUB_ENV
+          else
+            echo "NATIVE_VERSION_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: Documentserver logs native install
         continue-on-error: true
         run: |
@@ -164,21 +190,22 @@ jobs:
           EOF
 
       # ==================== Cleanup ====================
-      - name: Delete EC2 Instance (both healthy)
-        if: ${{ always() && env.DOCKER_HEALTHY == 'true' && env.NATIVE_HEALTHY == 'true' }}
+      - name: Delete EC2 Instance (all checks passed)
+        if: ${{ always() && env.DOCKER_HEALTHY == 'true' && env.NATIVE_HEALTHY == 'true' && env.DOCKER_VERSION_OK == 'true' && env.NATIVE_VERSION_OK == 'true' }}
         run: |
           aws ec2 terminate-instances --instance-ids ${{ env.INSTANCE_ID }}
           aws ec2 wait instance-terminated --instance-ids ${{ env.INSTANCE_ID }}
 
-      - name: Keep EC2 Instance (unhealthy)
-        if: ${{ always() && env.INSTANCE_ID != '' && (env.DOCKER_HEALTHY != 'true' || env.NATIVE_HEALTHY != 'true') }}
+      - name: Keep EC2 Instance (checks failed)
+        if: ${{ always() && env.INSTANCE_ID != '' && (env.DOCKER_HEALTHY != 'true' || env.NATIVE_HEALTHY != 'true' || env.DOCKER_VERSION_OK != 'true' || env.NATIVE_VERSION_OK != 'true') }}
         run: |
-          echo "::warning::Healthcheck failed! EC2 instance ${{ env.INSTANCE_ID }} (${{ env.EC2_IP }}) is kept alive for investigation."
+          echo "::warning::Checks failed! EC2 instance ${{ env.INSTANCE_ID }} (${{ env.EC2_IP }}) is kept alive for investigation."
           echo "Docker healthcheck: ${{ env.DOCKER_HEALTHY }}, Native healthcheck: ${{ env.NATIVE_HEALTHY }}"
+          echo "Docker version: ${{ env.DOCKER_VERSION_OK }}, Native version: ${{ env.NATIVE_VERSION_OK }}"
           echo "Instance: ${{ env.INSTANCE_ID }}, IP: ${{ env.EC2_IP }}, Tag: ${{ matrix.tag }}"
 
-      - name: Fail job if healthcheck failed
-        if: ${{ always() && (env.DOCKER_HEALTHY != 'true' || env.NATIVE_HEALTHY != 'true') }}
+      - name: Fail job if checks failed
+        if: ${{ always() && (env.DOCKER_HEALTHY != 'true' || env.NATIVE_HEALTHY != 'true' || env.DOCKER_VERSION_OK != 'true' || env.NATIVE_VERSION_OK != 'true') }}
         run: |
-          echo "::error::Docker healthy: ${{ env.DOCKER_HEALTHY }}, Native healthy: ${{ env.NATIVE_HEALTHY }}"
+          echo "::error::Docker healthy: ${{ env.DOCKER_HEALTHY }}, Native healthy: ${{ env.NATIVE_HEALTHY }}, Docker version: ${{ env.DOCKER_VERSION_OK }}, Native version: ${{ env.NATIVE_VERSION_OK }}"
           exit 1
