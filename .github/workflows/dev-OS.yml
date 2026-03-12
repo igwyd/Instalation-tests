@@ -180,13 +180,14 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
           curl -O https://download.onlyoffice.com/docs/docs-enterprise-install.sh
-          chmod +x docs-enterprise-install.sh
+          sudo chmod +x docs-enterprise-install.sh
           EOF
 
       - name: Install ONLYOFFICE Docs in Docker
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
-          printf "y\n" | sudo bash docs-enterprise-install.sh
+          printf "y\n" | sudo bash docs-enterprise-install.sh --documentimage onlyoffice/4testing-documentserver-ee --documentversion ${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
           EOF
 
       - name: Wait for Docker install to start
@@ -218,7 +219,19 @@ jobs:
           EOF
 
       # ==================== Native install (printf "n") ====================
+      - name: Add dev repo
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
+          if command -v apt-get &>/dev/null; then
+            echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
+            sudo apt-get update
+          elif command -v dnf &>/dev/null; then
+            sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
+          fi
+          EOF
+
       - name: Install ONLYOFFICE Docs natively
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
           printf "n\n" | sudo bash docs-enterprise-install.sh
@@ -258,3 +271,9 @@ jobs:
           echo "::warning::Healthcheck failed! EC2 instance ${{ env.INSTANCE_ID }} (${{ env.EC2_IP }}) is kept alive for investigation."
           echo "Docker healthcheck: ${{ env.DOCKER_HEALTHY }}, Native healthcheck: ${{ env.NATIVE_HEALTHY }}"
           echo "Instance: ${{ env.INSTANCE_ID }}, IP: ${{ env.EC2_IP }}, OS: ${{ matrix.name }}"
+
+      - name: Fail job if healthcheck failed
+        if: ${{ always() && (env.DOCKER_HEALTHY != 'true' || env.NATIVE_HEALTHY != 'true') }}
+        run: |
+          echo "::error::Docker healthy: ${{ env.DOCKER_HEALTHY }}, Native healthy: ${{ env.NATIVE_HEALTHY }}"
+          exit 1
