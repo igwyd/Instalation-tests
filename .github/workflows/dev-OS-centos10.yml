@@ -121,17 +121,24 @@ jobs:
           EOF
 
       # ==================== Native install (printf "n") ====================
+      - name: Install ONLYOFFICE Docs natively
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          printf "n\n" | sudo bash docs-enterprise-install.sh
+          EOF
+
       - name: Add dev repo
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
           EOF
 
-      - name: Install ONLYOFFICE Docs natively
+      - name: Install ONLYOFFICE Docs EE dev version
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          printf "n\n" | sudo bash docs-enterprise-install.sh
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          sudo dnf install onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
           EOF
 
       - name: Wait for native install to start

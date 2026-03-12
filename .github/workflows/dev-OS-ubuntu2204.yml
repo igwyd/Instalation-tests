@@ -121,6 +121,13 @@ jobs:
           EOF
 
       # ==================== Native install (printf "n") ====================
+      - name: Install ONLYOFFICE Docs natively
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          printf "n\n" | sudo bash docs-enterprise-install.sh
+          EOF
+
       - name: Add dev repo
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
@@ -128,11 +135,11 @@ jobs:
           sudo apt-get update
           EOF
 
-      - name: Install ONLYOFFICE Docs natively
+      - name: Install ONLYOFFICE Docs EE dev version
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
-          printf "n\n" | sudo bash docs-enterprise-install.sh
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y
           EOF
 
       - name: Wait for native install to start
