@@ -2,7 +2,7 @@ name: dev OS
 
 on:
   schedule:
-    - cron: '0 12 * * 3'  # Wednesday 15:00 Moscow time (UTC+3)
+    - cron: '0 14 * * 3'  # Wednesday 17:00 Moscow time (UTC+3)
   workflow_dispatch:
 
 jobs:
