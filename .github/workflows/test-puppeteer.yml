@@ -1,10 +1,10 @@
-name: tests
+name: test-puppeteer
 
 on:
   workflow_dispatch:
 
 jobs:
-  tests:
+  test-puppeteer:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout Repository
