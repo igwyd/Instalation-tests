@@ -1,0 +1,38 @@
+name: tests
+
+on:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install pre-requisites for LOAD test
+        run: |
+          git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
+          cd document-server-stress-testing/K6/
+
+          sed -i 's|"serverProtoSuffix": ""|"serverProtoSuffix": "s"|' save-changes-document-random-close.json
+          sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "div-oods.qa-onlyoffice.net"|' save-changes-document-random-close.json
+          sed -i 's|"serverPort": 80|"serverPort": 443|' save-changes-document-random-close.json
+          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "https://div-oods.qa-onlyoffice.net/wopi/files/docid/contents"|' save-changes-document-random-close.json
+          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "https://div-oods.qa-onlyoffice.net/dummyCallback"|' save-changes-document-random-close.json
+          sed -i 's|"jwtSecret": ""|"jwtSecret": "doc-linux"|' save-changes-document-random-close.json
+
+      - name: INFO about save-changes-document-random-close.json
+        run: |
+          echo "------ Updated json ------"
+          cd document-server-stress-testing/K6/
+          cat save-changes-document-random-close.json
+
+      - name: Run K6 LOAD test
+        continue-on-error: true
+        working-directory: document-server-stress-testing/K6
+        run: |
+          docker run --rm \
+            -v $(pwd):/K6 \
+            grafana/k6 run /K6/save-changes-document-random-close.js \
+            --quiet -s "2m":500 -s "8m":500 -s "1m":0
