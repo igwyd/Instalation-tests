@@ -118,7 +118,7 @@ jobs:
             echo "$output"
           fi
 
-      - name: Smoke puppeteer API tests with REDIS
+      - name: Puppeteer API tests with REDIS
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -128,7 +128,7 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
-      - name: Smoke puppeteer WOPI tests with REDIS
+      - name: Puppeteer WOPI tests with REDIS
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -204,7 +204,7 @@ jobs:
             echo "$output"
           fi
 
-      - name: Smoke puppeteer API tests with IOREDIS
+      - name: Puppeteer API tests with IOREDIS
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -214,7 +214,7 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
-      - name: Smoke puppeteer WOPI tests with IOREDIS
+      - name: Puppeteer WOPI tests with IOREDIS
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine

@@ -74,7 +74,7 @@ jobs:
           docker exec ds-ee-release supervisorctl start ds:example
           docker exec ds-ee-release supervisorctl status ds:example
 
-      - name: Smoke puppeteer API tests ONLYOFFICE-Docs EE
+      - name: Puppeteer API tests ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -84,7 +84,7 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
-      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs EE
+      - name: Puppeteer WOPI tests ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -122,7 +122,7 @@ jobs:
           docker exec ds-de-release supervisorctl start ds:example
           docker exec ds-de-release supervisorctl status ds:example
 
-      - name: Smoke puppeteer API tests ONLYOFFICE-Docs DE
+      - name: Puppeteer API tests ONLYOFFICE-Docs DE
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -131,7 +131,7 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
-      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs DE
+      - name: Puppeteer WOPI tests ONLYOFFICE-Docs DE
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -170,7 +170,7 @@ jobs:
           docker exec ds-release supervisorctl start ds:example
           docker exec ds-release supervisorctl status ds:example
 
-      - name: Smoke puppeteer API tests ONLYOFFICE-Docs CE
+      - name: Puppeteer API tests ONLYOFFICE-Docs CE
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -179,7 +179,7 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
-      - name: Smoke puppeteer WOPI tests ONLYOFFICE-Docs CE
+      - name: Puppeteer WOPI tests ONLYOFFICE-Docs CE
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine

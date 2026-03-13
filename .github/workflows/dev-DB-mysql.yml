@@ -178,7 +178,7 @@ jobs:
           npm install
           cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
 
-      - name: Smoke puppeteer API tests
+      - name: Puppeteer API tests
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -188,7 +188,7 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
-      - name: Smoke puppeteer WOPI tests
+      - name: Puppeteer WOPI tests
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
