@@ -16,10 +16,10 @@ jobs:
           cd document-server-stress-testing/K6/
 
           sed -i 's|"serverProtoSuffix": ""|"serverProtoSuffix": "s"|' save-changes-document-random-close.json
-          sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "div-oods.qa-onlyoffice.net"|' save-changes-document-random-close.json
+          sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "${{ vars.TEST_DSURL }}"|' save-changes-document-random-close.json
           sed -i 's|"serverPort": 80|"serverPort": 443|' save-changes-document-random-close.json
-          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "https://div-oods.qa-onlyoffice.net/wopi/files/docid/contents"|' save-changes-document-random-close.json
-          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "https://div-oods.qa-onlyoffice.net/dummyCallback"|' save-changes-document-random-close.json
+          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "https://${{ vars.TEST_DSURL }}/wopi/files/docid/contents"|' save-changes-document-random-close.json
+          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "https://${{ vars.TEST_DSURL }}/dummyCallback"|' save-changes-document-random-close.json
           sed -i 's|"jwtSecret": ""|"jwtSecret": "doc-linux"|' save-changes-document-random-close.json
 
       - name: INFO about save-changes-document-random-close.json

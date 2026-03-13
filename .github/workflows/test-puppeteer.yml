@@ -51,7 +51,7 @@ jobs:
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"https://div-oods.qa-onlyoffice.net/example\"#" ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"https://${{ vars.TEST_DSURL }}/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
