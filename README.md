@@ -13,36 +13,36 @@ Tested version: **<!-- onlyoffice-version-start -->v9.4.0-11<!-- onlyoffice-vers
 
 | Test | x64 | arm64 |
 |------|-----|-------|
-| DEB (Ubuntu 24.04) | ![dev-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64.yml/badge.svg?branch=main) | ![dev-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-arm64.yml/badge.svg?branch=main) |
-| RPM (CentOS 9) | ![dev-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64.yml/badge.svg?branch=main) | ![dev-RPM-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-arm64.yml/badge.svg?branch=main) |
+| dev-DEB (Ubuntu 24.04) | ![dev-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64.yml/badge.svg?branch=main) | ![dev-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-arm64.yml/badge.svg?branch=main) |
+| dev-RPM (CentOS 9) | ![dev-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64.yml/badge.svg?branch=main) | ![dev-RPM-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-arm64.yml/badge.svg?branch=main) |
 
-- Check installation on supported OS (Scheduled every Wednesday at 17:00 UTC+3)
+- Check installation on supported OS **Package** and **Docker** (Scheduled every Wednesday at 17:00 UTC+3)
 
 | OS | x64/arm64 |
 |---|---|
-| Ubuntu 22.04 | ![ubuntu2204](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-ubuntu2204.yml/badge.svg?branch=main) |
-| Debian 12 | ![debian12](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-debian12.yml/badge.svg?branch=main) |
-| Debian 13 | ![debian13](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-debian13.yml/badge.svg?branch=main) |
-| CentOS 10 stream | ![centos10](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-centos10.yml/badge.svg?branch=main) |
-| RHEL 9 | ![rhel9](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-rhel9.yml/badge.svg?branch=main) |
-| RHEL 10 | ![rhel10](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-rhel10.yml/badge.svg?branch=main) |
+| dev-OS (Ubuntu 22.04) | ![ubuntu2204](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-ubuntu2204.yml/badge.svg?branch=main) |
+| dev-OS (Debian 12) | ![debian12](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-debian12.yml/badge.svg?branch=main) |
+| dev-OS (Debian 13) | ![debian13](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-debian13.yml/badge.svg?branch=main) |
+| dev-OS (CentOS 10 stream) | ![centos10](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-centos10.yml/badge.svg?branch=main) |
+| dev-OS (RHEL 9) | ![rhel9](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-rhel9.yml/badge.svg?branch=main) |
+| dev-OS (RHEL 10) | ![rhel10](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-rhel10.yml/badge.svg?branch=main) |
 
 
 ### Backend tests
 
 | Test | Status |
 |------|--------|
-| Unix socket (redis + ioredis) | ![dev-Redis](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Redis-unix.sock.yml/badge.svg?branch=main) |
+| dev-Redis-unix.sock (redis + ioredis) | ![dev-Redis](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Redis-unix.sock.yml/badge.svg?branch=main) |
 
 ### Databases
 
 | Database | Status |
 |----------|--------|
-| PostgreSQL | ![postgres](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-postgres.yml/badge.svg?branch=main) |
-| MySQL | ![mysql](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mysql.yml/badge.svg?branch=main) |
-| MSSQL | ![mssql](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mssql.yml/badge.svg?branch=main) |
-| Oracle | ![oracle](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-Oracle.yml/badge.svg?branch=main) |
-| Dameng | ![dameng](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-dameng.yml/badge.svg?branch=main) |
+| dev-DB PostgreSQL | ![postgres](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-postgres.yml/badge.svg?branch=main) |
+| dev-DB MySQL | ![mysql](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mysql.yml/badge.svg?branch=main) |
+| dev-DB MSSQL | ![mssql](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mssql.yml/badge.svg?branch=main) |
+| dev-DB Oracle | ![oracle](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-Oracle.yml/badge.svg?branch=main) |
+| dev-DB Dameng | ![dameng](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-dameng.yml/badge.svg?branch=main) |
 
 
 ## Release
@@ -53,15 +53,15 @@ Official public repos. Triggered manually via `workflow_dispatch`.
 
 | Test | x64 | arm64 |
 |------|-----|-------|
-| DEB (Ubuntu 24.04) | ![release-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-DEB-x64.yml/badge.svg?branch=main) | ![release-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-DEB-arm64.yml/badge.svg?branch=main) |
-| RPM (CentOS 9) | ![release-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-RPM-x64.yml/badge.svg?branch=main) | ![release-RPM-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-RPM-arm64.yml/badge.svg?branch=main) |
+| release-DEB (Ubuntu 24.04) | ![release-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-DEB-x64.yml/badge.svg?branch=main) | ![release-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-DEB-arm64.yml/badge.svg?branch=main) |
+| release-RPM (CentOS 9) | ![release-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-RPM-x64.yml/badge.svg?branch=main) | ![release-RPM-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-RPM-arm64.yml/badge.svg?branch=main) |
 
 ### Docker
 
 | Test | x64 | arm64 |
 |------|-----|-------|
-| DEB-based image | ![docker-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-x64.yml/badge.svg?branch=main) | ![docker-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-arm64.yml/badge.svg?branch=main) |
-| RPM-based image | ![docker-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-RPM-x64.yml/badge.svg?branch=main) | |
+| release-Docker-DEB | ![docker-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-x64.yml/badge.svg?branch=main) | ![docker-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-arm64.yml/badge.svg?branch=main) |
+| release-Docker-RPM | ![docker-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-RPM-x64.yml/badge.svg?branch=main) | |
 
 ## Other
 
