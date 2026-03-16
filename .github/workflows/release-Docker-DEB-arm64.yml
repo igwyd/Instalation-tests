@@ -98,7 +98,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Wait for instance to reboot
-        run: sleep 180
+        run: sleep 300
 
       - name: Install Docker
         run: |

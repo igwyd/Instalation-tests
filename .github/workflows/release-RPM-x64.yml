@@ -99,7 +99,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Wait for instance to reboot
-        run: sleep 120
+        run: sleep 300
 
       - name: Install ONLYOFFICE-Docs EE
         continue-on-error: true
@@ -214,7 +214,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Wait for instance to reboot
-        run: sleep 60
+        run: sleep 120
 
       - name: Install ONLYOFFICE-Docs DE
         run: |
@@ -285,7 +285,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Wait for instance to reboot
-        run: sleep 60
+        run: sleep 120
 
       - name: Install ONLYOFFICE-Docs CE
         run: |

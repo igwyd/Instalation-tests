@@ -98,7 +98,7 @@ jobs:
         run: doctl compute droplet-action reboot $(doctl compute droplet list --format ID,Name | grep compile-test | awk '{print $1}')
 
       - name: Wait for instance to reboot
-        run: sleep 180
+        run: sleep 300
 
       - name: Install docker and ruby
         run: |
