@@ -9,14 +9,14 @@ Pre-release builds from S3 dev repo.
 Tested version: **<!-- onlyoffice-version-start -->v9.4.0-11<!-- onlyoffice-version-end -->**
 
 ### Package installation
-- Install from helpcenter guide and run all tests (Scheduled every Wednesday at 15:00 UTC+3)
+- Install from **helpcenter guide** and run all tests (Scheduled every Wednesday at 15:00 UTC+3)
 
 | Test | x64 | arm64 |
 |------|-----|-------|
 | dev-DEB (Ubuntu 24.04) | ![dev-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64.yml/badge.svg?branch=main) | ![dev-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-arm64.yml/badge.svg?branch=main) |
 | dev-RPM (CentOS 9) | ![dev-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64.yml/badge.svg?branch=main) | ![dev-RPM-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-arm64.yml/badge.svg?branch=main) |
 
-- Check installation on supported OS **Package** and **Docker** (Scheduled every Wednesday at 17:00 UTC+3)
+- Check installation **OneClickInstall** on supported OS **Package** and **Docker** (Scheduled every Wednesday at 17:00 UTC+3)
 
 | OS | x64/arm64 |
 |---|---|
