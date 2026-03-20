@@ -55,7 +55,7 @@ jobs:
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers example
 
       - name: Puppeteer WOPI tests ONLYOFFICE-Docs EE
         continue-on-error: true
@@ -64,4 +64,4 @@ jobs:
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true --providers wopi
