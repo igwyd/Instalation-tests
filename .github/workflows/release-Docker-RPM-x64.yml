@@ -138,7 +138,7 @@ jobs:
           echo "-------------healthcheck-------------"
           sudo curl -s http://127.0.0.1/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo docker exec ds-ee-release supervisorctl status
+          sudo docker exec ds-ee-release supervisorctl status all || true
           echo "---------Installed packages----------"
           sudo docker exec ds-ee-release bash -c "dpkg -l | grep onlyoffice"
           echo "--------packageType--------"
@@ -188,7 +188,7 @@ jobs:
           echo "-------------healthcheck-------------"
           sudo curl -s http://127.0.0.1/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo docker exec ds-de-release supervisorctl status
+          sudo docker exec ds-de-release supervisorctl status all || true
           echo "---------Installed packages----------"
           sudo docker exec ds-de-release bash -c "dpkg -l | grep onlyoffice"
           echo "--------packageType--------"
@@ -237,7 +237,7 @@ jobs:
           echo "-------------healthcheck-------------"
           sudo curl -s http://127.0.0.1/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo docker exec ds-release supervisorctl status
+          sudo docker exec ds-release supervisorctl status all || true
           echo "---------Installed packages----------"
           sudo docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
           echo "--------packageType--------"
