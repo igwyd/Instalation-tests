@@ -106,8 +106,6 @@ jobs:
           sudo docker exec ds-redis-sock supervisorctl status ds:example ds:converter ds:docservice
           echo "---------Installed packages----------"
           docker exec ds-redis-sock bash -c "dpkg -l | grep onlyoffice"
-          echo "---------api.js from server----------"
-          curl -s http://${RUNNER_IP}/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType--------"
           docker exec ds-redis-sock curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
@@ -192,8 +190,6 @@ jobs:
           sudo docker exec ds-ioredis-sock supervisorctl status ds:example ds:converter ds:docservice
           echo "---------Installed packages----------"
           sudo docker exec ds-ioredis-sock bash -c "dpkg -l | grep onlyoffice"
-          echo "---------api.js from server----------"
-          curl -s http://${RUNNER_IP}/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType--------"
           docker exec ds-ioredis-sock curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
