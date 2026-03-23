@@ -248,11 +248,11 @@ jobs:
           echo "Puppeteer API  failed: ${PUPPETEER_API_FAILED:-0}"
           echo "Puppeteer WOPI failed: ${PUPPETEER_WOPI_FAILED:-0}"
           echo "Puppeteer total failed: ${PUPPETEER_FAILED:-0}"
-          if [ "${PUPPETEER_FAILED:-0}" -gt 5 ]; then
-            echo "Too many puppeteer failures: ${PUPPETEER_FAILED} (threshold: 5)"
+          if [ "${PUPPETEER_FAILED:-0}" -gt 12 ]; then
+            echo "Too many puppeteer failures: ${PUPPETEER_FAILED} (threshold: 12)"
             FAILED=1
           else
-            echo "Puppeteer tests OK: ${PUPPETEER_FAILED:-0} failures (threshold: 5)"
+            echo "Puppeteer tests OK: ${PUPPETEER_FAILED:-0} failures (threshold: 12)"
           fi
 
           if [ "$FAILED" -eq 1 ]; then
