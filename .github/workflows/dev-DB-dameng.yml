@@ -231,7 +231,7 @@ jobs:
         run: |
           docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
 
-      - name: Check healthcheck and puppeteer results
+      - name: Check healthcheck, version and puppeteer results
         if: always()
         run: |
           FAILED=0
@@ -242,6 +242,17 @@ jobs:
             FAILED=1
           else
             echo "Healthcheck passed!"
+          fi
+
+          EXPECTED_VERSION="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          INSTALLED_VERSION=$(docker exec $ONLYOFFICE_CONTAINER_NAME bash -c "dpkg -l | grep onlyoffice" | awk '{print $3}' | head -n 1)
+          echo "Expected version:  $EXPECTED_VERSION"
+          echo "Installed version: $INSTALLED_VERSION"
+          if [ "$INSTALLED_VERSION" = "$EXPECTED_VERSION" ]; then
+            echo "Version check passed!"
+          else
+            echo "Version check failed: expected $EXPECTED_VERSION, got $INSTALLED_VERSION"
+            FAILED=1
           fi
 
           echo "Puppeteer API  failed: ${PUPPETEER_API_FAILED:-0}"
