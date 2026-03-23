@@ -122,7 +122,6 @@ jobs:
           cat save-changes-document-random-close.json
 
       - name: Run K6 LOAD test
-        continue-on-error: true
         working-directory: document-server-stress-testing/K6
         run: |
           docker run --rm \
