@@ -168,8 +168,6 @@ jobs:
           sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
-          echo "---------api.js from server----------"
-          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
@@ -240,8 +238,6 @@ jobs:
           sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
-          echo "---------api.js from server----------"
-          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
@@ -311,8 +307,6 @@ jobs:
           sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
-          echo "---------api.js from server----------"
-          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
@@ -387,8 +381,6 @@ jobs:
           sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
-          echo "---------api.js from server----------"
-          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
@@ -421,8 +413,6 @@ jobs:
           sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo rpm -qa | grep onlyoffice-documentserver
-          echo "---------api.js from server----------"
-          sudo curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"

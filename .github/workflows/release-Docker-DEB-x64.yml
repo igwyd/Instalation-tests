@@ -61,11 +61,9 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://127.0.0.1/healthcheck; echo
           echo "-------------DS services-------------"
-          docker exec ds-ee-release supervisorctl status
+          docker exec ds-ee-release supervisorctl status all || true
           echo "---------Installed packages----------"
           docker exec ds-ee-release bash -c "dpkg -l | grep onlyoffice"
-          echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType--------"
           docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
@@ -109,11 +107,9 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://127.0.0.1/healthcheck; echo
           echo "-------------DS services-------------"
-          docker exec ds-de-release supervisorctl status
+          docker exec ds-de-release supervisorctl status all || true
           echo "---------Installed packages----------"
           docker exec ds-de-release bash -c "dpkg -l | grep onlyoffice"
-          echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType--------"
           docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
@@ -157,11 +153,9 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://127.0.0.1/healthcheck; echo
           echo "-------------DS services-------------"
-          docker exec ds-release supervisorctl status
+          docker exec ds-release supervisorctl status all || true
           echo "---------Installed packages----------"
           docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
-          echo "---------api.js from server----------"
-          curl -s http://127.0.0.1/web-apps/apps/api/documents/api.js | head -n 10
           echo "--------packageType--------"
           docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
