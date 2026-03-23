@@ -91,7 +91,9 @@ jobs:
           sudo apt-get install jq -y
 
           echo "-------------healthcheck-------------"
-          curl -s http://${RUNNER_IP}/healthcheck; echo
+          HEALTHCHECK_RESULT=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          echo "Healthcheck: $HEALTHCHECK_RESULT"
+          echo "HEALTHCHECK_RESULT=$HEALTHCHECK_RESULT" >> $GITHUB_ENV
           echo "-------------DS services-------------"
           docker exec $ONLYOFFICE_CONTAINER_NAME sudo supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -107,37 +109,6 @@ jobs:
           else
             echo "$output"
           fi
-
-      - name: Install pre-requisites for LOAD test
-        run: |
-          git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
-          cd document-server-stress-testing/K6/
-
-          sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "onlyoffice"|' save-changes-document-random-close.json
-          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "http://onlyoffice/wopi/files/docid/contents"|' save-changes-document-random-close.json
-          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "http://onlyoffice/dummyCallback"|' save-changes-document-random-close.json
-          sed -i 's|"jwtSecret": ""|"jwtSecret": "MYSECRET"|' save-changes-document-random-close.json
-
-      - name: INFO about save-changes-document-random-close.json
-        run: |
-          echo "------ Updated json ------"
-          cd document-server-stress-testing/K6/
-          cat save-changes-document-random-close.json
-
-      - name: Run K6 LOAD test
-        working-directory: document-server-stress-testing/K6
-        run: |
-          docker run --rm \
-            -u "$(id -u):$(id -g)" \
-            --network ${{ job.services.onlyoffice.network }} \
-            -v "$(pwd)":/k6 \
-            grafana/k6 run /k6/save-changes-document-random-close.js \
-            --quiet \
-            -s "1m:500" -s "9m:500"
-
-      - name: Documentserver logs LOAD test
-        run: |
-          docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -198,3 +169,104 @@ jobs:
       - name: Documentserver logs PUPPETEER TEST
         run: |
           docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
+
+      - name: Parse PUPPETEER TEST results
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import os
+
+          def count_results(path):
+              if not os.path.exists(path):
+                  print(f"Report not found: {path}")
+                  return 0, 0
+              with open(path) as f:
+                  content = f.read()
+              ok  = content.count("<td>OK</td>")
+              err = content.count("<td>Error in script terminal.</td>")
+              return ok, err
+
+          api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
+          wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
+
+          total_ok  = api_ok  + wopi_ok
+          total_err = api_err + wopi_err
+
+          print(f"API tests:  OK={api_ok},  Failed={api_err}")
+          print(f"WOPI tests: OK={wopi_ok}, Failed={wopi_err}")
+          print(f"Total:      OK={total_ok}, Failed={total_err}")
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"PUPPETEER_API_FAILED={api_err}\n")
+              f.write(f"PUPPETEER_WOPI_FAILED={wopi_err}\n")
+              f.write(f"PUPPETEER_FAILED={total_err}\n")
+          EOF
+
+      - name: Install pre-requisites for LOAD test
+        run: |
+          git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
+          cd document-server-stress-testing/K6/
+
+          sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "onlyoffice"|' save-changes-document-random-close.json
+          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "http://onlyoffice/wopi/files/docid/contents"|' save-changes-document-random-close.json
+          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "http://onlyoffice/dummyCallback"|' save-changes-document-random-close.json
+          sed -i 's|"jwtSecret": ""|"jwtSecret": "MYSECRET"|' save-changes-document-random-close.json
+
+      - name: INFO about save-changes-document-random-close.json
+        run: |
+          echo "------ Updated json ------"
+          cd document-server-stress-testing/K6/
+          cat save-changes-document-random-close.json
+
+      - name: Run K6 LOAD test
+        working-directory: document-server-stress-testing/K6
+        run: |
+          docker run --rm \
+            -u "$(id -u):$(id -g)" \
+            --network ${{ job.services.onlyoffice.network }} \
+            -v "$(pwd)":/k6 \
+            grafana/k6 run /k6/save-changes-document-random-close.js \
+            --quiet \
+            -s "1m:500" -s "9m:500"
+
+      - name: Documentserver logs LOAD TEST
+        run: |
+          docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
+
+      - name: Check healthcheck, version and puppeteer results
+        if: always()
+        run: |
+          FAILED=0
+
+          echo "Healthcheck result: $HEALTHCHECK_RESULT"
+          if [ "$HEALTHCHECK_RESULT" != "true" ]; then
+            echo "Healthcheck failed!"
+            FAILED=1
+          else
+            echo "Healthcheck passed!"
+          fi
+
+          EXPECTED_VERSION="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          INSTALLED_VERSION=$(docker exec $ONLYOFFICE_CONTAINER_NAME bash -c "dpkg -l | grep onlyoffice" | awk '{print $3}' | head -n 1)
+          echo "Expected version:  $EXPECTED_VERSION"
+          echo "Installed version: $INSTALLED_VERSION"
+          if [ "$INSTALLED_VERSION" = "$EXPECTED_VERSION" ]; then
+            echo "Version check passed!"
+          else
+            echo "Version check failed: expected $EXPECTED_VERSION, got $INSTALLED_VERSION"
+            FAILED=1
+          fi
+
+          echo "Puppeteer API  failed: ${PUPPETEER_API_FAILED:-0}"
+          echo "Puppeteer WOPI failed: ${PUPPETEER_WOPI_FAILED:-0}"
+          echo "Puppeteer total failed: ${PUPPETEER_FAILED:-0}"
+          if [ "${PUPPETEER_FAILED:-0}" -gt 12 ]; then
+            echo "Too many puppeteer failures: ${PUPPETEER_FAILED} (threshold: 12)"
+            FAILED=1
+          else
+            echo "Puppeteer tests OK: ${PUPPETEER_FAILED:-0} failures (threshold: 12)"
+          fi
+
+          if [ "$FAILED" -eq 1 ]; then
+            exit 1
+          fi
