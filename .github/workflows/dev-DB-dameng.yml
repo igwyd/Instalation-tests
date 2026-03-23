@@ -108,37 +108,6 @@ jobs:
             echo "$output"
           fi
 
-      - name: Install pre-requisites for LOAD test
-        run: |
-          git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
-          cd document-server-stress-testing/K6/
-
-          sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "onlyoffice"|' save-changes-document-random-close.json
-          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "http://onlyoffice/wopi/files/docid/contents"|' save-changes-document-random-close.json
-          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "http://onlyoffice/dummyCallback"|' save-changes-document-random-close.json
-          sed -i 's|"jwtSecret": ""|"jwtSecret": "MYSECRET"|' save-changes-document-random-close.json
-
-      - name: INFO about save-changes-document-random-close.json
-        run: |
-          echo "------ Updated json ------"
-          cd document-server-stress-testing/K6/
-          cat save-changes-document-random-close.json
-
-      - name: Run K6 LOAD test
-        working-directory: document-server-stress-testing/K6
-        run: |
-          docker run --rm \
-            -u "$(id -u):$(id -g)" \
-            --network ${{ job.services.onlyoffice.network }} \
-            -v "$(pwd)":/k6 \
-            grafana/k6 run /k6/save-changes-document-random-close.js \
-            --quiet \
-            -s "1m:500" -s "9m:500"
-
-      - name: Documentserver logs LOAD TEST
-        run: |
-          docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -195,7 +164,11 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
-      - name: Parse puppeteer test results
+      - name: Documentserver logs PUPPETEER TEST
+        run: |
+          docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
+
+      - name: Parse PUPPETEER TEST results
         if: always()
         run: |
           python3 - <<'EOF'
@@ -227,7 +200,34 @@ jobs:
               f.write(f"PUPPETEER_FAILED={total_err}\n")
           EOF
 
-      - name: Documentserver logs PUPPETEER TEST
+      - name: Install pre-requisites for LOAD test
+        run: |
+          git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
+          cd document-server-stress-testing/K6/
+
+          sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "onlyoffice"|' save-changes-document-random-close.json
+          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "http://onlyoffice/wopi/files/docid/contents"|' save-changes-document-random-close.json
+          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "http://onlyoffice/dummyCallback"|' save-changes-document-random-close.json
+          sed -i 's|"jwtSecret": ""|"jwtSecret": "MYSECRET"|' save-changes-document-random-close.json
+
+      - name: INFO about save-changes-document-random-close.json
+        run: |
+          echo "------ Updated json ------"
+          cd document-server-stress-testing/K6/
+          cat save-changes-document-random-close.json
+
+      - name: Run K6 LOAD test
+        working-directory: document-server-stress-testing/K6
+        run: |
+          docker run --rm \
+            -u "$(id -u):$(id -g)" \
+            --network ${{ job.services.onlyoffice.network }} \
+            -v "$(pwd)":/k6 \
+            grafana/k6 run /k6/save-changes-document-random-close.js \
+            --quiet \
+            -s "1m:500" -s "9m:500"
+
+      - name: Documentserver logs LOAD TEST
         run: |
           docker logs -n 1000 $ONLYOFFICE_CONTAINER_NAME
 
