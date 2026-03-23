@@ -95,6 +95,8 @@ jobs:
           docker exec $ONLYOFFICE_CONTAINER_NAME sudo supervisorctl status all || true
           echo "---------Installed packages----------"
           docker exec $ONLYOFFICE_CONTAINER_NAME bash -c "dpkg -l | grep onlyoffice"
+          echo "----------MSSQL version--------------"
+          docker exec $MSSQL_CONTAINER_NAME /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "onlYoff1ce" -Q "SELECT @@VERSION" -C
           echo "--------packageType must be 1--------"
           docker exec $ONLYOFFICE_CONTAINER_NAME curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
