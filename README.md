@@ -35,6 +35,7 @@ Tested version: **<!-- onlyoffice-version-start -->v9.4.0-31<!-- onlyoffice-vers
 | dev-Redis-unix.sock (redis + ioredis) | ![dev-Redis](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Redis-unix.sock.yml/badge.svg?branch=main) |
 
 ### Databases
+* Tests with different DBs (Scheduled every Wednesday at 15:00 UTC+3)
 
 | Database | Status |
 |----------|--------|
