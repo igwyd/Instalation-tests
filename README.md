@@ -38,7 +38,7 @@ Pre-release builds from S3 dev repo.
 
 | Test | Status |
 |------|--------|
-| dev-DB check (MySQL, PostgreSQL, MSSQL, Oracle, Dameng, MariaDB) | ![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main) |
+| MySQL, PostgreSQL, MSSQL, Oracle, Dameng, MariaDB | ![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main) |
 
 
 ## Release
