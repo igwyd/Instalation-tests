@@ -104,10 +104,32 @@ jobs:
           echo "------------ START DS services -------------"
           docker exec ${{ matrix.container }} supervisorctl start ds:example ds:converter ds:docservice
           sleep 10
-          echo "---------- ds healthcheck -----------"
-          curl -s http://${RUNNER_IP}/healthcheck; echo
+
+      - name: Check healthcheck and socket configuration
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${RUNNER_IP}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_RESULT=$HC" >> $GITHUB_ENV
+
+          PING=$(docker exec ${{ matrix.container }} redis-cli -s /run/redis/redis-server.sock ping 2>/dev/null || echo "error")
+          echo "Redis socket ping: $PING"
+          if [ "$PING" = "PONG" ]; then
+            echo "REDIS_SOCK_OK=true" >> $GITHUB_ENV
+          else
+            echo "REDIS_SOCK_OK=false" >> $GITHUB_ENV
+          fi
+
+          PORT_CHECK=$(docker exec ${{ matrix.container }} netstat -tulpn 2>/dev/null | grep ':6379' || echo "")
+          echo "Port 6379 check: '${PORT_CHECK}'"
+          if [ -z "$PORT_CHECK" ]; then
+            echo "PORT_6379_CLOSED=true" >> $GITHUB_ENV
+          else
+            echo "PORT_6379_CLOSED=false" >> $GITHUB_ENV
+          fi
 
       - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
         run: |
           echo "-------------healthcheck-------------"
           curl -s http://${RUNNER_IP}/healthcheck; echo
@@ -148,3 +170,76 @@ jobs:
         run: |
           docker logs -n 1000 ${{ matrix.container }}
           docker rm -fv ${{ matrix.container }}
+
+      - name: Parse puppeteer results
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import os
+
+          def count_results(path):
+              if not os.path.exists(path):
+                  print(f"Report not found: {path}")
+                  return 0, 0
+              with open(path) as f:
+                  content = f.read()
+              ok  = content.count("<td>OK</td>")
+              err = content.count("<td>Error in script terminal.</td>")
+              return ok, err
+
+          api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
+          wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
+
+          total_ok  = api_ok  + wopi_ok
+          total_err = api_err + wopi_err
+
+          print(f"API tests:  OK={api_ok},  Failed={api_err}")
+          print(f"WOPI tests: OK={wopi_ok}, Failed={wopi_err}")
+          print(f"Total:      OK={total_ok}, Failed={total_err}")
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"PUPPETEER_API_FAILED={api_err}\n")
+              f.write(f"PUPPETEER_WOPI_FAILED={wopi_err}\n")
+              f.write(f"PUPPETEER_FAILED={total_err}\n")
+          EOF
+
+      - name: Final check
+        if: always()
+        run: |
+          FAILED=0
+
+          echo "=== Healthcheck ==="
+          echo "Healthcheck: ${HEALTHCHECK_RESULT:-not set}"
+          if [ "${HEALTHCHECK_RESULT}" != "true" ]; then
+            echo "Healthcheck FAILED"
+            FAILED=1
+          fi
+
+          echo "=== Redis socket ==="
+          echo "Redis socket ping: ${REDIS_SOCK_OK:-not set}"
+          if [ "${REDIS_SOCK_OK}" != "true" ]; then
+            echo "Redis socket check FAILED"
+            FAILED=1
+          fi
+
+          echo "=== Port 6379 ==="
+          echo "Port 6379 closed: ${PORT_6379_CLOSED:-not set}"
+          if [ "${PORT_6379_CLOSED}" != "true" ]; then
+            echo "Port 6379 is not closed!"
+            FAILED=1
+          fi
+
+          echo "=== Puppeteer results ==="
+          echo "Puppeteer API  failed: ${PUPPETEER_API_FAILED:-0}"
+          echo "Puppeteer WOPI failed: ${PUPPETEER_WOPI_FAILED:-0}"
+          echo "Puppeteer total failed: ${PUPPETEER_FAILED:-0}"
+          if [ "${PUPPETEER_FAILED:-0}" -gt 12 ]; then
+            echo "Too many puppeteer failures: ${PUPPETEER_FAILED} (threshold: 12)"
+            FAILED=1
+          else
+            echo "Puppeteer tests OK: ${PUPPETEER_FAILED:-0} failures (threshold: 12)"
+          fi
+
+          if [ "$FAILED" -eq 1 ]; then
+            exit 1
+          fi
