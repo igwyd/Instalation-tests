@@ -27,7 +27,7 @@ Pre-release builds from S3 dev repo.
 
 
 ### Backend tests
-* redis
+* redis (Scheduled every Wednesday at 15:00 UTC+3)
 
 | Test | Status |
 |------|--------|
