@@ -159,6 +159,26 @@ jobs:
           sudo systemctl status ds-example
           EOF
 
+      - name: Check healthcheck and version EE
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck EE: $HC"
+          echo "HEALTHCHECK_EE=$HC" >> $GITHUB_ENV
+
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "dpkg-query -W -f='\${Version}' onlyoffice-documentserver-ee 2>/dev/null || echo 'not-found'")
+          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          echo "Version EE: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_EE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_EE_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: Clear puppeteer output before EE tests
+        run: rm -rf Dep.Tests/puppeteer/out
+
       - name: Puppeteer API tests ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
@@ -177,6 +197,39 @@ jobs:
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Parse puppeteer results EE
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import os
+
+          def count_results(path):
+              if not os.path.exists(path):
+                  print(f"Report not found: {path}")
+                  return 0, 0
+              with open(path) as f:
+                  content = f.read()
+              ok  = content.count("<td>OK</td>")
+              err = content.count("<td>Error in script terminal.</td>")
+              return ok, err
+
+          api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
+          wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
+          total_ok  = api_ok  + wopi_ok
+          total_err = api_err + wopi_err
+
+          print(f"EE API tests:  OK={api_ok},  Failed={api_err}")
+          print(f"EE WOPI tests: OK={wopi_ok}, Failed={wopi_err}")
+          print(f"EE Total:      OK={total_ok}, Failed={total_err}")
+
+          prev_total = int(os.environ.get("PUPPETEER_TOTAL_FAILED", "0"))
+          new_total = prev_total + total_err
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"PUPPETEER_EE_FAILED={total_err}\n")
+              f.write(f"PUPPETEER_TOTAL_FAILED={new_total}\n")
+          EOF
 
       - name: Documentserver logs ONLYOFFICE-Docs EE
         continue-on-error: true
@@ -228,6 +281,26 @@ jobs:
           sudo systemctl status ds-example
           EOF
 
+      - name: Check healthcheck and version DE
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck DE: $HC"
+          echo "HEALTHCHECK_DE=$HC" >> $GITHUB_ENV
+
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "dpkg-query -W -f='\${Version}' onlyoffice-documentserver-de 2>/dev/null || echo 'not-found'")
+          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          echo "Version DE: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_DE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_DE_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: Clear puppeteer output before DE tests
+        run: rm -rf Dep.Tests/puppeteer/out
+
       - name: Puppeteer API tests ONLYOFFICE-Docs DE
         continue-on-error: true
         run: |
@@ -245,6 +318,39 @@ jobs:
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Parse puppeteer results DE
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import os
+
+          def count_results(path):
+              if not os.path.exists(path):
+                  print(f"Report not found: {path}")
+                  return 0, 0
+              with open(path) as f:
+                  content = f.read()
+              ok  = content.count("<td>OK</td>")
+              err = content.count("<td>Error in script terminal.</td>")
+              return ok, err
+
+          api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
+          wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
+          total_ok  = api_ok  + wopi_ok
+          total_err = api_err + wopi_err
+
+          print(f"DE API tests:  OK={api_ok},  Failed={api_err}")
+          print(f"DE WOPI tests: OK={wopi_ok}, Failed={wopi_err}")
+          print(f"DE Total:      OK={total_ok}, Failed={total_err}")
+
+          prev_total = int(os.environ.get("PUPPETEER_TOTAL_FAILED", "0"))
+          new_total = prev_total + total_err
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"PUPPETEER_DE_FAILED={total_err}\n")
+              f.write(f"PUPPETEER_TOTAL_FAILED={new_total}\n")
+          EOF
 
       - name: Documentserver logs ONLYOFFICE-Docs DE
         continue-on-error: true
@@ -296,6 +402,26 @@ jobs:
           sudo systemctl status ds-example
           EOF
 
+      - name: Check healthcheck and version CE
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck CE: $HC"
+          echo "HEALTHCHECK_CE=$HC" >> $GITHUB_ENV
+
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "dpkg-query -W -f='\${Version}' onlyoffice-documentserver 2>/dev/null || echo 'not-found'")
+          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          echo "Version CE: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_CE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_CE_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: Clear puppeteer output before CE tests
+        run: rm -rf Dep.Tests/puppeteer/out
+
       - name: Puppeteer API tests ONLYOFFICE-Docs CE
         continue-on-error: true
         run: |
@@ -313,6 +439,39 @@ jobs:
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Parse puppeteer results CE
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import os
+
+          def count_results(path):
+              if not os.path.exists(path):
+                  print(f"Report not found: {path}")
+                  return 0, 0
+              with open(path) as f:
+                  content = f.read()
+              ok  = content.count("<td>OK</td>")
+              err = content.count("<td>Error in script terminal.</td>")
+              return ok, err
+
+          api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
+          wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
+          total_ok  = api_ok  + wopi_ok
+          total_err = api_err + wopi_err
+
+          print(f"CE API tests:  OK={api_ok},  Failed={api_err}")
+          print(f"CE WOPI tests: OK={wopi_ok}, Failed={wopi_err}")
+          print(f"CE Total:      OK={total_ok}, Failed={total_err}")
+
+          prev_total = int(os.environ.get("PUPPETEER_TOTAL_FAILED", "0"))
+          new_total = prev_total + total_err
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"PUPPETEER_CE_FAILED={total_err}\n")
+              f.write(f"PUPPETEER_TOTAL_FAILED={new_total}\n")
+          EOF
 
       - name: Documentserver logs ONLYOFFICE-Docs CE
         continue-on-error: true
@@ -368,6 +527,18 @@ jobs:
           sudo systemctl status ds-example
           EOF
 
+      - name: Check healthcheck EE RELEASE and save JWT before upgrade
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck EE RELEASE: $HC"
+          echo "HEALTHCHECK_EE_RELEASE=$HC" >> $GITHUB_ENV
+
+          JWT_HASH=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo jq -c '{token: .services.CoAuthoring.token, secret: .services.CoAuthoring.secret}' /etc/onlyoffice/documentserver/local.json | md5sum | cut -d' ' -f1")
+          echo "JWT hash before upgrade: $JWT_HASH"
+          echo "JWT_BEFORE=$JWT_HASH" >> $GITHUB_ENV
+
       - name: Update ONLYOFFICE-EE to the DEV
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
@@ -401,6 +572,38 @@ jobs:
           sudo systemctl status ds-example
           EOF
 
+      - name: Check healthcheck, version and JWT after upgrade
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck EE after upgrade: $HC"
+          echo "HEALTHCHECK_EE_UPGRADE=$HC" >> $GITHUB_ENV
+
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "dpkg-query -W -f='\${Version}' onlyoffice-documentserver-ee 2>/dev/null || echo 'not-found'")
+          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          echo "Version after upgrade: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_EE_UPGRADE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_EE_UPGRADE_OK=false" >> $GITHUB_ENV
+          fi
+
+          JWT_AFTER=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo jq -c '{token: .services.CoAuthoring.token, secret: .services.CoAuthoring.secret}' /etc/onlyoffice/documentserver/local.json | md5sum | cut -d' ' -f1")
+          echo "JWT hash before upgrade: $JWT_BEFORE"
+          echo "JWT hash after  upgrade: $JWT_AFTER"
+          if [ "$JWT_BEFORE" = "$JWT_AFTER" ]; then
+            echo "JWT settings preserved after upgrade"
+            echo "JWT_MATCH=true" >> $GITHUB_ENV
+          else
+            echo "JWT settings changed after upgrade!"
+            echo "JWT_MATCH=false" >> $GITHUB_ENV
+          fi
+
+      - name: Clear puppeteer output before EE upgrade tests
+        run: rm -rf Dep.Tests/puppeteer/out
+
       - name: Puppeteer API tests ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
@@ -419,12 +622,94 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
+      - name: Parse puppeteer results EE after upgrade
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import os
+
+          def count_results(path):
+              if not os.path.exists(path):
+                  print(f"Report not found: {path}")
+                  return 0, 0
+              with open(path) as f:
+                  content = f.read()
+              ok  = content.count("<td>OK</td>")
+              err = content.count("<td>Error in script terminal.</td>")
+              return ok, err
+
+          api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
+          wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
+          total_ok  = api_ok  + wopi_ok
+          total_err = api_err + wopi_err
+
+          print(f"EE upgrade API tests:  OK={api_ok},  Failed={api_err}")
+          print(f"EE upgrade WOPI tests: OK={wopi_ok}, Failed={wopi_err}")
+          print(f"EE upgrade Total:      OK={total_ok}, Failed={total_err}")
+
+          prev_total = int(os.environ.get("PUPPETEER_TOTAL_FAILED", "0"))
+          new_total = prev_total + total_err
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"PUPPETEER_EE_UPGRADE_FAILED={total_err}\n")
+              f.write(f"PUPPETEER_TOTAL_FAILED={new_total}\n")
+          EOF
+
       - name: Documentserver logs ONLYOFFICE-Docs EE after UPGRADE
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
+
+      - name: Final check
+        if: always()
+        run: |
+          FAILED=0
+
+          echo "=== Healthcheck results ==="
+          for VAR in HEALTHCHECK_EE HEALTHCHECK_DE HEALTHCHECK_CE HEALTHCHECK_EE_RELEASE HEALTHCHECK_EE_UPGRADE; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-not set}"
+            if [ "${VAL}" != "true" ]; then
+              echo "$VAR FAILED"
+              FAILED=1
+            fi
+          done
+
+          echo "=== Version check results ==="
+          for VAR in VERSION_EE_OK VERSION_DE_OK VERSION_CE_OK VERSION_EE_UPGRADE_OK; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-not set}"
+            if [ "${VAL}" != "true" ]; then
+              echo "$VAR FAILED"
+              FAILED=1
+            fi
+          done
+
+          echo "=== JWT check ==="
+          echo "JWT_MATCH: ${JWT_MATCH:-not set}"
+          if [ "${JWT_MATCH}" != "true" ]; then
+            echo "JWT check FAILED — JWT settings changed after upgrade"
+            FAILED=1
+          fi
+
+          echo "=== Puppeteer results ==="
+          echo "Puppeteer EE failed:          ${PUPPETEER_EE_FAILED:-0}"
+          echo "Puppeteer DE failed:          ${PUPPETEER_DE_FAILED:-0}"
+          echo "Puppeteer CE failed:          ${PUPPETEER_CE_FAILED:-0}"
+          echo "Puppeteer EE upgrade failed:  ${PUPPETEER_EE_UPGRADE_FAILED:-0}"
+          echo "Puppeteer total failed:       ${PUPPETEER_TOTAL_FAILED:-0}"
+          if [ "${PUPPETEER_TOTAL_FAILED:-0}" -gt 12 ]; then
+            echo "Too many puppeteer failures: ${PUPPETEER_TOTAL_FAILED} (threshold: 12)"
+            FAILED=1
+          else
+            echo "Puppeteer tests OK: ${PUPPETEER_TOTAL_FAILED:-0} failures (threshold: 12)"
+          fi
+
+          if [ "$FAILED" -eq 1 ]; then
+            exit 1
+          fi
 
       - name: Delete EC2 Instance
         run: |
