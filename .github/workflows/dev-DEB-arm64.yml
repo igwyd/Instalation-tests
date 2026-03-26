@@ -249,7 +249,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Wait for instance to reboot
-        run: sleep 300
+        run: sleep 120
 
       - name: Install ONLYOFFICE-Docs DE
         run: |
@@ -370,7 +370,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Wait for instance to reboot
-        run: sleep 300
+        run: sleep 120
 
       - name: Install ONLYOFFICE-Docs CE
         run: |
@@ -491,7 +491,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Wait for instance to reboot
-        run: sleep 300
+        run: sleep 120
 
       - name: Install ONLYOFFICE-Docs EE RELEASE for testing UPGRADE
         run: |
@@ -695,17 +695,16 @@ jobs:
           fi
 
           echo "=== Puppeteer results ==="
-          echo "Puppeteer EE failed:          ${PUPPETEER_EE_FAILED:-0}"
-          echo "Puppeteer DE failed:          ${PUPPETEER_DE_FAILED:-0}"
-          echo "Puppeteer CE failed:          ${PUPPETEER_CE_FAILED:-0}"
-          echo "Puppeteer EE upgrade failed:  ${PUPPETEER_EE_UPGRADE_FAILED:-0}"
-          echo "Puppeteer total failed:       ${PUPPETEER_TOTAL_FAILED:-0}"
-          if [ "${PUPPETEER_TOTAL_FAILED:-0}" -gt 12 ]; then
-            echo "Too many puppeteer failures: ${PUPPETEER_TOTAL_FAILED} (threshold: 12)"
-            FAILED=1
-          else
-            echo "Puppeteer tests OK: ${PUPPETEER_TOTAL_FAILED:-0} failures (threshold: 12)"
-          fi
+          for VAR in PUPPETEER_EE_FAILED PUPPETEER_DE_FAILED PUPPETEER_CE_FAILED PUPPETEER_EE_UPGRADE_FAILED; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-0}"
+            if [ "${VAL:-0}" -gt 12 ]; then
+              echo "$VAR FAILED (threshold: 12)"
+              FAILED=1
+            else
+              echo "$VAR OK (${VAL:-0} failures, threshold: 12)"
+            fi
+          done
 
           if [ "$FAILED" -eq 1 ]; then
             exit 1
