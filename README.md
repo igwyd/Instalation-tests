@@ -2,12 +2,15 @@
 
 Automated installation testing of ONLYOFFICE Docs packages via GitHub Actions.
 
-## Dev builds
+## Develop (tested version: **<!-- onlyoffice-version-start -->v9.4.0-24<!-- onlyoffice-version-end -->**)
 
 Pre-release builds from S3 dev repo.
 
+<<<<<<< HEAD
 Tested version: **<!-- onlyoffice-version-start -->v9.4.0-31<!-- onlyoffice-version-end -->**
 
+=======
+>>>>>>> 66d4107 ([Readme] small rework readme)
 ### Package installation
 - Install from **helpcenter guide** and run all tests (Scheduled every Wednesday at 15:00 UTC+3)
 
@@ -29,12 +32,14 @@ Tested version: **<!-- onlyoffice-version-start -->v9.4.0-31<!-- onlyoffice-vers
 
 
 ### Backend tests
+* redis
 
 | Test | Status |
 |------|--------|
 | dev-Redis-unix.sock (redis + ioredis) | ![dev-Redis](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Redis-unix.sock.yml/badge.svg?branch=main) |
 
-### Databases
+
+* Tests with different DBs (Scheduled every Wednesday at 15:00 UTC+3)
 
 | Database | Status |
 |----------|--------|
