@@ -43,6 +43,7 @@ Pre-release builds from S3 dev repo.
 | dev-DB MSSQL | ![mssql](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mssql.yml/badge.svg?branch=main) |
 | dev-DB Oracle | ![oracle](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-Oracle.yml/badge.svg?branch=main) |
 | dev-DB Dameng | ![dameng](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-dameng.yml/badge.svg?branch=main) |
+| dev-DB MariaDB | ![mariadb](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mariadb.yml/badge.svg?branch=main) |
 
 
 ## Release
