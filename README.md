@@ -36,14 +36,9 @@ Pre-release builds from S3 dev repo.
 
 * Tests with different DBs (Scheduled every Wednesday at 15:00 UTC+3)
 
-| Database | Status |
-|----------|--------|
-| dev-DB PostgreSQL | ![postgres](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-postgres.yml/badge.svg?branch=main) |
-| dev-DB MySQL | ![mysql](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mysql.yml/badge.svg?branch=main) |
-| dev-DB MSSQL | ![mssql](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mssql.yml/badge.svg?branch=main) |
-| dev-DB Oracle | ![oracle](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-Oracle.yml/badge.svg?branch=main) |
-| dev-DB Dameng | ![dameng](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-dameng.yml/badge.svg?branch=main) |
-| dev-DB MariaDB | ![mariadb](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-mariadb.yml/badge.svg?branch=main) |
+| Test | Status |
+|------|--------|
+| dev-DB check (MySQL, PostgreSQL, MSSQL, Oracle, Dameng, MariaDB) | ![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main) |
 
 
 ## Release
