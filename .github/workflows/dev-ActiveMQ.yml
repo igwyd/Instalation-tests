@@ -1,0 +1,218 @@
+name: dev ActiveMQ
+
+on:
+  schedule:
+    - cron: '0 12 * * 3'  # Wednesday 15:00 Moscow time (UTC+3)
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    name: dev ActiveMQ ${{ matrix.mq }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mq: artemis
+            mq_image: apache/activemq-artemis:2.40.0-alpine
+            mq_user: artemis
+            mq_password: artemis
+
+          - mq: classic
+            mq_image: apache/activemq-classic:latest
+            mq_user: admin
+            mq_password: admin
+
+    steps:
+      - name: Create docker network and start containers
+        run: |
+          docker network create ds-network
+
+          if [ "${{ matrix.mq }}" = "artemis" ]; then
+            docker run -d --network ds-network \
+              --name onlyoffice-mq \
+              -e ARTEMIS_USER=${{ matrix.mq_user }} \
+              -e ARTEMIS_PASSWORD=${{ matrix.mq_password }} \
+              ${{ matrix.mq_image }}
+          else
+            docker run -d --network ds-network \
+              --name onlyoffice-mq \
+              -e ACTIVEMQ_USERNAME=${{ matrix.mq_user }} \
+              -e ACTIVEMQ_PASSWORD=${{ matrix.mq_password }} \
+              ${{ matrix.mq_image }}
+          fi
+
+          docker run -d --network ds-network -p 80:80 \
+            --name onlyoffice \
+            -e AMQP_TYPE=activemq \
+            -e AMQP_URI=amqp://${{ matrix.mq_user }}:${{ matrix.mq_password }}@onlyoffice-mq \
+            -e JWT_ENABLED=true \
+            -e JWT_SECRET=MYSECRET \
+            -e WOPI_ENABLED=true \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
+
+      - name: Docker containers STATUS
+        run: docker ps -a
+
+      - name: Wait for ${{ matrix.mq }} and ONLYOFFICE to be ready
+        run: sleep 180
+
+      - name: Get runner IP
+        run: |
+          IP=$(ip route get 1 | awk '{print $7}')
+          echo "RUNNER_IP=$IP" >> $GITHUB_ENV
+          echo "Runner IP is $IP"
+
+      - name: start ds example
+        run: |
+          docker exec onlyoffice supervisorctl start ds:example
+
+      - name: Initialize check defaults
+        run: |
+          echo "HEALTHY=false" >> $GITHUB_ENV
+          echo "VERSION_OK=false" >> $GITHUB_ENV
+          echo "PUPPETEER_OK=true" >> $GITHUB_ENV
+          echo "PUPPETEER_FAILED=0" >> $GITHUB_ENV
+          echo "PUPPETEER_API_FAILED=0" >> $GITHUB_ENV
+          echo "PUPPETEER_WOPI_FAILED=0" >> $GITHUB_ENV
+
+      - name: INFO
+        continue-on-error: true
+        run: |
+          sudo apt-get install jq -y
+
+          echo "-------------healthcheck-------------"
+          HEALTHCHECK_RESULT=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          echo "Healthcheck: $HEALTHCHECK_RESULT"
+          if [ "$HEALTHCHECK_RESULT" = "true" ]; then
+            echo "HEALTHY=true" >> $GITHUB_ENV
+          fi
+          echo "-------------DS services-------------"
+          docker exec onlyoffice supervisorctl status all || true
+          echo "--------installed packages-----------"
+          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType must be 1--------"
+          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "----------${{ matrix.mq }} logs-----------"
+          docker logs --tail 50 onlyoffice-mq
+
+      - name: Check version
+        continue-on-error: true
+        run: |
+          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          ACTUAL=$(docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice" | awk '{print $3}' | head -n 1)
+          echo "Expected version: $EXPECTED"
+          echo "Actual version:   $ACTUAL"
+          if [ "$ACTUAL" = "$EXPECTED" ]; then
+            echo "VERSION_OK=true" >> $GITHUB_ENV
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up nodejs
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install prerequisites for puppeteer tests
+        run: |
+          sudo apt-get update
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo dpkg -i google-chrome-stable_current_amd64.deb
+          sudo apt-get install -f -y
+          google-chrome --version
+          python3 --version
+          pip3 --version
+          node -v
+          npm -v
+
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GIT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
+          ssh-keyscan git.onlyoffice.com >> ~/.ssh/known_hosts
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          git clone git@git.onlyoffice.com:ONLYOFFICE-QA/Dep.Tests.git
+          cd Dep.Tests
+          sed -i 's/url=https:\/\/github.com\/ONLYOFFICE-data\/pp-files.git/url = git@github.com:ONLYOFFICE-data\/pp-files.git/' .gitmodules
+          git submodule update --init puppeteer/files
+          cd puppeteer/engine
+          npm install
+          cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
+
+      - name: Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${RUNNER_IP}/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
+          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Documentserver logs PUPPETEER TEST
+        continue-on-error: true
+        run: docker logs --tail 500 onlyoffice
+
+      - name: Parse PUPPETEER TEST results
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import os
+
+          def count_results(path):
+              if not os.path.exists(path):
+                  print(f"Report not found: {path}")
+                  return 0, 0
+              with open(path) as f:
+                  content = f.read()
+              ok  = content.count("<td>OK</td>")
+              err = content.count("<td>Error in script terminal.</td>")
+              return ok, err
+
+          api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
+          wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
+
+          total_ok  = api_ok  + wopi_ok
+          total_err = api_err + wopi_err
+
+          print(f"API tests:  OK={api_ok},  Failed={api_err}")
+          print(f"WOPI tests: OK={wopi_ok}, Failed={wopi_err}")
+          print(f"Total:      OK={total_ok}, Failed={total_err}")
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"PUPPETEER_API_FAILED={api_err}\n")
+              f.write(f"PUPPETEER_WOPI_FAILED={wopi_err}\n")
+              f.write(f"PUPPETEER_FAILED={total_err}\n")
+              f.write(f"PUPPETEER_OK={'false' if total_err > 12 else 'true'}\n")
+          EOF
+
+      - name: Final check
+        if: always()
+        run: |
+          echo "Healthcheck:         $HEALTHY"
+          echo "Version:             $VERSION_OK"
+          echo "Puppeteer API fail:  $PUPPETEER_API_FAILED"
+          echo "Puppeteer WOPI fail: $PUPPETEER_WOPI_FAILED"
+          echo "Puppeteer total:     $PUPPETEER_FAILED"
+          echo "Puppeteer OK:        $PUPPETEER_OK"
+          echo "==="
+          FAILED=0
+          [ "$HEALTHY"      = "true" ] || { echo "FAIL: Healthcheck";                                  FAILED=1; }
+          [ "$VERSION_OK"   = "true" ] || { echo "FAIL: Version";                                      FAILED=1; }
+          [ "$PUPPETEER_OK" = "true" ] || { echo "FAIL: Puppeteer (${PUPPETEER_FAILED} errors > 12)"; FAILED=1; }
+          [ "$FAILED" -eq 0 ] && echo "All checks passed!" || { echo "::error::Some checks failed!"; exit 1; }
