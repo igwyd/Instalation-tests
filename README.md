@@ -44,7 +44,7 @@ Pre-release builds from S3 dev repo.
 
 | Test | Status |
 |------|--------|
-| dev-ActiveMQ | ![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main) |
+| dev-ActiveMQ Classic and Artemis | ![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main) |
 
 
 ## Release
