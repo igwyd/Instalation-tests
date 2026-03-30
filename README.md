@@ -40,6 +40,12 @@ Pre-release builds from S3 dev repo.
 |------|--------|
 | MySQL, PostgreSQL, MSSQL, Oracle, Dameng, MariaDB | ![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main) |
 
+* Tests with ActiveMQ-Classic and ActiveMQ-Artemis
+
+| Test | Status |
+|------|--------|
+| dev-ActiveMQ | ![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main) |
+
 
 ## Release
 
