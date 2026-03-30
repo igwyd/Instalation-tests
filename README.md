@@ -53,10 +53,10 @@ Official public repos. Triggered manually via `workflow_dispatch`.
 
 ### Package installation
 
-| Test | x64 | arm64 |
-|------|-----|-------|
-| release-DEB (Ubuntu 24.04) | ![release-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-DEB-x64-arm64.yml/badge.svg?branch=main) | ![release-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-DEB-x64-arm64.yml/badge.svg?branch=main) |
-| release-RPM (CentOS 9) | ![release-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-RPM-x64-arm64.yml/badge.svg?branch=main) | ![release-RPM-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-RPM-x64-arm64.yml/badge.svg?branch=main) |
+| Test | x64/arm64 |
+|------|-----|
+| release-DEB (Ubuntu 24.04) | ![release-DEB](https://github.com/igwyd/Instalation-tests/actions/workflows/release-DEB-x64-arm64.yml/badge.svg?branch=main) |
+| release-RPM (CentOS 9) | ![release-RPM](https://github.com/igwyd/Instalation-tests/actions/workflows/release-RPM-x64-arm64.yml/badge.svg?branch=main) |
 
 ### Docker
 
