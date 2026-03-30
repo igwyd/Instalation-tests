@@ -1,4 +1,4 @@
-name: dev ActiveMQ
+name: dev ActiveMQ x64
 
 on:
   schedule:

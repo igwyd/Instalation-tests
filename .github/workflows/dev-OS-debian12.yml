@@ -1,4 +1,4 @@
-name: dev OS Debian 12
+name: dev OS Debian 12 x64-arm64
 
 on:
   schedule:

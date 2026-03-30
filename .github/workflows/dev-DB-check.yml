@@ -1,4 +1,4 @@
-name: dev DB check
+name: dev DB check x64
 
 on:
   schedule:

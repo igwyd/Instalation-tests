@@ -1,4 +1,4 @@
-name: Compile from source
+name: Compile from source x64
 
 on:
   workflow_dispatch:
