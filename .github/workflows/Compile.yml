@@ -65,7 +65,7 @@ jobs:
             echo "DROPLET_IP=$IP" >> $GITHUB_ENV
   
       - name: Wait for SSH to be Ready
-        run: sleep 180
+        run: sleep 120
   
       - name: Add SSH Key
         run: |
@@ -98,7 +98,7 @@ jobs:
         run: doctl compute droplet-action reboot $(doctl compute droplet list --format ID,Name | grep compile-test | awk '{print $1}')
 
       - name: Wait for instance to reboot
-        run: sleep 300
+        run: sleep 60
 
       - name: Install docker and ruby
         run: |

@@ -15,11 +15,9 @@ jobs:
           - arch: x64
             ami: ami-04331ec57720ee626
             instance_type: t2.medium
-            ssh_wait: 180
           - arch: arm64
             ami: ami-058dc7e5ef5f28287
             instance_type: t4g.medium
-            ssh_wait: 60
     name: dev RPM ${{ matrix.arch }}
     steps:
       - name: Checkout Repository
@@ -92,7 +90,7 @@ jobs:
           echo "EC2_IP=$IP" >> $GITHUB_ENV
 
       - name: Wait for SSH to be Ready
-        run: sleep ${{ matrix.ssh_wait }}
+        run: sleep 120
 
       - name: Add SSH Key
         run: |
@@ -113,8 +111,8 @@ jobs:
       - name: Reboot EC2 Instance
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
-      - name: Wait for instance to reboot
-        run: sleep 300
+      - name: Wait for instance to reboot after upgrade
+        run: sleep 180
 
       - name: Install ONLYOFFICE-Docs EE
         continue-on-error: true
@@ -282,7 +280,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Wait for instance to reboot
-        run: sleep 120
+        run: sleep 60
 
       - name: Install ONLYOFFICE-Docs DE
         run: |
@@ -404,7 +402,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Wait for instance to reboot
-        run: sleep 120
+        run: sleep 60
 
       - name: Install ONLYOFFICE-Docs CE
         run: |
@@ -526,7 +524,7 @@ jobs:
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
       - name: Wait for instance to reboot
-        run: sleep 120
+        run: sleep 60
 
       - name: Install ONLYOFFICE-Docs EE RELEASE for testing UPGRADE
         run: |

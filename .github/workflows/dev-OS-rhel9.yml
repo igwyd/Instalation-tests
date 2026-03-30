@@ -55,7 +55,7 @@ jobs:
           echo "EC2_IP=$IP" >> $GITHUB_ENV
 
       - name: Wait for SSH to be Ready
-        run: sleep 180
+        run: sleep 120
 
       - name: Add SSH Key
         run: |
@@ -74,8 +74,8 @@ jobs:
       - name: Reboot EC2 Instance
         run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
 
-      - name: Wait for instance to reboot
-        run: sleep 300
+      - name: Wait for instance to reboot after upgrade
+        run: sleep 180
 
       # ==================== Docker install (printf "y") ====================
       - name: Download install script
