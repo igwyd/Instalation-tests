@@ -1,4 +1,4 @@
-name: dev OS CentOS 10 stream
+name: dev OS CentOS 10 stream x64-arm64
 
 on:
   schedule:

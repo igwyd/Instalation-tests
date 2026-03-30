@@ -1,4 +1,4 @@
-name: dev OS RHEL 10
+name: dev OS RHEL 10 x64-arm64
 
 on:
   schedule:

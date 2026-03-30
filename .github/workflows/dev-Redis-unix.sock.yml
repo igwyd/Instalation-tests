@@ -1,4 +1,4 @@
-name: dev Redis unix.sock
+name: dev Redis unix.sock x64
 
 on:
   schedule:
