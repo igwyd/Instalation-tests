@@ -12,7 +12,7 @@ Pre-release builds from S3 dev repo.
 | Test | x64/arm64 |
 |------|-----|
 | dev-DEB (Ubuntu 24.04) | ![dev-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml/badge.svg?branch=main) | ![dev-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml/badge.svg?branch=main) |
-| dev-RPM (CentOS 9) | ![dev-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64.yml/badge.svg?branch=main) |
+| dev-RPM (CentOS 9) | ![dev-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml/badge.svg?branch=main) |
 
 - Check installation **OneClickInstall** on supported OS **Package** and **Docker** (Scheduled every Wednesday at 17:00 UTC+3)
 
