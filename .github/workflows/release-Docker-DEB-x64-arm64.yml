@@ -127,7 +127,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s http://127.0.0.1/healthcheck; echo
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-release supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -135,7 +135,7 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           echo "-------------DS-example-------------"
           sudo docker exec ds-ee-release supervisorctl start ds:example
           sudo docker exec ds-ee-release supervisorctl status ds:example
@@ -227,7 +227,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
-          curl -s http://127.0.0.1/healthcheck; echo
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-de-release supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -235,7 +235,7 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           echo "-------------DS-example-------------"
           sudo docker exec ds-de-release supervisorctl start ds:example
           sudo docker exec ds-de-release supervisorctl status ds:example
@@ -326,7 +326,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
-          curl -s http://127.0.0.1/healthcheck; echo
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-release supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -334,7 +334,7 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           echo "-------------DS-example-------------"
           sudo docker exec ds-release supervisorctl start ds:example
           sudo docker exec ds-release supervisorctl status ds:example
