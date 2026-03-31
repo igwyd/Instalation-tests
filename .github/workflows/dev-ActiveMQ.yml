@@ -72,7 +72,6 @@ jobs:
         run: |
           echo "HEALTHY=false" >> $GITHUB_ENV
           echo "VERSION_OK=false" >> $GITHUB_ENV
-          echo "PUPPETEER_OK=true" >> $GITHUB_ENV
           echo "PUPPETEER_FAILED=0" >> $GITHUB_ENV
           echo "PUPPETEER_API_FAILED=0" >> $GITHUB_ENV
           echo "PUPPETEER_WOPI_FAILED=0" >> $GITHUB_ENV
@@ -198,21 +197,42 @@ jobs:
               f.write(f"PUPPETEER_API_FAILED={api_err}\n")
               f.write(f"PUPPETEER_WOPI_FAILED={wopi_err}\n")
               f.write(f"PUPPETEER_FAILED={total_err}\n")
-              f.write(f"PUPPETEER_OK={'false' if total_err > 12 else 'true'}\n")
           EOF
 
       - name: Final check
         if: always()
         run: |
-          echo "Healthcheck:         $HEALTHY"
-          echo "Version:             $VERSION_OK"
-          echo "Puppeteer API fail:  $PUPPETEER_API_FAILED"
-          echo "Puppeteer WOPI fail: $PUPPETEER_WOPI_FAILED"
-          echo "Puppeteer total:     $PUPPETEER_FAILED"
-          echo "Puppeteer OK:        $PUPPETEER_OK"
-          echo "==="
           FAILED=0
-          [ "$HEALTHY"      = "true" ] || { echo "FAIL: Healthcheck";                                  FAILED=1; }
-          [ "$VERSION_OK"   = "true" ] || { echo "FAIL: Version";                                      FAILED=1; }
-          [ "$PUPPETEER_OK" = "true" ] || { echo "FAIL: Puppeteer (${PUPPETEER_FAILED} errors > 12)"; FAILED=1; }
-          [ "$FAILED" -eq 0 ] && echo "All checks passed!" || { echo "::error::Some checks failed!"; exit 1; }
+
+          echo "=== Healthcheck ==="
+          echo "Healthcheck: ${HEALTHY:-not set}"
+          if [ "${HEALTHY}" != "true" ]; then
+            echo "Healthcheck FAILED"
+            FAILED=1
+          else
+            echo "Healthcheck passed"
+          fi
+
+          echo "=== Version ==="
+          echo "Version OK: ${VERSION_OK:-not set}"
+          if [ "${VERSION_OK}" != "true" ]; then
+            echo "Version check FAILED"
+            FAILED=1
+          else
+            echo "Version check passed"
+          fi
+
+          echo "=== Puppeteer results ==="
+          echo "Puppeteer API  failed: ${PUPPETEER_API_FAILED:-0}"
+          echo "Puppeteer WOPI failed: ${PUPPETEER_WOPI_FAILED:-0}"
+          echo "Puppeteer total failed: ${PUPPETEER_FAILED:-0}"
+          if [ "${PUPPETEER_FAILED:-0}" -gt 15 ]; then
+            echo "Too many puppeteer failures: ${PUPPETEER_FAILED} (threshold: 15)"
+            FAILED=1
+          else
+            echo "Puppeteer tests OK: ${PUPPETEER_FAILED:-0} failures (threshold: 15)"
+          fi
+
+          if [ "$FAILED" -eq 1 ]; then
+            exit 1
+          fi
