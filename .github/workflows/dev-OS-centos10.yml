@@ -89,7 +89,7 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
-          printf "y\n" | sudo bash docs-enterprise-install.sh --documentimage onlyoffice/4testing-documentserver-ee --documentversion ${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }} --skiphardwarecheck true
+          printf "y\n" | sudo bash docs-enterprise-install.sh --documentimage onlyoffice/4testing-documentserver-ee --documentversion ${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }} --skiphardwarecheck true
           EOF
 
       - name: Wait for Docker install to start
@@ -109,7 +109,7 @@ jobs:
       - name: Check version Docker install
         continue-on-error: true
         run: |
-          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           ACTUAL=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} 'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") dpkg-query -W onlyoffice-documentserver-ee' | awk '{print $2}')
           echo "Expected version: $EXPECTED"
           echo "Actual version: $ACTUAL"
@@ -144,14 +144,14 @@ jobs:
       - name: Add dev repo
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
-          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
+          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_DEV_VERSION }}.repo
           EOF
 
       - name: Install ONLYOFFICE Docs EE dev version
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
-          sudo dnf install onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
+          sudo dnf install onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
           EOF
 
       - name: Wait for native install to start
@@ -171,7 +171,7 @@ jobs:
       - name: Check version native install
         continue-on-error: true
         run: |
-          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           ACTUAL=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} 'rpm -q --qf "%{VERSION}-%{RELEASE}" onlyoffice-documentserver-ee' | sed 's/\.el[0-9]*//')
           echo "Expected version: $EXPECTED"
           echo "Actual version: $ACTUAL"

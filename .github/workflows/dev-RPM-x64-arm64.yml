@@ -152,9 +152,9 @@ jobs:
           sudo yum install fontconfig -y
           sudo rpm -i https://sourceforge.net/projects/mscorefonts2/files/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm
 
-          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
+          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_DEV_VERSION }}.repo
 
-          sudo yum install onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
+          sudo yum install onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
 
           sudo service nginx start
           sudo systemctl enable nginx
@@ -199,7 +199,7 @@ jobs:
 
           VERSION=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
             "rpm -q --queryformat '%{VERSION}-%{RELEASE}' onlyoffice-documentserver-ee 2>/dev/null || echo 'not-found'")
-          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7"
           echo "Version EE: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
             echo "VERSION_EE_OK=true" >> $GITHUB_ENV
@@ -285,7 +285,7 @@ jobs:
       - name: Install ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
-          sudo dnf install onlyoffice-documentserver-de-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
+          sudo dnf install onlyoffice-documentserver-de-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
           sudo service nginx start
           sudo systemctl enable nginx
           printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
@@ -322,7 +322,7 @@ jobs:
 
           VERSION=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
             "rpm -q --queryformat '%{VERSION}-%{RELEASE}' onlyoffice-documentserver-de 2>/dev/null || echo 'not-found'")
-          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7"
           echo "Version DE: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
             echo "VERSION_DE_OK=true" >> $GITHUB_ENV
@@ -407,7 +407,7 @@ jobs:
       - name: Install ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
-          sudo dnf install onlyoffice-documentserver-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
+          sudo dnf install onlyoffice-documentserver-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
           sudo service nginx start
           sudo systemctl enable nginx
           printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
@@ -444,7 +444,7 @@ jobs:
 
           VERSION=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
             "rpm -q --queryformat '%{VERSION}-%{RELEASE}' onlyoffice-documentserver 2>/dev/null || echo 'not-found'")
-          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7"
           echo "Version CE: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
             echo "VERSION_CE_OK=true" >> $GITHUB_ENV
@@ -577,8 +577,8 @@ jobs:
       - name: Update ONLYOFFICE-EE to the DEV
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
-          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_VERSION }}.repo
-          sudo yum upgrade onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7 -y
+          sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_DEV_VERSION }}.repo
+          sudo yum upgrade onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE DEV and JWT has not been modified
@@ -615,7 +615,7 @@ jobs:
 
           VERSION=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
             "rpm -q --queryformat '%{VERSION}-%{RELEASE}' onlyoffice-documentserver-ee 2>/dev/null || echo 'not-found'")
-          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}.el7"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7"
           echo "Version after upgrade: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
             echo "VERSION_EE_UPGRADE_OK=true" >> $GITHUB_ENV

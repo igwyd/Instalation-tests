@@ -50,7 +50,7 @@ jobs:
             -e JWT_ENABLED=true \
             -e JWT_SECRET=MYSECRET \
             -e WOPI_ENABLED=true \
-            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
 
       - name: Docker containers STATUS
         run: docker ps -a
@@ -100,7 +100,7 @@ jobs:
       - name: Check version
         continue-on-error: true
         run: |
-          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           ACTUAL=$(docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice" | awk '{print $3}' | head -n 1)
           echo "Expected version: $EXPECTED"
           echo "Actual version:   $ACTUAL"
