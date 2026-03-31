@@ -60,10 +60,10 @@ Official public repos. Triggered manually via `workflow_dispatch`.
 
 ### Docker
 
-| Test | x64 | arm64 |
-|------|-----|-------|
-| release-Docker-DEB | ![docker-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-x64.yml/badge.svg?branch=main) | ![docker-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-arm64.yml/badge.svg?branch=main) |
-| release-Docker-RPM | ![docker-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-RPM-x64.yml/badge.svg?branch=main) | |
+| Test | x64/arm64 |
+|------|-----------|
+| release-Docker-DEB | ![release-Docker-DEB](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-x64-arm64.yml/badge.svg?branch=main) |
+| release-Docker-RPM | ![release-Docker-RPM](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-RPM-x64-arm64.yml/badge.svg?branch=main) |
 
 ## Other
 
