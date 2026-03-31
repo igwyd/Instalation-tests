@@ -167,6 +167,18 @@ jobs:
           echo "Healthcheck EE: $HC"
           echo "HEALTHCHECK_EE=$HC" >> $GITHUB_ENV
 
+      - name: Check version EE
+        continue-on-error: true
+        run: |
+          VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
+          EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
+          echo "Version EE: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_EE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_EE_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: Clear puppeteer output before EE tests
         run: rm -rf Dep.Tests/puppeteer/out
 
@@ -267,6 +279,18 @@ jobs:
           echo "Healthcheck DE: $HC"
           echo "HEALTHCHECK_DE=$HC" >> $GITHUB_ENV
 
+      - name: Check version DE
+        continue-on-error: true
+        run: |
+          VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
+          EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
+          echo "Version DE: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_DE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_DE_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: Clear puppeteer output before DE tests
         run: rm -rf Dep.Tests/puppeteer/out
 
@@ -366,6 +390,18 @@ jobs:
           echo "Healthcheck CE: $HC"
           echo "HEALTHCHECK_CE=$HC" >> $GITHUB_ENV
 
+      - name: Check version CE
+        continue-on-error: true
+        run: |
+          VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
+          EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
+          echo "Version CE: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_CE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_CE_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: Clear puppeteer output before CE tests
         run: rm -rf Dep.Tests/puppeteer/out
 
@@ -439,6 +475,16 @@ jobs:
         if: always()
         run: |
           FAILED=0
+
+          echo "=== Version results ==="
+          for VAR in VERSION_EE_OK VERSION_DE_OK VERSION_CE_OK; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-not set}"
+            if [ "${VAL}" != "true" ]; then
+              echo "$VAR FAILED"
+              FAILED=1
+            fi
+          done
 
           echo "=== Healthcheck results ==="
           for VAR in HEALTHCHECK_EE HEALTHCHECK_DE HEALTHCHECK_CE; do
