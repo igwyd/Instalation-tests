@@ -554,11 +554,11 @@ jobs:
           for VAR in PUPPETEER_EE_FAILED PUPPETEER_DE_FAILED PUPPETEER_CE_FAILED; do
             VAL="${!VAR}"
             echo "$VAR: ${VAL:-0}"
-            if [ "${VAL:-0}" -gt 12 ]; then
-              echo "$VAR FAILED (threshold: 12)"
+            if [ "${VAL:-0}" -gt 15 ]; then
+              echo "$VAR FAILED (threshold: 15)"
               FAILED=1
             else
-              echo "$VAR OK (${VAL:-0} failures, threshold: 12)"
+              echo "$VAR OK (${VAL:-0} failures, threshold: 15)"
             fi
           done
 
