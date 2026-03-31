@@ -70,7 +70,7 @@ jobs:
 
       - name: Docker run ONLYOFFICE-Docs EE for test ${{ matrix.driver }}
         run: |
-          docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ${{ matrix.container }} onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
+          docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ${{ matrix.container }} onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           sleep 180
           docker exec ${{ matrix.container }} supervisorctl start ds:example
           echo "-------------healthcheck-------------"

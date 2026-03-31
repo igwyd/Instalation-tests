@@ -140,9 +140,9 @@ jobs:
           sudo apt-get install ttf-mscorefonts-installer -y
 
           echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
-          echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
+          echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_DEV_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
           sudo apt-get update
-          sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y
+          sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }} -y
           EOF
 
 
@@ -179,7 +179,7 @@ jobs:
 
           VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "dpkg-query -W -f='\${Version}' onlyoffice-documentserver-ee 2>/dev/null || echo 'not-found'")
-          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version EE: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
             echo "VERSION_EE_OK=true" >> $GITHUB_ENV
@@ -267,7 +267,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           echo onlyoffice-documentserver-de onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
           echo onlyoffice-documentserver-de onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
-          sudo apt-get install onlyoffice-documentserver-de=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y
+          sudo apt-get install onlyoffice-documentserver-de=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }} -y
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
@@ -301,7 +301,7 @@ jobs:
 
           VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "dpkg-query -W -f='\${Version}' onlyoffice-documentserver-de 2>/dev/null || echo 'not-found'")
-          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version DE: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
             echo "VERSION_DE_OK=true" >> $GITHUB_ENV
@@ -388,7 +388,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           echo onlyoffice-documentserver onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
           echo onlyoffice-documentserver onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
-          sudo apt-get install onlyoffice-documentserver=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y
+          sudo apt-get install onlyoffice-documentserver=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }} -y
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
@@ -422,7 +422,7 @@ jobs:
 
           VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "dpkg-query -W -f='\${Version}' onlyoffice-documentserver 2>/dev/null || echo 'not-found'")
-          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version CE: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
             echo "VERSION_CE_OK=true" >> $GITHUB_ENV
@@ -553,9 +553,9 @@ jobs:
       - name: Update ONLYOFFICE-EE to the DEV
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
+          echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_DEV_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
           sudo apt-get update
-          sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }} -y
+          sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }} -y
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE DEV and JWT has not been modified
@@ -592,7 +592,7 @@ jobs:
 
           VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "dpkg-query -W -f='\${Version}' onlyoffice-documentserver-ee 2>/dev/null || echo 'not-found'")
-          EXPECTED="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version after upgrade: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
             echo "VERSION_EE_UPGRADE_OK=true" >> $GITHUB_ENV

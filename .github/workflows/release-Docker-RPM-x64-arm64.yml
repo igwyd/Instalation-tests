@@ -1,11 +1,22 @@
-name: release Docker RPM x64
+name: release Docker RPM x64-arm64
 
 on:
   workflow_dispatch:
 
 jobs:
-  check-docker-rpm-x64:
+  check-docker-rpm:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            ami: ami-04331ec57720ee626
+            instance_type: t2.medium
+          - arch: arm64
+            ami: ami-058dc7e5ef5f28287
+            instance_type: t4g.medium
+    name: release Docker RPM ${{ matrix.arch }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -56,11 +67,11 @@ jobs:
       - name: Create EC2 Instance
         run: |
           INSTANCE_ID=$(aws ec2 run-instances \
-            --image-id ami-04331ec57720ee626 \
-            --instance-type t2.medium \
+            --image-id ${{ matrix.ami }} \
+            --instance-type ${{ matrix.instance_type }} \
             --key-name demin \
             --security-groups AllPortsOpened \
-            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_release-docker-rpm-x64}]' \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_release-docker-rpm-${{ matrix.arch }}}]' \
             --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":50,"VolumeType":"gp3"}}]' \
             --query "Instances[0].InstanceId" --output text)
 
@@ -76,7 +87,7 @@ jobs:
           echo "EC2 Public IP: $IP"
           echo "EC2_IP=$IP" >> $GITHUB_ENV
 
-      - name: Wait for SSH to be ready
+      - name: Wait for SSH to be Ready
         run: sleep 120
 
       - name: Add SSH Key
@@ -89,7 +100,7 @@ jobs:
 
       - name: Upgrade RPM packages
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           sudo dnf -y clean all
           sudo dnf -y update
           sudo dnf install wget -y
@@ -117,7 +128,6 @@ jobs:
           sudo dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
           sudo systemctl enable --now docker
           sudo docker ps
-          sudo docker compose version
           sudo docker --version
           EOF
 
@@ -136,7 +146,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           sudo dnf install jq -y
           echo "-------------healthcheck-------------"
-          sudo curl -s http://127.0.0.1/healthcheck; echo
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-release supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -144,11 +154,33 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           echo "-------------DS-example-------------"
           sudo docker exec ds-ee-release supervisorctl start ds:example
           sudo docker exec ds-ee-release supervisorctl status ds:example
           EOF
+
+      - name: Check healthcheck EE
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck EE: $HC"
+          echo "HEALTHCHECK_EE=$HC" >> $GITHUB_ENV
+
+      - name: Check version EE
+        continue-on-error: true
+        run: |
+          VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
+          EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
+          echo "Version EE: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_EE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_EE_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: Clear puppeteer output before EE tests
+        run: rm -rf Dep.Tests/puppeteer/out
 
       - name: Puppeteer API tests ONLYOFFICE-Docs EE
         continue-on-error: true
@@ -169,6 +201,46 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
+      - name: Parse puppeteer results EE
+        if: always()
+        run: |
+          python3 - <<'PYEOF'
+          import os
+
+          def count_results(path):
+              if not os.path.exists(path):
+                  print(f"Report not found: {path}")
+                  return 0, 0
+              with open(path) as f:
+                  content = f.read()
+              ok  = content.count("<td>OK</td>")
+              err = content.count("<td>Error in script terminal.</td>")
+              return ok, err
+
+          api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
+          wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
+          total_ok  = api_ok  + wopi_ok
+          total_err = api_err + wopi_err
+
+          print(f"EE API tests:  OK={api_ok},  Failed={api_err}")
+          print(f"EE WOPI tests: OK={wopi_ok}, Failed={wopi_err}")
+          print(f"EE Total:      OK={total_ok}, Failed={total_err}")
+
+          prev_total = int(os.environ.get("PUPPETEER_TOTAL_FAILED", "0"))
+          new_total = prev_total + total_err
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"PUPPETEER_EE_FAILED={total_err}\n")
+              f.write(f"PUPPETEER_TOTAL_FAILED={new_total}\n")
+          PYEOF
+
+      - name: Documentserver logs ONLYOFFICE-Docs EE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo docker exec ds-ee-release bash -c "tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log"
+          EOF
+
       - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
@@ -186,7 +258,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           echo "-------------healthcheck-------------"
-          sudo curl -s http://127.0.0.1/healthcheck; echo
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-de-release supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -194,11 +266,33 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           echo "-------------DS-example-------------"
           sudo docker exec ds-de-release supervisorctl start ds:example
           sudo docker exec ds-de-release supervisorctl status ds:example
           EOF
+
+      - name: Check healthcheck DE
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck DE: $HC"
+          echo "HEALTHCHECK_DE=$HC" >> $GITHUB_ENV
+
+      - name: Check version DE
+        continue-on-error: true
+        run: |
+          VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
+          EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
+          echo "Version DE: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_DE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_DE_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: Clear puppeteer output before DE tests
+        run: rm -rf Dep.Tests/puppeteer/out
 
       - name: Puppeteer API tests ONLYOFFICE-Docs DE
         continue-on-error: true
@@ -218,6 +312,46 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
+      - name: Parse puppeteer results DE
+        if: always()
+        run: |
+          python3 - <<'PYEOF'
+          import os
+
+          def count_results(path):
+              if not os.path.exists(path):
+                  print(f"Report not found: {path}")
+                  return 0, 0
+              with open(path) as f:
+                  content = f.read()
+              ok  = content.count("<td>OK</td>")
+              err = content.count("<td>Error in script terminal.</td>")
+              return ok, err
+
+          api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
+          wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
+          total_ok  = api_ok  + wopi_ok
+          total_err = api_err + wopi_err
+
+          print(f"DE API tests:  OK={api_ok},  Failed={api_err}")
+          print(f"DE WOPI tests: OK={wopi_ok}, Failed={wopi_err}")
+          print(f"DE Total:      OK={total_ok}, Failed={total_err}")
+
+          prev_total = int(os.environ.get("PUPPETEER_TOTAL_FAILED", "0"))
+          new_total = prev_total + total_err
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"PUPPETEER_DE_FAILED={total_err}\n")
+              f.write(f"PUPPETEER_TOTAL_FAILED={new_total}\n")
+          PYEOF
+
+      - name: Documentserver logs ONLYOFFICE-Docs DE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo docker exec ds-de-release bash -c "tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log"
+          EOF
+
       - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
@@ -235,7 +369,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           echo "-------------healthcheck-------------"
-          sudo curl -s http://127.0.0.1/healthcheck; echo
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-release supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -243,11 +377,33 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           echo "-------------DS-example-------------"
           sudo docker exec ds-release supervisorctl start ds:example
           sudo docker exec ds-release supervisorctl status ds:example
           EOF
+
+      - name: Check healthcheck CE
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck CE: $HC"
+          echo "HEALTHCHECK_CE=$HC" >> $GITHUB_ENV
+
+      - name: Check version CE
+        continue-on-error: true
+        run: |
+          VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
+          EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
+          echo "Version CE: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_CE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_CE_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: Clear puppeteer output before CE tests
+        run: rm -rf Dep.Tests/puppeteer/out
 
       - name: Puppeteer API tests ONLYOFFICE-Docs CE
         continue-on-error: true
@@ -267,7 +423,97 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
+      - name: Parse puppeteer results CE
+        if: always()
+        run: |
+          python3 - <<'PYEOF'
+          import os
+
+          def count_results(path):
+              if not os.path.exists(path):
+                  print(f"Report not found: {path}")
+                  return 0, 0
+              with open(path) as f:
+                  content = f.read()
+              ok  = content.count("<td>OK</td>")
+              err = content.count("<td>Error in script terminal.</td>")
+              return ok, err
+
+          api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
+          wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
+          total_ok  = api_ok  + wopi_ok
+          total_err = api_err + wopi_err
+
+          print(f"CE API tests:  OK={api_ok},  Failed={api_err}")
+          print(f"CE WOPI tests: OK={wopi_ok}, Failed={wopi_err}")
+          print(f"CE Total:      OK={total_ok}, Failed={total_err}")
+
+          prev_total = int(os.environ.get("PUPPETEER_TOTAL_FAILED", "0"))
+          new_total = prev_total + total_err
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"PUPPETEER_CE_FAILED={total_err}\n")
+              f.write(f"PUPPETEER_TOTAL_FAILED={new_total}\n")
+          PYEOF
+
+      - name: Documentserver logs ONLYOFFICE-Docs CE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo docker exec ds-release bash -c "tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log"
+          EOF
+
+      - name: Remove ONLYOFFICE-Docs CE
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo docker stop ds-release
+          sudo docker rm ds-release
+          sudo docker rmi onlyoffice/documentserver
+          EOF
+
+      - name: Final check
+        if: always()
+        run: |
+          FAILED=0
+
+          echo "=== Version results ==="
+          for VAR in VERSION_EE_OK VERSION_DE_OK VERSION_CE_OK; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-not set}"
+            if [ "${VAL}" != "true" ]; then
+              echo "$VAR FAILED"
+              FAILED=1
+            fi
+          done
+
+          echo "=== Healthcheck results ==="
+          for VAR in HEALTHCHECK_EE HEALTHCHECK_DE HEALTHCHECK_CE; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-not set}"
+            if [ "${VAL}" != "true" ]; then
+              echo "$VAR FAILED"
+              FAILED=1
+            fi
+          done
+
+          echo "=== Puppeteer results ==="
+          for VAR in PUPPETEER_EE_FAILED PUPPETEER_DE_FAILED PUPPETEER_CE_FAILED; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-0}"
+            if [ "${VAL:-0}" -gt 12 ]; then
+              echo "$VAR FAILED (threshold: 12)"
+              FAILED=1
+            else
+              echo "$VAR OK (${VAL:-0} failures, threshold: 12)"
+            fi
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            exit 1
+          fi
+
       - name: Delete EC2 Instance
+        if: always()
         run: |
           aws ec2 terminate-instances --instance-ids ${{ env.INSTANCE_ID }}
           aws ec2 wait instance-terminated --instance-ids ${{ env.INSTANCE_ID }}

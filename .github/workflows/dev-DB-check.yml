@@ -132,7 +132,7 @@ jobs:
             -e WOPI_ENABLED=true \
             -e JWT_SECRET=MYSECRET \
             --name onlyoffice \
-            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_VERSION }}.${{ vars.ONLYOFFICE_BUILD }}
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
 
       - name: docker containers STATUS
         run: |
@@ -351,7 +351,7 @@ jobs:
             echo "Healthcheck passed!"
           fi
 
-          EXPECTED_VERSION="${{ vars.ONLYOFFICE_VERSION }}-${{ vars.ONLYOFFICE_BUILD }}"
+          EXPECTED_VERSION="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           INSTALLED_VERSION=$(docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice" | awk '{print $3}' | head -n 1)
           echo "Expected version:  $EXPECTED_VERSION"
           echo "Installed version: $INSTALLED_VERSION"
