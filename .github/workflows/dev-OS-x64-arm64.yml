@@ -206,7 +206,7 @@ jobs:
       - name: Healthcheck Docker install
         continue-on-error: true
         run: |
-          RESULT=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} 'curl -s http://127.0.0.1/healthcheck')
+          RESULT=$(curl -s http://${{ env.EC2_IP }}/healthcheck)
           echo "Healthcheck result: $RESULT"
           if [ "$RESULT" = "true" ]; then
             echo "DOCKER_HEALTHY=true" >> $GITHUB_ENV
@@ -277,7 +277,7 @@ jobs:
       - name: Healthcheck native install
         continue-on-error: true
         run: |
-          RESULT=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} 'curl -s http://127.0.0.1/healthcheck')
+          RESULT=$(curl -s http://${{ env.EC2_IP }}/healthcheck)
           echo "Healthcheck result: $RESULT"
           if [ "$RESULT" = "true" ]; then
             echo "NATIVE_HEALTHY=true" >> $GITHUB_ENV
