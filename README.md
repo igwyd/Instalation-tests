@@ -33,7 +33,7 @@ Pre-release builds from S3 dev repo.
 
 | Test | Status |
 |------|--------|
-| MySQL, PostgreSQL, MSSQL, Oracle, Dameng, MariaDB | ![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main) |
+| MySQL, PostgreSQL (14,15,16,17,18), MSSQL, Oracle, Dameng, MariaDB | ![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main) |
 
 * Tests with ActiveMQ-Classic and ActiveMQ-Artemis
 

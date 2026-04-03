@@ -30,6 +30,42 @@ jobs:
             db_pwd: onlyoffice
             k6_stage_ramp: "1m:500"
             k6_stage_main: "9m:500"
+          - db: postgres14
+            db_image: postgres:14
+            db_name: postgresdb
+            db_port: 5432
+            db_type: postgres
+            db_user: onlyoffice
+            db_pwd: onlyoffice
+            k6_stage_ramp: "1m:500"
+            k6_stage_main: "9m:500"
+          - db: postgres15
+            db_image: postgres:15
+            db_name: postgresdb
+            db_port: 5432
+            db_type: postgres
+            db_user: onlyoffice
+            db_pwd: onlyoffice
+            k6_stage_ramp: "1m:500"
+            k6_stage_main: "9m:500"
+          - db: postgres16
+            db_image: postgres:16
+            db_name: postgresdb
+            db_port: 5432
+            db_type: postgres
+            db_user: onlyoffice
+            db_pwd: onlyoffice
+            k6_stage_ramp: "1m:500"
+            k6_stage_main: "9m:500"
+          - db: postgres17
+            db_image: postgres:17
+            db_name: postgresdb
+            db_port: 5432
+            db_type: postgres
+            db_user: onlyoffice
+            db_pwd: onlyoffice
+            k6_stage_ramp: "1m:500"
+            k6_stage_main: "9m:500"
           - db: mssql
             db_image: docker.io/igwyd890/mssql-onlyoffice:2025
             db_name: mssqldb
@@ -84,7 +120,7 @@ jobs:
                 -e MYSQL_PASSWORD=onlyoffice \
                 ${{ matrix.db_image }}
               ;;
-            postgres)
+            postgres | postgres14 | postgres15 | postgres16 | postgres17)
               docker run -d --network ds-network --name ${{ matrix.db_name }} \
                 -e POSTGRES_DB=onlyoffice \
                 -e POSTGRES_USER=onlyoffice \
@@ -189,7 +225,7 @@ jobs:
             mysql)
               docker exec ${{ matrix.db_name }} mysql --version
               ;;
-            postgres)
+            postgres | postgres14 | postgres15 | postgres16 | postgres17)
               docker exec ${{ matrix.db_name }} psql --version
               ;;
             mssql)
