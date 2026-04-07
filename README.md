@@ -29,7 +29,7 @@ Pre-release builds from S3 dev repo.
 | dev-Redis-unix.sock (redis + ioredis) | ![dev-Redis](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Redis-unix.sock.yml/badge.svg?branch=main) |
 
 
-* Tests with different DBs (Scheduled every Wednesday at 15:00 UTC+3)
+* Tests with different DBs (Scheduled every Wednesday at 14:00 UTC+3)
 
 | Test | Status |
 |------|--------|
