@@ -21,42 +21,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Puppeteer
+        uses: ./.github/actions/setup-puppeteer
         with:
-          python-version: '3.12'
-
-      - name: Set up nodejs
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install prerequisites for puppeteer tests
-        run: |
-          sudo apt-get update
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo dpkg -i google-chrome-stable_current_amd64.deb
-          sudo apt-get install -f -y
-          google-chrome --version
-          python3 --version
-          pip3 --version
-          node -v
-          npm -v
-
-          mkdir -p ~/.ssh
-          echo "${{ secrets.GIT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          eval $(ssh-agent -s)
-          ssh-add ~/.ssh/id_rsa
-          ssh-keyscan git.onlyoffice.com >> ~/.ssh/known_hosts
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
-          git clone git@git.onlyoffice.com:ONLYOFFICE-QA/Dep.Tests.git
-          cd Dep.Tests
-          sed -i 's/url=https:\/\/github.com\/ONLYOFFICE-data\/pp-files.git/url = git@github.com:ONLYOFFICE-data\/pp-files.git/' .gitmodules
-          git submodule update --init puppeteer/files
-          cd puppeteer/engine
-          npm install
-          cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
+          git_ssh_private_key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
 
       - name: Configure AWS CLI
         run: |
@@ -230,36 +198,7 @@ jobs:
 
       - name: Parse puppeteer results EE
         if: always()
-        run: |
-          python3 - <<'EOF'
-          import os
-
-          def count_results(path):
-              if not os.path.exists(path):
-                  print(f"Report not found: {path}")
-                  return 0, 0
-              with open(path) as f:
-                  content = f.read()
-              ok  = content.count("<td>OK</td>")
-              err = content.count("<td>Error in script terminal.</td>")
-              return ok, err
-
-          api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
-          wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
-          total_ok  = api_ok  + wopi_ok
-          total_err = api_err + wopi_err
-
-          print(f"EE API tests:  OK={api_ok},  Failed={api_err}")
-          print(f"EE WOPI tests: OK={wopi_ok}, Failed={wopi_err}")
-          print(f"EE Total:      OK={total_ok}, Failed={total_err}")
-
-          prev_total = int(os.environ.get("PUPPETEER_TOTAL_FAILED", "0"))
-          new_total = prev_total + total_err
-
-          with open(os.environ["GITHUB_ENV"], "a") as f:
-              f.write(f"PUPPETEER_EE_FAILED={total_err}\n")
-              f.write(f"PUPPETEER_TOTAL_FAILED={new_total}\n")
-          EOF
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition EE
 
       - name: Documentserver logs ONLYOFFICE-Docs EE
         continue-on-error: true
@@ -355,36 +294,7 @@ jobs:
 
       - name: Parse puppeteer results DE
         if: always()
-        run: |
-          python3 - <<'EOF'
-          import os
-
-          def count_results(path):
-              if not os.path.exists(path):
-                  print(f"Report not found: {path}")
-                  return 0, 0
-              with open(path) as f:
-                  content = f.read()
-              ok  = content.count("<td>OK</td>")
-              err = content.count("<td>Error in script terminal.</td>")
-              return ok, err
-
-          api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
-          wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
-          total_ok  = api_ok  + wopi_ok
-          total_err = api_err + wopi_err
-
-          print(f"DE API tests:  OK={api_ok},  Failed={api_err}")
-          print(f"DE WOPI tests: OK={wopi_ok}, Failed={wopi_err}")
-          print(f"DE Total:      OK={total_ok}, Failed={total_err}")
-
-          prev_total = int(os.environ.get("PUPPETEER_TOTAL_FAILED", "0"))
-          new_total = prev_total + total_err
-
-          with open(os.environ["GITHUB_ENV"], "a") as f:
-              f.write(f"PUPPETEER_DE_FAILED={total_err}\n")
-              f.write(f"PUPPETEER_TOTAL_FAILED={new_total}\n")
-          EOF
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition DE
 
       - name: Documentserver logs ONLYOFFICE-Docs DE
         continue-on-error: true
@@ -480,36 +390,7 @@ jobs:
 
       - name: Parse puppeteer results CE
         if: always()
-        run: |
-          python3 - <<'EOF'
-          import os
-
-          def count_results(path):
-              if not os.path.exists(path):
-                  print(f"Report not found: {path}")
-                  return 0, 0
-              with open(path) as f:
-                  content = f.read()
-              ok  = content.count("<td>OK</td>")
-              err = content.count("<td>Error in script terminal.</td>")
-              return ok, err
-
-          api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
-          wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
-          total_ok  = api_ok  + wopi_ok
-          total_err = api_err + wopi_err
-
-          print(f"CE API tests:  OK={api_ok},  Failed={api_err}")
-          print(f"CE WOPI tests: OK={wopi_ok}, Failed={wopi_err}")
-          print(f"CE Total:      OK={total_ok}, Failed={total_err}")
-
-          prev_total = int(os.environ.get("PUPPETEER_TOTAL_FAILED", "0"))
-          new_total = prev_total + total_err
-
-          with open(os.environ["GITHUB_ENV"], "a") as f:
-              f.write(f"PUPPETEER_CE_FAILED={total_err}\n")
-              f.write(f"PUPPETEER_TOTAL_FAILED={new_total}\n")
-          EOF
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition CE
 
       - name: Documentserver logs ONLYOFFICE-Docs CE
         continue-on-error: true
