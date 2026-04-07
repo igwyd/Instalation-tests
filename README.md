@@ -18,7 +18,7 @@ Pre-release builds from S3 dev repo.
 
 | OS | x64/arm64 |
 |---|---|
-| dev-OS (Ubuntu 22.04, Debian 12/13, CentOS 10, RHEL 9/10) | ![dev-OS](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-x64-arm64.yml/badge.svg?branch=main) |
+| dev-OS (Ubuntu 22.04, Debian 12/13, CentOS 10, RHEL 8/9/10) | ![dev-OS](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-x64-arm64.yml/badge.svg?branch=main) |
 
 
 ### Backend tests

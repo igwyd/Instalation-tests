@@ -90,6 +90,25 @@ jobs:
             instance_type: t4g.medium
             tag: dev-centos10-arm64
 
+          # RHEL 8
+          - os_name: RHEL 8
+            os_type: rpm
+            ssh_user: ec2-user
+            device_name: /dev/sda1
+            arch: x64
+            ami: ami-06ab04dfd55c423e4
+            instance_type: t2.medium
+            tag: dev-rhel8-x64
+
+          - os_name: RHEL 8
+            os_type: rpm
+            ssh_user: ec2-user
+            device_name: /dev/sda1
+            arch: arm64
+            ami: ami-088bb968ff4a01d7a
+            instance_type: t4g.medium
+            tag: dev-rhel8-arm64
+
           # RHEL 9
           - os_name: RHEL 9
             os_type: rpm
