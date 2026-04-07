@@ -314,7 +314,7 @@ jobs:
         run: |
           docker logs -n 1000 onlyoffice
 
-      - name: Check healthcheck, version and puppeteer results
+      - name: Final check
         if: always()
         run: |
           FAILED=0
