@@ -5,7 +5,7 @@ on:
 
 jobs:
   test-compilation:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -98,7 +98,7 @@ jobs:
         run: doctl compute droplet-action reboot $(doctl compute droplet list --format ID,Name | grep compile-test | awk '{print $1}')
 
       - name: Wait for instance to reboot
-        run: sleep 60
+        run: sleep 120
 
       - name: Install docker and ruby
         run: |
@@ -129,8 +129,11 @@ jobs:
           git clone https://github.com/ONLYOFFICE/build_tools.git -b ${{ vars.ONLYOFFICE_BUILDTOOLS_BRANCH }}
           cd build_tools
           mkdir out
-          sudo docker build --tag onlyoffice-document-editors-builder .
-          sudo docker run --name onlyoffice-build-tools -d -v /root/build_tools/out:/build_tools/out onlyoffice-document-editors-builder
+          sudo docker build --tag onlyoffice-document-editors-builder --build-arg BRANCH=${{ vars.ONLYOFFICE_BUILDTOOLS_BRANCH }} .
+          sudo docker run --name onlyoffice-build-tools -d \
+            -e BRANCH=${{ vars.ONLYOFFICE_BUILDTOOLS_BRANCH }} \
+            -v /root/build_tools/out:/build_tools/out \
+            onlyoffice-document-editors-builder
           sudo docker logs -f onlyoffice-build-tools >> build.log 2>&1
           sudo docker ps -a
           ls -lah /root/build_tools/out
