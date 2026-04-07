@@ -207,6 +207,14 @@ jobs:
           tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
 
+      - name: Check DS logs for errors EE
+        continue-on-error: true
+        run: |
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            'sudo grep -iEh "\[error\]|typeerror" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
+          echo "DS log errors EE: $ERRORS"
+          echo "DS_LOG_ERRORS_EE=$ERRORS" >> $GITHUB_ENV
+
       - name: Remove ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
@@ -302,6 +310,14 @@ jobs:
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
+
+      - name: Check DS logs for errors DE
+        continue-on-error: true
+        run: |
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            'sudo grep -iEh "\[error\]|typeerror" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
+          echo "DS log errors DE: $ERRORS"
+          echo "DS_LOG_ERRORS_DE=$ERRORS" >> $GITHUB_ENV
 
       - name: Remove ONLYOFFICE-Docs DE
         run: |
@@ -399,6 +415,14 @@ jobs:
           tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
 
+      - name: Check DS logs for errors CE
+        continue-on-error: true
+        run: |
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            'sudo grep -iEh "\[error\]|typeerror" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
+          echo "DS log errors CE: $ERRORS"
+          echo "DS_LOG_ERRORS_CE=$ERRORS" >> $GITHUB_ENV
+
       - name: Remove ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
@@ -441,6 +465,12 @@ jobs:
             else
               echo "$VAR OK (${VAL:-0} failures, threshold: 5)"
             fi
+          done
+
+          echo "=== DS log errors ==="
+          for VAR in DS_LOG_ERRORS_EE DS_LOG_ERRORS_DE DS_LOG_ERRORS_CE; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-0}"
           done
 
           if [ "$FAILED" -eq 1 ]; then

@@ -138,6 +138,13 @@ jobs:
         continue-on-error: true
         run: docker logs --tail 500 onlyoffice
 
+      - name: Check DS logs for errors
+        continue-on-error: true
+        run: |
+          ERRORS=$(docker exec onlyoffice bash -c 'grep -iEh "\[error\]|typeerror" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
+          echo "DS log errors: $ERRORS"
+          echo "DS_LOG_ERRORS=$ERRORS" >> $GITHUB_ENV
+
       - name: Parse PUPPETEER TEST results
         if: always()
         run: python3 .github/scripts/parse-puppeteer-results.py
@@ -175,6 +182,9 @@ jobs:
           else
             echo "Puppeteer tests OK: ${PUPPETEER_FAILED:-0} failures (threshold: 5)"
           fi
+
+          echo "=== DS log errors ==="
+          echo "DS log errors: ${DS_LOG_ERRORS:-0}"
 
           if [ "$FAILED" -eq 1 ]; then
             exit 1

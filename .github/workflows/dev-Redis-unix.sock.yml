@@ -136,6 +136,13 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
+      - name: Check DS logs for errors ${{ matrix.driver }}
+        continue-on-error: true
+        run: |
+          ERRORS=$(docker exec ${{ matrix.container }} bash -c 'grep -iEh "\[error\]|typeerror" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
+          echo "DS log errors: $ERRORS"
+          echo "DS_LOG_ERRORS=$ERRORS" >> $GITHUB_ENV
+
       - name: Documentserver logs and remove ${{ matrix.driver }} container
         run: |
           docker logs -n 1000 ${{ matrix.container }}
@@ -181,6 +188,9 @@ jobs:
           else
             echo "Puppeteer tests OK: ${PUPPETEER_FAILED:-0} failures (threshold: 5)"
           fi
+
+          echo "=== DS log errors ==="
+          echo "DS log errors: ${DS_LOG_ERRORS:-0}"
 
           if [ "$FAILED" -eq 1 ]; then
             exit 1

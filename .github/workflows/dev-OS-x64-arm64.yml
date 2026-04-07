@@ -163,6 +163,8 @@ jobs:
           echo "NATIVE_HEALTHY=false" >> $GITHUB_ENV
           echo "NATIVE_VERSION_OK=false" >> $GITHUB_ENV
           echo "PUPPETEER_TOTAL_FAILED=0" >> $GITHUB_ENV
+          echo "DS_LOG_ERRORS_DOCKER=0" >> $GITHUB_ENV
+          echo "DS_LOG_ERRORS_NATIVE=0" >> $GITHUB_ENV
 
       - name: Configure AWS CLI
         run: |
@@ -275,6 +277,14 @@ jobs:
           sudo docker logs $(sudo docker ps -q --filter "name=onlyoffice") 2>&1 | tail -n 1000 || true
           EOF
 
+      - name: Check DS logs for errors Docker install
+        continue-on-error: true
+        run: |
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") bash -c "grep -iEh \"\\[error\\]|typeerror\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+          echo "DS log errors Docker: $ERRORS"
+          echo "DS_LOG_ERRORS_DOCKER=$ERRORS" >> $GITHUB_ENV
+
       - name: Clear puppeteer output before Docker tests
         run: rm -rf Dep.Tests/puppeteer/out
 
@@ -382,6 +392,14 @@ jobs:
           sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
 
+      - name: Check DS logs for errors native install
+        continue-on-error: true
+        run: |
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo grep -iEh "\[error\]|typeerror" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
+          echo "DS log errors native: $ERRORS"
+          echo "DS_LOG_ERRORS_NATIVE=$ERRORS" >> $GITHUB_ENV
+
       - name: Clear puppeteer output before Native tests
         run: rm -rf Dep.Tests/puppeteer/out
 
@@ -459,6 +477,10 @@ jobs:
           else
             echo "Puppeteer tests OK: ${PUPPETEER_TOTAL_FAILED:-0} failures (threshold: 5)"
           fi
+
+          echo "=== DS log errors ==="
+          echo "DS log errors Docker: ${DS_LOG_ERRORS_DOCKER:-0}"
+          echo "DS log errors Native: ${DS_LOG_ERRORS_NATIVE:-0}"
 
           if [ "$FAILED" -eq 1 ]; then
             echo "::error::Instance: ${{ env.INSTANCE_ID }}, IP: ${{ env.EC2_IP }}, Tag: ${{ matrix.tag }}"
