@@ -155,6 +155,18 @@ jobs:
           sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
 
+      - name: Check DS default services EE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_EE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected enabled services after EE install: $UNEXPECTED"
+            echo "SERVICES_EE_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: Check healthcheck and version EE
         continue-on-error: true
         run: |
@@ -260,6 +272,18 @@ jobs:
           sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
 
+      - name: Check DS default services DE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_DE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected enabled services after DE install: $UNEXPECTED"
+            echo "SERVICES_DE_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: Check healthcheck and version DE
         continue-on-error: true
         run: |
@@ -363,6 +387,18 @@ jobs:
           echo "------------WOPI external------------"
           sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
+
+      - name: Check DS default services CE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_CE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected enabled services after CE install: $UNEXPECTED"
+            echo "SERVICES_CE_OK=false" >> $GITHUB_ENV
+          fi
 
       - name: Check healthcheck and version CE
         continue-on-error: true
@@ -473,6 +509,18 @@ jobs:
           sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
 
+      - name: Check DS default services EE RELEASE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_EE_RELEASE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected enabled services after EE RELEASE install: $UNEXPECTED"
+            echo "SERVICES_EE_RELEASE_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: Check healthcheck EE RELEASE and save JWT before upgrade
         continue-on-error: true
         run: |
@@ -513,6 +561,18 @@ jobs:
           echo "------------WOPI external------------"
           sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
+
+      - name: Check DS default services EE UPGRADE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_EE_UPGRADE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected enabled services after EE upgrade: $UNEXPECTED"
+            echo "SERVICES_EE_UPGRADE_OK=false" >> $GITHUB_ENV
+          fi
 
       - name: Check healthcheck, version and JWT after upgrade
         continue-on-error: true
@@ -620,6 +680,16 @@ jobs:
             echo "JWT check FAILED — JWT settings changed after upgrade"
             FAILED=1
           fi
+
+          echo "=== DS services check ==="
+          for VAR in SERVICES_EE_OK SERVICES_DE_OK SERVICES_CE_OK SERVICES_EE_RELEASE_OK SERVICES_EE_UPGRADE_OK; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-not set}"
+            if [ "${VAL}" != "true" ]; then
+              echo "$VAR FAILED — unexpected services enabled after install"
+              FAILED=1
+            fi
+          done
 
           echo "=== Puppeteer results ==="
           for VAR in PUPPETEER_EE_FAILED PUPPETEER_DE_FAILED PUPPETEER_CE_FAILED PUPPETEER_EE_UPGRADE_FAILED; do

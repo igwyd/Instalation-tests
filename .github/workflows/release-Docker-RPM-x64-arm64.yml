@@ -125,6 +125,18 @@ jobs:
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
 
+      - name: Check DS default services EE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-release supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_EE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services after EE install: $UNEXPECTED"
+            echo "SERVICES_EE_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: Check healthcheck EE
         continue-on-error: true
         run: |
@@ -219,6 +231,18 @@ jobs:
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
 
+      - name: Check DS default services DE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            "sudo docker exec ds-de-release supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_DE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services after DE install: $UNEXPECTED"
+            echo "SERVICES_DE_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: Check healthcheck DE
         continue-on-error: true
         run: |
@@ -311,6 +335,18 @@ jobs:
           echo "-------------WOPI local--------------"
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
+
+      - name: Check DS default services CE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            "sudo docker exec ds-release supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_CE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services after CE install: $UNEXPECTED"
+            echo "SERVICES_CE_OK=false" >> $GITHUB_ENV
+          fi
 
       - name: Check healthcheck CE
         continue-on-error: true
@@ -406,6 +442,16 @@ jobs:
             echo "$VAR: ${VAL:-not set}"
             if [ "${VAL}" != "true" ]; then
               echo "$VAR FAILED"
+              FAILED=1
+            fi
+          done
+
+          echo "=== DS services check ==="
+          for VAR in SERVICES_EE_OK SERVICES_DE_OK SERVICES_CE_OK; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-not set}"
+            if [ "${VAL}" != "true" ]; then
+              echo "$VAR FAILED — unexpected services running after install"
               FAILED=1
             fi
           done

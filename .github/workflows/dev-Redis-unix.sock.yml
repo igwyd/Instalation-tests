@@ -45,6 +45,17 @@ jobs:
           echo "-------------healthcheck-------------"
           curl -s http://${RUNNER_IP}/healthcheck; echo
 
+      - name: Check DS default services
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(docker exec ${{ matrix.container }} supervisorctl status all | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services: $UNEXPECTED"
+            echo "SERVICES_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: Change ${{ matrix.driver }} unix.sock configuration
         run: |
           echo "------------ STOP DS services -------------"
@@ -178,6 +189,13 @@ jobs:
           echo "Port 6379 closed: ${PORT_6379_CLOSED:-not set}"
           if [ "${PORT_6379_CLOSED}" != "true" ]; then
             echo "Port 6379 is not closed!"
+            FAILED=1
+          fi
+
+          echo "=== DS services check ==="
+          echo "Services OK: ${SERVICES_OK:-not set}"
+          if [ "${SERVICES_OK}" != "true" ]; then
+            echo "DS services check FAILED — unexpected services running after install"
             FAILED=1
           fi
 

@@ -240,6 +240,18 @@ jobs:
       - name: Wait for Docker install to start
         run: sleep 300
 
+      - name: Check DS default services Docker install
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") supervisorctl status all' | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_DOCKER_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services Docker: $UNEXPECTED"
+            echo "SERVICES_DOCKER_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: Healthcheck Docker install
         continue-on-error: true
         run: |
@@ -350,6 +362,18 @@ jobs:
 
       - name: Wait for native install to start
         run: sleep 10
+
+      - name: Check DS default services native install
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_NATIVE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected enabled services native: $UNEXPECTED"
+            echo "SERVICES_NATIVE_OK=false" >> $GITHUB_ENV
+          fi
 
       - name: Healthcheck native install
         continue-on-error: true
@@ -465,6 +489,18 @@ jobs:
             FAILED=1
           else
             echo "Native version check passed"
+          fi
+
+          echo "=== DS services check ==="
+          echo "Services Docker OK: ${SERVICES_DOCKER_OK:-not set}"
+          if [ "${SERVICES_DOCKER_OK}" != "true" ]; then
+            echo "Docker services check FAILED — unexpected services running after install"
+            FAILED=1
+          fi
+          echo "Services Native OK: ${SERVICES_NATIVE_OK:-not set}"
+          if [ "${SERVICES_NATIVE_OK}" != "true" ]; then
+            echo "Native services check FAILED — unexpected services enabled after install"
+            FAILED=1
           fi
 
           echo "=== Puppeteer results ==="

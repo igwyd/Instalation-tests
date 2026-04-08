@@ -250,6 +250,17 @@ jobs:
             echo "$output"
           fi
 
+      - name: Check DS default services
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(docker exec onlyoffice supervisorctl status all | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services: $UNEXPECTED"
+            echo "SERVICES_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: Setup Puppeteer
         uses: ./.github/actions/setup-puppeteer
         with:
@@ -344,6 +355,12 @@ jobs:
             echo "Version check passed!"
           else
             echo "Version check failed: expected $EXPECTED_VERSION, got $INSTALLED_VERSION"
+            FAILED=1
+          fi
+
+          echo "DS services check: ${SERVICES_OK:-not set}"
+          if [ "${SERVICES_OK}" != "true" ]; then
+            echo "DS services check FAILED — unexpected services running after install"
             FAILED=1
           fi
 
