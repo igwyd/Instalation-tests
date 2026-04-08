@@ -168,7 +168,7 @@ jobs:
         continue-on-error: true
         run: |
           ERRORS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'sudo docker exec ds-ee-release bash -c "grep -iEh \"\\[error\\]|typeerror\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+            'sudo docker exec ds-ee-release bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
           echo "DS log errors EE: $ERRORS"
           echo "DS_LOG_ERRORS_EE=$ERRORS" >> $GITHUB_ENV
 
@@ -261,7 +261,7 @@ jobs:
         continue-on-error: true
         run: |
           ERRORS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'sudo docker exec ds-de-release bash -c "grep -iEh \"\\[error\\]|typeerror\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+            'sudo docker exec ds-de-release bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
           echo "DS log errors DE: $ERRORS"
           echo "DS_LOG_ERRORS_DE=$ERRORS" >> $GITHUB_ENV
 
@@ -354,7 +354,7 @@ jobs:
         continue-on-error: true
         run: |
           ERRORS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'sudo docker exec ds-release bash -c "grep -iEh \"\\[error\\]|typeerror\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+            'sudo docker exec ds-release bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
           echo "DS log errors CE: $ERRORS"
           echo "DS_LOG_ERRORS_CE=$ERRORS" >> $GITHUB_ENV
 
