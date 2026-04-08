@@ -191,7 +191,6 @@ jobs:
           docker cp performance-test/local-production-linux.json onlyoffice:/etc/onlyoffice/documentserver/local-production-linux.json
           docker exec onlyoffice supervisorctl restart ds:docservice
           docker exec onlyoffice supervisorctl restart ds:converter
-          docker exec onlyoffice supervisorctl start ds:example
 
           cat <<'EOF' > license.lic
           ${{ secrets.LICENSE_KEY }}
@@ -255,6 +254,9 @@ jobs:
         uses: ./.github/actions/setup-puppeteer
         with:
           git_ssh_private_key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
+
+      - name: Start ds-example
+        run: docker exec onlyoffice supervisorctl start ds:example
 
       - name: Puppeteer API tests
         continue-on-error: true

@@ -104,9 +104,6 @@ jobs:
           sudo docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo docker exec ds-ee-release supervisorctl start ds:example
-          sudo docker exec ds-ee-release supervisorctl status ds:example
           EOF
 
       - name: Check healthcheck EE
@@ -127,6 +124,12 @@ jobs:
           else
             echo "VERSION_EE_OK=false" >> $GITHUB_ENV
           fi
+
+      - name: Start ds-example EE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-release supervisorctl start ds:example"
 
       - name: Clear puppeteer output before EE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -195,9 +198,6 @@ jobs:
           sudo docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo docker exec ds-de-release supervisorctl start ds:example
-          sudo docker exec ds-de-release supervisorctl status ds:example
           EOF
 
       - name: Check healthcheck DE
@@ -218,6 +218,12 @@ jobs:
           else
             echo "VERSION_DE_OK=false" >> $GITHUB_ENV
           fi
+
+      - name: Start ds-example DE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-de-release supervisorctl start ds:example"
 
       - name: Clear puppeteer output before DE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -285,9 +291,6 @@ jobs:
           sudo docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo docker exec ds-release supervisorctl start ds:example
-          sudo docker exec ds-release supervisorctl status ds:example
           EOF
 
       - name: Check healthcheck CE
@@ -308,6 +311,12 @@ jobs:
           else
             echo "VERSION_CE_OK=false" >> $GITHUB_ENV
           fi
+
+      - name: Start ds-example CE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-release supervisorctl start ds:example"
 
       - name: Clear puppeteer output before CE tests
         run: rm -rf Dep.Tests/puppeteer/out

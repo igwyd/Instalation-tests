@@ -106,7 +106,6 @@ jobs:
 
           echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
           sudo apt-get install onlyoffice-documentserver-ee -y
-          sudo systemctl start ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
@@ -127,9 +126,6 @@ jobs:
           curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo systemctl start ds-example
-          sudo systemctl status ds-example
           EOF
 
       - name: Check healthcheck EE
@@ -152,6 +148,12 @@ jobs:
           else
             echo "VERSION_EE_OK=false" >> $GITHUB_ENV
           fi
+
+      - name: Start ds-example EE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo systemctl start ds-example"
 
       - name: Clear puppeteer output before EE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -213,7 +215,6 @@ jobs:
           echo onlyoffice-documentserver-de onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
           echo onlyoffice-documentserver-de onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
           printf "n/n" | sudo apt-get install onlyoffice-documentserver-de -y
-          sudo systemctl start ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
@@ -233,9 +234,6 @@ jobs:
           curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo systemctl start ds-example
-          sudo systemctl status ds-example
           EOF
 
       - name: Check healthcheck DE
@@ -258,6 +256,12 @@ jobs:
           else
             echo "VERSION_DE_OK=false" >> $GITHUB_ENV
           fi
+
+      - name: Start ds-example DE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo systemctl start ds-example"
 
       - name: Clear puppeteer output before DE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -318,7 +322,6 @@ jobs:
           echo onlyoffice-documentserver onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
           echo onlyoffice-documentserver onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
           printf "n/n" | sudo apt-get install onlyoffice-documentserver -y
-          sudo systemctl start ds-example
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
@@ -338,9 +341,6 @@ jobs:
           curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo systemctl start ds-example
-          sudo systemctl status ds-example
           EOF
 
       - name: Check healthcheck CE
@@ -363,6 +363,12 @@ jobs:
           else
             echo "VERSION_CE_OK=false" >> $GITHUB_ENV
           fi
+
+      - name: Start ds-example CE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo systemctl start ds-example"
 
       - name: Clear puppeteer output before CE tests
         run: rm -rf Dep.Tests/puppeteer/out

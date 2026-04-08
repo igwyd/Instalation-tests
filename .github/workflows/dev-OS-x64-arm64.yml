@@ -240,12 +240,6 @@ jobs:
       - name: Wait for Docker install to start
         run: sleep 300
 
-      - name: Start ds:example Docker install
-        continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") supervisorctl start ds:example'
-
       - name: Healthcheck Docker install
         continue-on-error: true
         run: |
@@ -284,6 +278,12 @@ jobs:
             'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") bash -c "grep -iEh \"\\[error\\]|typeerror\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
           echo "DS log errors Docker: $ERRORS"
           echo "DS_LOG_ERRORS_DOCKER=$ERRORS" >> $GITHUB_ENV
+
+      - name: Start ds:example Docker install
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") supervisorctl start ds:example'
 
       - name: Clear puppeteer output before Docker tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -351,12 +351,6 @@ jobs:
       - name: Wait for native install to start
         run: sleep 10
 
-      - name: Start ds:example native install
-        continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-            'sudo systemctl start ds-example || true'
-
       - name: Healthcheck native install
         continue-on-error: true
         run: |
@@ -399,6 +393,12 @@ jobs:
             'sudo grep -iEh "\[error\]|typeerror" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
           echo "DS log errors native: $ERRORS"
           echo "DS_LOG_ERRORS_NATIVE=$ERRORS" >> $GITHUB_ENV
+
+      - name: Start ds:example native install
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo systemctl start ds-example || true'
 
       - name: Clear puppeteer output before Native tests
         run: rm -rf Dep.Tests/puppeteer/out

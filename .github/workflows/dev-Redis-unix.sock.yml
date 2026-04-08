@@ -42,7 +42,6 @@ jobs:
         run: |
           docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ${{ matrix.container }} onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           sleep 180
-          docker exec ${{ matrix.container }} supervisorctl start ds:example
           echo "-------------healthcheck-------------"
           curl -s http://${RUNNER_IP}/healthcheck; echo
 
@@ -72,7 +71,7 @@ jobs:
           docker cp ${{ matrix.config }} ${{ matrix.container }}:/etc/onlyoffice/documentserver/local-production-linux.json
           docker exec ${{ matrix.container }} cat /etc/onlyoffice/documentserver/local-production-linux.json
           echo "------------ START DS services -------------"
-          docker exec ${{ matrix.container }} supervisorctl start ds:example ds:converter ds:docservice
+          docker exec ${{ matrix.container }} supervisorctl start ds:converter ds:docservice
           sleep 10
 
       - name: Check healthcheck and socket configuration
@@ -116,6 +115,10 @@ jobs:
           else
             echo "$output"
           fi
+
+      - name: Start ds-example
+        continue-on-error: true
+        run: docker exec ${{ matrix.container }} supervisorctl start ds:example
 
       - name: Puppeteer API tests with ${{ matrix.driver }}
         continue-on-error: true

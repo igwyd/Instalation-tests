@@ -133,9 +133,6 @@ jobs:
           sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
           sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo systemctl start ds-example
-          sudo systemctl status ds-example
           EOF
 
       - name: Check healthcheck and version EE
@@ -154,6 +151,12 @@ jobs:
           else
             echo "VERSION_EE_OK=false" >> $GITHUB_ENV
           fi
+
+      - name: Start ds-example EE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo systemctl start ds-example"
 
       - name: Clear puppeteer output before EE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -234,9 +237,6 @@ jobs:
           sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
           sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo systemctl start ds-example
-          sudo systemctl status ds-example
           EOF
 
       - name: Check healthcheck and version DE
@@ -255,6 +255,12 @@ jobs:
           else
             echo "VERSION_DE_OK=false" >> $GITHUB_ENV
           fi
+
+      - name: Start ds-example DE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo systemctl start ds-example"
 
       - name: Clear puppeteer output before DE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -334,9 +340,6 @@ jobs:
           sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
           sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo systemctl start ds-example
-          sudo systemctl status ds-example
           EOF
 
       - name: Check healthcheck and version CE
@@ -355,6 +358,12 @@ jobs:
           else
             echo "VERSION_CE_OK=false" >> $GITHUB_ENV
           fi
+
+      - name: Start ds-example CE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo systemctl start ds-example"
 
       - name: Clear puppeteer output before CE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -438,9 +447,6 @@ jobs:
           sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
           sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo systemctl start ds-example
-          sudo systemctl status ds-example
           EOF
 
       - name: Check healthcheck EE RELEASE and save JWT before upgrade
@@ -483,9 +489,6 @@ jobs:
           sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
           sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo systemctl start ds-example
-          sudo systemctl status ds-example
           EOF
 
       - name: Check healthcheck, version and JWT after upgrade
@@ -516,6 +519,12 @@ jobs:
             echo "JWT settings changed after upgrade!"
             echo "JWT_MATCH=false" >> $GITHUB_ENV
           fi
+
+      - name: Start ds-example EE after upgrade
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo systemctl start ds-example"
 
       - name: Clear puppeteer output before EE upgrade tests
         run: rm -rf Dep.Tests/puppeteer/out
