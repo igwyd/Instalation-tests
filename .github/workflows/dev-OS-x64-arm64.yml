@@ -9,7 +9,7 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     name: ${{ matrix.os_name }} ${{ matrix.arch }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -90,6 +90,25 @@ jobs:
             instance_type: t4g.medium
             tag: dev-centos10-arm64
 
+          # RHEL 8
+          - os_name: RHEL 8
+            os_type: rpm
+            ssh_user: ec2-user
+            device_name: /dev/sda1
+            arch: x64
+            ami: ami-06ab04dfd55c423e4
+            instance_type: t2.medium
+            tag: dev-rhel8-x64
+
+          - os_name: RHEL 8
+            os_type: rpm
+            ssh_user: ec2-user
+            device_name: /dev/sda1
+            arch: arm64
+            ami: ami-088bb968ff4a01d7a
+            instance_type: t4g.medium
+            tag: dev-rhel8-arm64
+
           # RHEL 9
           - os_name: RHEL 9
             os_type: rpm
@@ -129,6 +148,24 @@ jobs:
             tag: dev-rhel10-arm64
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Puppeteer
+        uses: ./.github/actions/setup-puppeteer
+        with:
+          git_ssh_private_key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
+
+      - name: Initialize check defaults
+        run: |
+          echo "DOCKER_HEALTHY=false" >> $GITHUB_ENV
+          echo "DOCKER_VERSION_OK=false" >> $GITHUB_ENV
+          echo "NATIVE_HEALTHY=false" >> $GITHUB_ENV
+          echo "NATIVE_VERSION_OK=false" >> $GITHUB_ENV
+          echo "PUPPETEER_TOTAL_FAILED=0" >> $GITHUB_ENV
+          echo "DS_LOG_ERRORS_DOCKER=0" >> $GITHUB_ENV
+          echo "DS_LOG_ERRORS_NATIVE=0" >> $GITHUB_ENV
+
       - name: Configure AWS CLI
         run: |
           aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -203,6 +240,12 @@ jobs:
       - name: Wait for Docker install to start
         run: sleep 300
 
+      - name: Start ds:example Docker install
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") supervisorctl start ds:example'
+
       - name: Healthcheck Docker install
         continue-on-error: true
         run: |
@@ -233,6 +276,40 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
           sudo docker logs $(sudo docker ps -q --filter "name=onlyoffice") 2>&1 | tail -n 1000 || true
           EOF
+
+      - name: Check DS logs for errors Docker install
+        continue-on-error: true
+        run: |
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") bash -c "grep -iEh \"\\[error\\]|typeerror\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+          echo "DS log errors Docker: $ERRORS"
+          echo "DS_LOG_ERRORS_DOCKER=$ERRORS" >> $GITHUB_ENV
+
+      - name: Clear puppeteer output before Docker tests
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: Puppeteer API tests Docker install
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
+          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: Puppeteer WOPI tests Docker install
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Parse puppeteer results Docker
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition DOCKER
 
       - name: Remove Docker containers
         run: |
@@ -274,6 +351,12 @@ jobs:
       - name: Wait for native install to start
         run: sleep 10
 
+      - name: Start ds:example native install
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo systemctl start ds-example || true'
+
       - name: Healthcheck native install
         continue-on-error: true
         run: |
@@ -309,23 +392,103 @@ jobs:
           sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
           EOF
 
-      # ==================== Cleanup ====================
-      - name: Delete EC2 Instance (all checks passed)
-        if: ${{ always() && env.DOCKER_HEALTHY == 'true' && env.NATIVE_HEALTHY == 'true' && env.DOCKER_VERSION_OK == 'true' && env.NATIVE_VERSION_OK == 'true' }}
+      - name: Check DS logs for errors native install
+        continue-on-error: true
+        run: |
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo grep -iEh "\[error\]|typeerror" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
+          echo "DS log errors native: $ERRORS"
+          echo "DS_LOG_ERRORS_NATIVE=$ERRORS" >> $GITHUB_ENV
+
+      - name: Clear puppeteer output before Native tests
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: Puppeteer API tests Native install
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: Puppeteer WOPI tests Native install
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Parse puppeteer results Native
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition NATIVE
+
+      # ==================== Final check + Cleanup ====================
+      - name: Final check
+        if: always()
+        run: |
+          FAILED=0
+
+          echo "=== Docker healthcheck ==="
+          echo "Docker healthy: ${DOCKER_HEALTHY:-not set}"
+          if [ "${DOCKER_HEALTHY}" != "true" ]; then
+            echo "Docker healthcheck FAILED"
+            FAILED=1
+          else
+            echo "Docker healthcheck passed"
+          fi
+
+          echo "=== Docker version ==="
+          echo "Docker version OK: ${DOCKER_VERSION_OK:-not set}"
+          if [ "${DOCKER_VERSION_OK}" != "true" ]; then
+            echo "Docker version check FAILED"
+            FAILED=1
+          else
+            echo "Docker version check passed"
+          fi
+
+          echo "=== Native healthcheck ==="
+          echo "Native healthy: ${NATIVE_HEALTHY:-not set}"
+          if [ "${NATIVE_HEALTHY}" != "true" ]; then
+            echo "Native healthcheck FAILED"
+            FAILED=1
+          else
+            echo "Native healthcheck passed"
+          fi
+
+          echo "=== Native version ==="
+          echo "Native version OK: ${NATIVE_VERSION_OK:-not set}"
+          if [ "${NATIVE_VERSION_OK}" != "true" ]; then
+            echo "Native version check FAILED"
+            FAILED=1
+          else
+            echo "Native version check passed"
+          fi
+
+          echo "=== Puppeteer results ==="
+          echo "Puppeteer Docker  failed: ${PUPPETEER_DOCKER_FAILED:-0}"
+          echo "Puppeteer Native  failed: ${PUPPETEER_NATIVE_FAILED:-0}"
+          echo "Puppeteer total   failed: ${PUPPETEER_TOTAL_FAILED:-0}"
+          if [ "${PUPPETEER_TOTAL_FAILED:-0}" -gt 5 ]; then
+            echo "Too many puppeteer failures: ${PUPPETEER_TOTAL_FAILED} (threshold: 5)"
+            FAILED=1
+          else
+            echo "Puppeteer tests OK: ${PUPPETEER_TOTAL_FAILED:-0} failures (threshold: 5)"
+          fi
+
+          echo "=== DS log errors ==="
+          echo "DS log errors Docker: ${DS_LOG_ERRORS_DOCKER:-0}"
+          echo "DS log errors Native: ${DS_LOG_ERRORS_NATIVE:-0}"
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::Instance: ${{ env.INSTANCE_ID }}, IP: ${{ env.EC2_IP }}, Tag: ${{ matrix.tag }}"
+            exit 1
+          fi
+
+      - name: Delete EC2 Instance
+        if: always()
         run: |
           aws ec2 terminate-instances --instance-ids ${{ env.INSTANCE_ID }}
           aws ec2 wait instance-terminated --instance-ids ${{ env.INSTANCE_ID }}
-
-      - name: Keep EC2 Instance (checks failed)
-        if: ${{ always() && env.INSTANCE_ID != '' && (env.DOCKER_HEALTHY != 'true' || env.NATIVE_HEALTHY != 'true' || env.DOCKER_VERSION_OK != 'true' || env.NATIVE_VERSION_OK != 'true') }}
-        run: |
-          echo "::warning::Checks failed! EC2 instance ${{ env.INSTANCE_ID }} (${{ env.EC2_IP }}) is kept alive for investigation."
-          echo "Docker healthcheck: ${{ env.DOCKER_HEALTHY }}, Native healthcheck: ${{ env.NATIVE_HEALTHY }}"
-          echo "Docker version: ${{ env.DOCKER_VERSION_OK }}, Native version: ${{ env.NATIVE_VERSION_OK }}"
-          echo "Instance: ${{ env.INSTANCE_ID }}, IP: ${{ env.EC2_IP }}, Tag: ${{ matrix.tag }}"
-
-      - name: Fail job if checks failed
-        if: ${{ always() && (env.DOCKER_HEALTHY != 'true' || env.NATIVE_HEALTHY != 'true' || env.DOCKER_VERSION_OK != 'true' || env.NATIVE_VERSION_OK != 'true') }}
-        run: |
-          echo "::error::Docker healthy: ${{ env.DOCKER_HEALTHY }}, Native healthy: ${{ env.NATIVE_HEALTHY }}, Docker version: ${{ env.DOCKER_VERSION_OK }}, Native version: ${{ env.NATIVE_VERSION_OK }}"
-          exit 1
