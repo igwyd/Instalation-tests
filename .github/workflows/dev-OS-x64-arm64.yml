@@ -240,11 +240,17 @@ jobs:
       - name: Wait for Docker install to start
         run: sleep 300
 
-      - name: Start ds:example Docker install
+      - name: Check DS default services Docker install
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") supervisorctl start ds:example'
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") supervisorctl status all' | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_DOCKER_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services Docker: $UNEXPECTED"
+            echo "SERVICES_DOCKER_OK=false" >> $GITHUB_ENV
+          fi
 
       - name: Healthcheck Docker install
         continue-on-error: true
@@ -281,9 +287,15 @@ jobs:
         continue-on-error: true
         run: |
           ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") bash -c "grep -iEh \"\\[error\\]|typeerror\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
           echo "DS log errors Docker: $ERRORS"
           echo "DS_LOG_ERRORS_DOCKER=$ERRORS" >> $GITHUB_ENV
+
+      - name: Start ds:example Docker install
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") supervisorctl start ds:example'
 
       - name: Clear puppeteer output before Docker tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -351,11 +363,17 @@ jobs:
       - name: Wait for native install to start
         run: sleep 10
 
-      - name: Start ds:example native install
+      - name: Check DS default services native install
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-            'sudo systemctl start ds-example || true'
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_NATIVE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected enabled services native: $UNEXPECTED"
+            echo "SERVICES_NATIVE_OK=false" >> $GITHUB_ENV
+          fi
 
       - name: Healthcheck native install
         continue-on-error: true
@@ -396,9 +414,15 @@ jobs:
         continue-on-error: true
         run: |
           ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-            'sudo grep -iEh "\[error\]|typeerror" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
+            'sudo grep -iEh "\[error\]|typeerror|failed to load|load error" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
           echo "DS log errors native: $ERRORS"
           echo "DS_LOG_ERRORS_NATIVE=$ERRORS" >> $GITHUB_ENV
+
+      - name: Start ds:example native install
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo systemctl start ds-example || true'
 
       - name: Clear puppeteer output before Native tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -465,6 +489,18 @@ jobs:
             FAILED=1
           else
             echo "Native version check passed"
+          fi
+
+          echo "=== DS services check ==="
+          echo "Services Docker OK: ${SERVICES_DOCKER_OK:-not set}"
+          if [ "${SERVICES_DOCKER_OK}" != "true" ]; then
+            echo "Docker services check FAILED — unexpected services running after install"
+            FAILED=1
+          fi
+          echo "Services Native OK: ${SERVICES_NATIVE_OK:-not set}"
+          if [ "${SERVICES_NATIVE_OK}" != "true" ]; then
+            echo "Native services check FAILED — unexpected services enabled after install"
+            FAILED=1
           fi
 
           echo "=== Puppeteer results ==="

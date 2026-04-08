@@ -104,10 +104,19 @@ jobs:
           sudo docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo docker exec ds-ee-release supervisorctl start ds:example
-          sudo docker exec ds-ee-release supervisorctl status ds:example
           EOF
+
+      - name: Check DS default services EE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-release supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_EE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services after EE install: $UNEXPECTED"
+            echo "SERVICES_EE_OK=false" >> $GITHUB_ENV
+          fi
 
       - name: Check healthcheck EE
         continue-on-error: true
@@ -127,6 +136,12 @@ jobs:
           else
             echo "VERSION_EE_OK=false" >> $GITHUB_ENV
           fi
+
+      - name: Start ds-example EE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-release supervisorctl start ds:example"
 
       - name: Clear puppeteer output before EE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -165,7 +180,7 @@ jobs:
         continue-on-error: true
         run: |
           ERRORS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'sudo docker exec ds-ee-release bash -c "grep -iEh \"\\[error\\]|typeerror\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+            'sudo docker exec ds-ee-release bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
           echo "DS log errors EE: $ERRORS"
           echo "DS_LOG_ERRORS_EE=$ERRORS" >> $GITHUB_ENV
 
@@ -195,10 +210,19 @@ jobs:
           sudo docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo docker exec ds-de-release supervisorctl start ds:example
-          sudo docker exec ds-de-release supervisorctl status ds:example
           EOF
+
+      - name: Check DS default services DE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-de-release supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_DE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services after DE install: $UNEXPECTED"
+            echo "SERVICES_DE_OK=false" >> $GITHUB_ENV
+          fi
 
       - name: Check healthcheck DE
         continue-on-error: true
@@ -218,6 +242,12 @@ jobs:
           else
             echo "VERSION_DE_OK=false" >> $GITHUB_ENV
           fi
+
+      - name: Start ds-example DE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-de-release supervisorctl start ds:example"
 
       - name: Clear puppeteer output before DE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -255,7 +285,7 @@ jobs:
         continue-on-error: true
         run: |
           ERRORS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'sudo docker exec ds-de-release bash -c "grep -iEh \"\\[error\\]|typeerror\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+            'sudo docker exec ds-de-release bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
           echo "DS log errors DE: $ERRORS"
           echo "DS_LOG_ERRORS_DE=$ERRORS" >> $GITHUB_ENV
 
@@ -285,10 +315,19 @@ jobs:
           sudo docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
-          echo "-------------DS-example-------------"
-          sudo docker exec ds-release supervisorctl start ds:example
-          sudo docker exec ds-release supervisorctl status ds:example
           EOF
+
+      - name: Check DS default services CE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-release supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_CE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services after CE install: $UNEXPECTED"
+            echo "SERVICES_CE_OK=false" >> $GITHUB_ENV
+          fi
 
       - name: Check healthcheck CE
         continue-on-error: true
@@ -308,6 +347,12 @@ jobs:
           else
             echo "VERSION_CE_OK=false" >> $GITHUB_ENV
           fi
+
+      - name: Start ds-example CE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-release supervisorctl start ds:example"
 
       - name: Clear puppeteer output before CE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -345,7 +390,7 @@ jobs:
         continue-on-error: true
         run: |
           ERRORS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'sudo docker exec ds-release bash -c "grep -iEh \"\\[error\\]|typeerror\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+            'sudo docker exec ds-release bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
           echo "DS log errors CE: $ERRORS"
           echo "DS_LOG_ERRORS_CE=$ERRORS" >> $GITHUB_ENV
 
@@ -378,6 +423,16 @@ jobs:
             echo "$VAR: ${VAL:-not set}"
             if [ "${VAL}" != "true" ]; then
               echo "$VAR FAILED"
+              FAILED=1
+            fi
+          done
+
+          echo "=== DS services check ==="
+          for VAR in SERVICES_EE_OK SERVICES_DE_OK SERVICES_CE_OK; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-not set}"
+            if [ "${VAL}" != "true" ]; then
+              echo "$VAR FAILED — unexpected services running after install"
               FAILED=1
             fi
           done

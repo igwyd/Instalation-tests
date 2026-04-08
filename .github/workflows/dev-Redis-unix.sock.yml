@@ -42,9 +42,19 @@ jobs:
         run: |
           docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ${{ matrix.container }} onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           sleep 180
-          docker exec ${{ matrix.container }} supervisorctl start ds:example
           echo "-------------healthcheck-------------"
           curl -s http://${RUNNER_IP}/healthcheck; echo
+
+      - name: Check DS default services
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(docker exec ${{ matrix.container }} supervisorctl status all | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services: $UNEXPECTED"
+            echo "SERVICES_OK=false" >> $GITHUB_ENV
+          fi
 
       - name: Change ${{ matrix.driver }} unix.sock configuration
         run: |
@@ -72,7 +82,7 @@ jobs:
           docker cp ${{ matrix.config }} ${{ matrix.container }}:/etc/onlyoffice/documentserver/local-production-linux.json
           docker exec ${{ matrix.container }} cat /etc/onlyoffice/documentserver/local-production-linux.json
           echo "------------ START DS services -------------"
-          docker exec ${{ matrix.container }} supervisorctl start ds:example ds:converter ds:docservice
+          docker exec ${{ matrix.container }} supervisorctl start ds:converter ds:docservice
           sleep 10
 
       - name: Check healthcheck and socket configuration
@@ -117,6 +127,10 @@ jobs:
             echo "$output"
           fi
 
+      - name: Start ds-example
+        continue-on-error: true
+        run: docker exec ${{ matrix.container }} supervisorctl start ds:example
+
       - name: Puppeteer API tests with ${{ matrix.driver }}
         continue-on-error: true
         run: |
@@ -139,7 +153,7 @@ jobs:
       - name: Check DS logs for errors ${{ matrix.driver }}
         continue-on-error: true
         run: |
-          ERRORS=$(docker exec ${{ matrix.container }} bash -c 'grep -iEh "\[error\]|typeerror" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
+          ERRORS=$(docker exec ${{ matrix.container }} bash -c 'grep -iEh "\[error\]|typeerror|failed to load|load error" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
           echo "DS log errors: $ERRORS"
           echo "DS_LOG_ERRORS=$ERRORS" >> $GITHUB_ENV
 
@@ -175,6 +189,13 @@ jobs:
           echo "Port 6379 closed: ${PORT_6379_CLOSED:-not set}"
           if [ "${PORT_6379_CLOSED}" != "true" ]; then
             echo "Port 6379 is not closed!"
+            FAILED=1
+          fi
+
+          echo "=== DS services check ==="
+          echo "Services OK: ${SERVICES_OK:-not set}"
+          if [ "${SERVICES_OK}" != "true" ]; then
+            echo "DS services check FAILED — unexpected services running after install"
             FAILED=1
           fi
 

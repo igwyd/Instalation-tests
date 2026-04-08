@@ -67,10 +67,6 @@ jobs:
           echo "RUNNER_IP=$IP" >> $GITHUB_ENV
           echo "Runner IP is $IP"
 
-      - name: start ds example
-        run: |
-          docker exec onlyoffice supervisorctl start ds:example
-
       - name: Initialize check defaults
         run: |
           echo "HEALTHY=false" >> $GITHUB_ENV
@@ -78,6 +74,17 @@ jobs:
           echo "PUPPETEER_FAILED=0" >> $GITHUB_ENV
           echo "PUPPETEER_API_FAILED=0" >> $GITHUB_ENV
           echo "PUPPETEER_WOPI_FAILED=0" >> $GITHUB_ENV
+
+      - name: Check DS default services
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(docker exec onlyoffice supervisorctl status all | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services: $UNEXPECTED"
+            echo "SERVICES_OK=false" >> $GITHUB_ENV
+          fi
 
       - name: INFO
         continue-on-error: true
@@ -115,6 +122,9 @@ jobs:
         with:
           git_ssh_private_key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
 
+      - name: Start ds-example
+        run: docker exec onlyoffice supervisorctl start ds:example
+
       - name: Puppeteer API tests
         continue-on-error: true
         run: |
@@ -141,7 +151,7 @@ jobs:
       - name: Check DS logs for errors
         continue-on-error: true
         run: |
-          ERRORS=$(docker exec onlyoffice bash -c 'grep -iEh "\[error\]|typeerror" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
+          ERRORS=$(docker exec onlyoffice bash -c 'grep -iEh "\[error\]|typeerror|failed to load|load error" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
           echo "DS log errors: $ERRORS"
           echo "DS_LOG_ERRORS=$ERRORS" >> $GITHUB_ENV
 
@@ -170,6 +180,13 @@ jobs:
             FAILED=1
           else
             echo "Version check passed"
+          fi
+
+          echo "=== DS services check ==="
+          echo "Services OK: ${SERVICES_OK:-not set}"
+          if [ "${SERVICES_OK}" != "true" ]; then
+            echo "DS services check FAILED — unexpected services running after install"
+            FAILED=1
           fi
 
           echo "=== Puppeteer results ==="
