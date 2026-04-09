@@ -163,6 +163,7 @@ jobs:
           else
             echo "VERSION_EE_OK=false" >> $GITHUB_ENV
           fi
+          echo "VERSION_EE_ACTUAL=$VERSION" >> $GITHUB_ENV
 
       - name: Start ds-example EE
         continue-on-error: true
@@ -279,6 +280,7 @@ jobs:
           else
             echo "VERSION_DE_OK=false" >> $GITHUB_ENV
           fi
+          echo "VERSION_DE_ACTUAL=$VERSION" >> $GITHUB_ENV
 
       - name: Start ds-example DE
         continue-on-error: true
@@ -394,6 +396,7 @@ jobs:
           else
             echo "VERSION_CE_OK=false" >> $GITHUB_ENV
           fi
+          echo "VERSION_CE_ACTUAL=$VERSION" >> $GITHUB_ENV
 
       - name: Start ds-example CE
         continue-on-error: true
@@ -567,6 +570,7 @@ jobs:
           else
             echo "VERSION_EE_UPGRADE_OK=false" >> $GITHUB_ENV
           fi
+          echo "VERSION_EE_UPGRADE_ACTUAL=$VERSION" >> $GITHUB_ENV
 
           JWT_AFTER=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "sudo jq -c '{token: .services.CoAuthoring.token, secret: .services.CoAuthoring.secret}' /etc/onlyoffice/documentserver/local.json | md5sum | cut -d' ' -f1")
@@ -642,9 +646,13 @@ jobs:
           done
 
           echo "=== Version check results ==="
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Expected version: $EXPECTED"
           for VAR in VERSION_EE_OK VERSION_DE_OK VERSION_CE_OK VERSION_EE_UPGRADE_OK; do
             VAL="${!VAR}"
-            echo "$VAR: ${VAL:-not set}"
+            ACTUAL_VAR="${VAR/_OK/_ACTUAL}"
+            ACTUAL="${!ACTUAL_VAR}"
+            echo "$VAR: ${VAL:-not set} (actual: ${ACTUAL:-not set})"
             if [ "${VAL}" != "true" ]; then
               echo "$VAR FAILED"
               FAILED=1

@@ -155,6 +155,7 @@ jobs:
           else
             echo "VERSION_EE_OK=false" >> $GITHUB_ENV
           fi
+          echo "VERSION_EE_ACTUAL=$VERSION" >> $GITHUB_ENV
 
       - name: Start ds-example EE
         continue-on-error: true
@@ -261,6 +262,7 @@ jobs:
           else
             echo "VERSION_DE_OK=false" >> $GITHUB_ENV
           fi
+          echo "VERSION_DE_ACTUAL=$VERSION" >> $GITHUB_ENV
 
       - name: Start ds-example DE
         continue-on-error: true
@@ -366,6 +368,7 @@ jobs:
           else
             echo "VERSION_CE_OK=false" >> $GITHUB_ENV
           fi
+          echo "VERSION_CE_ACTUAL=$VERSION" >> $GITHUB_ENV
 
       - name: Start ds-example CE
         continue-on-error: true
@@ -427,9 +430,13 @@ jobs:
           FAILED=0
 
           echo "=== Version results ==="
+          EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
+          echo "Expected version: $EXPECTED"
           for VAR in VERSION_EE_OK VERSION_DE_OK VERSION_CE_OK; do
             VAL="${!VAR}"
-            echo "$VAR: ${VAL:-not set}"
+            ACTUAL_VAR="${VAR/_OK/_ACTUAL}"
+            ACTUAL="${!ACTUAL_VAR}"
+            echo "$VAR: ${VAL:-not set} (actual: ${ACTUAL:-not set})"
             if [ "${VAL}" != "true" ]; then
               echo "$VAR FAILED"
               FAILED=1
