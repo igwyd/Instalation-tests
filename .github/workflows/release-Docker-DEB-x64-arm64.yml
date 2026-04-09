@@ -453,6 +453,10 @@ jobs:
           for VAR in DS_LOG_ERRORS_EE DS_LOG_ERRORS_DE DS_LOG_ERRORS_CE; do
             VAL="${!VAR}"
             echo "$VAR: ${VAL:-0}"
+            if [ "${VAL:-0}" -gt 0 ]; then
+              echo "$VAR FAILED"
+              FAILED=1
+            fi
           done
 
           if [ "$FAILED" -eq 1 ]; then

@@ -376,6 +376,10 @@ jobs:
 
           echo "=== DS log errors ==="
           echo "DS log errors: ${DS_LOG_ERRORS:-0}"
+          if [ "${DS_LOG_ERRORS:-0}" -gt 0 ]; then
+            echo "DS log errors FAILED"
+            FAILED=1
+          fi
 
           if [ "$FAILED" -eq 1 ]; then
             exit 1
