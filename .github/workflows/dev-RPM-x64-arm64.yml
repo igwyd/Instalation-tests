@@ -2,7 +2,7 @@ name: dev RPM x64-arm64
 
 on:
   schedule:
-    - cron: '0 12 * * 3'  # Wednesday 15:00 Mosсow time (UTC+3)
+    - cron: '0 11 * * 3'  # Wednesday 14:00 Mosсow time (UTC+3)
   workflow_dispatch:
 
 jobs:
