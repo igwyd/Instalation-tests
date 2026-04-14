@@ -2,7 +2,7 @@
 
 Automated installation testing of ONLYOFFICE Docs packages via GitHub Actions.
 
-## Develop **<!-- onlyoffice-version-start -->v9.4.0-40<!-- onlyoffice-version-end -->**
+## Develop **<!-- onlyoffice-version-start -->v9.4.0-49<!-- onlyoffice-version-end -->**
 
 Pre-release builds from S3 dev repo.
 
