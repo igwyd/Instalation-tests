@@ -105,7 +105,6 @@ jobs:
           sudo docker pull onlyoffice/documentserver-ee
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-release onlyoffice/documentserver-ee
           sleep 90
-          sudo docker exec ds-ee-release supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
@@ -147,7 +146,8 @@ jobs:
       - name: Check version EE
         continue-on-error: true
         run: |
-          VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
+          VERSION=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-release dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
           echo "Version EE: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
@@ -254,7 +254,8 @@ jobs:
       - name: Check version DE
         continue-on-error: true
         run: |
-          VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
+          VERSION=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            "sudo docker exec ds-de-release dpkg-query -W onlyoffice-documentserver-de" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
           echo "Version DE: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
@@ -360,7 +361,8 @@ jobs:
       - name: Check version CE
         continue-on-error: true
         run: |
-          VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
+          VERSION=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            "sudo docker exec ds-release dpkg-query -W onlyoffice-documentserver" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
           echo "Version CE: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
