@@ -1,22 +1,24 @@
-name: release Docker RPM x64-arm64
+name: dev Docker DEB x64-arm64
 
 on:
+  schedule:
+    - cron: '0 13 * * 3'  # Wednesday 16:00 Mosсow time (UTC+3)
   workflow_dispatch:
 
 jobs:
-  check-docker-rpm:
+  check-docker-deb:
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: x64
-            ami: ami-04331ec57720ee626
+            ami: ami-0b6c6ebed2801a5cb
             instance_type: t2.medium
           - arch: arm64
-            ami: ami-058dc7e5ef5f28287
+            ami: ami-0a7a4e87939439934
             instance_type: t4g.medium
-    name: release Docker RPM ${{ matrix.arch }}
+    name: dev Docker DEB ${{ matrix.arch }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -39,7 +41,7 @@ jobs:
             --instance-type ${{ matrix.instance_type }} \
             --key-name demin \
             --security-groups AllPortsOpened \
-            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_release-docker-rpm-${{ matrix.arch }}}]' \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_dev-docker-deb-${{ matrix.arch }}}]' \
             --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":50,"VolumeType":"gp3"}}]' \
             --query "Instances[0].InstanceId" --output text)
 
@@ -66,61 +68,42 @@ jobs:
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
 
-      - name: Upgrade RPM packages
+      - name: Install Docker on EC2
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo dnf -y clean all
-          sudo dnf -y update
-          sudo dnf install wget -y
-          EOF
-
-      - name: Reboot EC2 Instance
-        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
-
-      - name: Wait for instance to reboot
-        run: sleep 120
-
-      - name: Install Docker
-        run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo dnf remove docker \
-                  docker-client \
-                  docker-client-latest \
-                  docker-common \
-                  docker-latest \
-                  docker-latest-logrotate \
-                  docker-logrotate \
-                  docker-engine -y
-          sudo dnf -y install dnf-plugins-core
-          sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-          sudo dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-          sudo systemctl enable --now docker
-          sudo docker ps
-          sudo docker --version
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+          echo "deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \$(. /etc/os-release && echo "\$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+          sudo systemctl start docker
           EOF
 
       - name: Docker run ONLYOFFICE-Docs EE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo docker pull onlyoffice/documentserver-ee
-          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-release onlyoffice/documentserver-ee
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           sleep 90
-          sudo docker exec ds-ee-release supervisorctl start all
+          sudo docker exec ds-ee-dev supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo dnf install jq -y
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo docker exec ds-ee-release supervisorctl status all || true
+          sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
-          sudo docker exec ds-ee-release bash -c "dpkg -l | grep onlyoffice"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
           echo "--------packageType--------"
-          sudo docker exec ds-ee-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
@@ -128,8 +111,8 @@ jobs:
       - name: Check DS default services EE
         continue-on-error: true
         run: |
-          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo docker exec ds-ee-release supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_EE_OK=true" >> $GITHUB_ENV
           else
@@ -148,7 +131,7 @@ jobs:
         continue-on-error: true
         run: |
           VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
-          EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version EE: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
             echo "VERSION_EE_OK=true" >> $GITHUB_ENV
@@ -160,8 +143,8 @@ jobs:
       - name: Start ds-example EE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo docker exec ds-ee-release supervisorctl start ds:example"
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output before EE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -192,42 +175,42 @@ jobs:
       - name: Documentserver logs ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo docker exec ds-ee-release bash -c "tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log"
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker exec ds-ee-dev bash -c "tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log"
           EOF
 
       - name: Check DS logs for errors EE
         continue-on-error: true
         run: |
-          ERRORS=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            'sudo docker exec ds-ee-release bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            'sudo docker exec ds-ee-dev bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
           echo "DS log errors EE: $ERRORS"
           echo "DS_LOG_ERRORS_EE=$ERRORS" >> $GITHUB_ENV
 
       - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo docker stop ds-ee-release
-          sudo docker rm ds-ee-release
-          sudo docker rmi onlyoffice/documentserver-ee
-          sudo docker pull onlyoffice/documentserver-de
-          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-de-release onlyoffice/documentserver-de
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker stop ds-ee-dev
+          sudo docker rm ds-ee-dev
+          sudo docker rmi onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo docker pull onlyoffice/4testing-documentserver-de:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-de-dev onlyoffice/4testing-documentserver-de:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           sleep 90
-          sudo docker exec ds-de-release supervisorctl start all
+          sudo docker exec ds-de-dev supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo docker exec ds-de-release supervisorctl status all || true
+          sudo docker exec ds-de-dev supervisorctl status all || true
           echo "---------Installed packages----------"
-          sudo docker exec ds-de-release bash -c "dpkg -l | grep onlyoffice"
+          sudo docker exec ds-de-dev bash -c "dpkg -l | grep onlyoffice"
           echo "--------packageType--------"
-          sudo docker exec ds-de-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo docker exec ds-de-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
@@ -235,8 +218,8 @@ jobs:
       - name: Check DS default services DE
         continue-on-error: true
         run: |
-          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo docker exec ds-de-release supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-de-dev supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_DE_OK=true" >> $GITHUB_ENV
           else
@@ -255,7 +238,7 @@ jobs:
         continue-on-error: true
         run: |
           VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
-          EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version DE: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
             echo "VERSION_DE_OK=true" >> $GITHUB_ENV
@@ -267,8 +250,8 @@ jobs:
       - name: Start ds-example DE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo docker exec ds-de-release supervisorctl start ds:example"
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-de-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output before DE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -298,42 +281,42 @@ jobs:
       - name: Documentserver logs ONLYOFFICE-Docs DE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo docker exec ds-de-release bash -c "tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log"
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker exec ds-de-dev bash -c "tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log"
           EOF
 
       - name: Check DS logs for errors DE
         continue-on-error: true
         run: |
-          ERRORS=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            'sudo docker exec ds-de-release bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            'sudo docker exec ds-de-dev bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
           echo "DS log errors DE: $ERRORS"
           echo "DS_LOG_ERRORS_DE=$ERRORS" >> $GITHUB_ENV
 
       - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo docker stop ds-de-release
-          sudo docker rm ds-de-release
-          sudo docker rmi onlyoffice/documentserver-de
-          sudo docker pull onlyoffice/documentserver
-          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-release onlyoffice/documentserver
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker stop ds-de-dev
+          sudo docker rm ds-de-dev
+          sudo docker rmi onlyoffice/4testing-documentserver-de:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo docker pull onlyoffice/4testing-documentserver:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-dev onlyoffice/4testing-documentserver:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           sleep 90
-          sudo docker exec ds-release supervisorctl start all
+          sudo docker exec ds-dev supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
           curl -s http://${{ env.EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
-          sudo docker exec ds-release supervisorctl status all || true
+          sudo docker exec ds-dev supervisorctl status all || true
           echo "---------Installed packages----------"
-          sudo docker exec ds-release bash -c "dpkg -l | grep onlyoffice"
+          sudo docker exec ds-dev bash -c "dpkg -l | grep onlyoffice"
           echo "--------packageType--------"
-          sudo docker exec ds-release curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          sudo docker exec ds-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
           curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
@@ -341,8 +324,8 @@ jobs:
       - name: Check DS default services CE
         continue-on-error: true
         run: |
-          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo docker exec ds-release supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-dev supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_CE_OK=true" >> $GITHUB_ENV
           else
@@ -361,7 +344,7 @@ jobs:
         continue-on-error: true
         run: |
           VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
-          EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version CE: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
             echo "VERSION_CE_OK=true" >> $GITHUB_ENV
@@ -373,8 +356,8 @@ jobs:
       - name: Start ds-example CE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo docker exec ds-release supervisorctl start ds:example"
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output before CE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -404,24 +387,24 @@ jobs:
       - name: Documentserver logs ONLYOFFICE-Docs CE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo docker exec ds-release bash -c "tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log"
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker exec ds-dev bash -c "tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log"
           EOF
 
       - name: Check DS logs for errors CE
         continue-on-error: true
         run: |
-          ERRORS=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            'sudo docker exec ds-release bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            'sudo docker exec ds-dev bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
           echo "DS log errors CE: $ERRORS"
           echo "DS_LOG_ERRORS_CE=$ERRORS" >> $GITHUB_ENV
 
       - name: Remove ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
-          sudo docker stop ds-release
-          sudo docker rm ds-release
-          sudo docker rmi onlyoffice/documentserver
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker stop ds-dev
+          sudo docker rm ds-dev
+          sudo docker rmi onlyoffice/4testing-documentserver:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
 
       - name: Final check
@@ -430,7 +413,7 @@ jobs:
           FAILED=0
 
           echo "=== Version results ==="
-          EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Expected version: $EXPECTED"
           for VAR in VERSION_EE_OK VERSION_DE_OK VERSION_CE_OK; do
             VAL="${!VAR}"
