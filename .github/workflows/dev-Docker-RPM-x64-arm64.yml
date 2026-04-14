@@ -1,0 +1,498 @@
+name: dev Docker RPM x64-arm64
+
+on:
+  schedule:
+    - cron: '0 12 * * 3'  # Wednesday 15:00 Mosсow time (UTC+3)
+  workflow_dispatch:
+
+jobs:
+  check-docker-rpm:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            ami: ami-04331ec57720ee626
+            instance_type: t2.medium
+          - arch: arm64
+            ami: ami-058dc7e5ef5f28287
+            instance_type: t4g.medium
+    name: dev Docker RPM ${{ matrix.arch }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Puppeteer
+        uses: ./.github/actions/setup-puppeteer
+        with:
+          git_ssh_private_key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
+
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-east-1
+
+      - name: Create EC2 Instance
+        run: |
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id ${{ matrix.ami }} \
+            --instance-type ${{ matrix.instance_type }} \
+            --key-name demin \
+            --security-groups AllPortsOpened \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_dev-docker-rpm-${{ matrix.arch }}}]' \
+            --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":50,"VolumeType":"gp3"}}]' \
+            --query "Instances[0].InstanceId" --output text)
+
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+          echo "Waiting for instance to start..."
+          aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+
+      - name: Get EC2 Public IP
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ env.INSTANCE_ID }} \
+            --query "Reservations[].Instances[].PublicIpAddress" --output text)
+          echo "EC2 Public IP: $IP"
+          echo "EC2_IP=$IP" >> $GITHUB_ENV
+
+      - name: Wait for SSH to be Ready
+        run: sleep 120
+
+      - name: Add SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Upgrade RPM packages
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo dnf -y clean all
+          sudo dnf -y update
+          sudo dnf install wget -y
+          EOF
+
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Wait for instance to reboot
+        run: sleep 120
+
+      - name: Install Docker
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo dnf remove docker \
+                  docker-client \
+                  docker-client-latest \
+                  docker-common \
+                  docker-latest \
+                  docker-latest-logrotate \
+                  docker-logrotate \
+                  docker-engine -y
+          sudo dnf -y install dnf-plugins-core
+          sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+          sudo dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+          sudo systemctl enable --now docker
+          sudo docker ps
+          sudo docker --version
+          EOF
+
+      - name: Docker run ONLYOFFICE-Docs EE
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sleep 90
+          sudo docker exec ds-ee-dev supervisorctl start all
+          EOF
+
+      - name: Info about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo dnf install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI local--------------"
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: Check DS default services EE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_EE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services after EE install: $UNEXPECTED"
+            echo "SERVICES_EE_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: Check healthcheck EE
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck EE: $HC"
+          echo "HEALTHCHECK_EE=$HC" >> $GITHUB_ENV
+
+      - name: Check version EE
+        continue-on-error: true
+        run: |
+          VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version EE: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_EE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_EE_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_EE_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: Start ds-example EE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: Clear puppeteer output before EE tests
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: Puppeteer API tests ONLYOFFICE-Docs EE
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: Puppeteer WOPI tests ONLYOFFICE-Docs EE
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Parse puppeteer results EE
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition EE
+
+      - name: Documentserver logs ONLYOFFICE-Docs EE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo docker exec ds-ee-dev bash -c "tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log"
+          EOF
+
+      - name: Check DS logs for errors EE
+        continue-on-error: true
+        run: |
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            'sudo docker exec ds-ee-dev bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+          echo "DS log errors EE: $ERRORS"
+          echo "DS_LOG_ERRORS_EE=$ERRORS" >> $GITHUB_ENV
+
+      - name: Remove ONLYOFFICE-Docs EE and Install ONLYOFFICE-Docs DE
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo docker stop ds-ee-dev
+          sudo docker rm ds-ee-dev
+          sudo docker rmi onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo docker pull onlyoffice/4testing-documentserver-de:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-de-dev onlyoffice/4testing-documentserver-de:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sleep 90
+          sudo docker exec ds-de-dev supervisorctl start all
+          EOF
+
+      - name: Info about installed Package, must be ONLYOFFICE-Docs DE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          echo "-------------healthcheck-------------"
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-de-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-de-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-de-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI local--------------"
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: Check DS default services DE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            "sudo docker exec ds-de-dev supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_DE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services after DE install: $UNEXPECTED"
+            echo "SERVICES_DE_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: Check healthcheck DE
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck DE: $HC"
+          echo "HEALTHCHECK_DE=$HC" >> $GITHUB_ENV
+
+      - name: Check version DE
+        continue-on-error: true
+        run: |
+          VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version DE: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_DE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_DE_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_DE_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: Start ds-example DE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            "sudo docker exec ds-de-dev supervisorctl start ds:example"
+
+      - name: Clear puppeteer output before DE tests
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: Puppeteer API tests ONLYOFFICE-Docs DE
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: Puppeteer WOPI tests ONLYOFFICE-Docs DE
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Parse puppeteer results DE
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition DE
+
+      - name: Documentserver logs ONLYOFFICE-Docs DE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo docker exec ds-de-dev bash -c "tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log"
+          EOF
+
+      - name: Check DS logs for errors DE
+        continue-on-error: true
+        run: |
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            'sudo docker exec ds-de-dev bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+          echo "DS log errors DE: $ERRORS"
+          echo "DS_LOG_ERRORS_DE=$ERRORS" >> $GITHUB_ENV
+
+      - name: Remove ONLYOFFICE-Docs DE and Install ONLYOFFICE-Docs CE
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo docker stop ds-de-dev
+          sudo docker rm ds-de-dev
+          sudo docker rmi onlyoffice/4testing-documentserver-de:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo docker pull onlyoffice/4testing-documentserver:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-dev onlyoffice/4testing-documentserver:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sleep 90
+          sudo docker exec ds-dev supervisorctl start all
+          EOF
+
+      - name: Info about installed Package, must be ONLYOFFICE-Docs CE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          echo "-------------healthcheck-------------"
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI local--------------"
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: Check DS default services CE
+        continue-on-error: true
+        run: |
+          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            "sudo docker exec ds-dev supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+          if [ -z "$UNEXPECTED" ]; then
+            echo "SERVICES_CE_OK=true" >> $GITHUB_ENV
+          else
+            echo "Unexpected running services after CE install: $UNEXPECTED"
+            echo "SERVICES_CE_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: Check healthcheck CE
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck CE: $HC"
+          echo "HEALTHCHECK_CE=$HC" >> $GITHUB_ENV
+
+      - name: Check version CE
+        continue-on-error: true
+        run: |
+          VERSION=$(curl -s "http://${{ env.EC2_IP }}/info/info.json" | jq -r '.buildVersion // "not-found"')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version CE: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_CE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_CE_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_CE_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: Start ds-example CE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            "sudo docker exec ds-dev supervisorctl start ds:example"
+
+      - name: Clear puppeteer output before CE tests
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: Puppeteer API tests ONLYOFFICE-Docs CE
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: Puppeteer WOPI tests ONLYOFFICE-Docs CE
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Parse puppeteer results CE
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition CE
+
+      - name: Documentserver logs ONLYOFFICE-Docs CE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo docker exec ds-dev bash -c "tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log"
+          EOF
+
+      - name: Check DS logs for errors CE
+        continue-on-error: true
+        run: |
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
+            'sudo docker exec ds-dev bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+          echo "DS log errors CE: $ERRORS"
+          echo "DS_LOG_ERRORS_CE=$ERRORS" >> $GITHUB_ENV
+
+      - name: Remove ONLYOFFICE-Docs CE
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
+          sudo docker stop ds-dev
+          sudo docker rm ds-dev
+          sudo docker rmi onlyoffice/4testing-documentserver:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Final check
+        if: always()
+        run: |
+          FAILED=0
+
+          echo "=== Version results ==="
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Expected version: $EXPECTED"
+          for VAR in VERSION_EE_OK VERSION_DE_OK VERSION_CE_OK; do
+            VAL="${!VAR}"
+            ACTUAL_VAR="${VAR/_OK/_ACTUAL}"
+            ACTUAL="${!ACTUAL_VAR}"
+            echo "$VAR: ${VAL:-not set} (actual: ${ACTUAL:-not set})"
+            if [ "${VAL}" != "true" ]; then
+              echo "$VAR FAILED"
+              FAILED=1
+            fi
+          done
+
+          echo "=== Healthcheck results ==="
+          for VAR in HEALTHCHECK_EE HEALTHCHECK_DE HEALTHCHECK_CE; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-not set}"
+            if [ "${VAL}" != "true" ]; then
+              echo "$VAR FAILED"
+              FAILED=1
+            fi
+          done
+
+          echo "=== DS services check ==="
+          for VAR in SERVICES_EE_OK SERVICES_DE_OK SERVICES_CE_OK; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-not set}"
+            if [ "${VAL}" != "true" ]; then
+              echo "$VAR FAILED — unexpected services running after install"
+              FAILED=1
+            fi
+          done
+
+          echo "=== Puppeteer results ==="
+          for VAR in PUPPETEER_EE_FAILED PUPPETEER_DE_FAILED PUPPETEER_CE_FAILED; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-0}"
+            if [ "${VAL:-0}" -gt 5 ]; then
+              echo "$VAR FAILED (threshold: 5)"
+              FAILED=1
+            else
+              echo "$VAR OK (${VAL:-0} failures, threshold: 5)"
+            fi
+          done
+
+          echo "=== DS log errors ==="
+          for VAR in DS_LOG_ERRORS_EE DS_LOG_ERRORS_DE DS_LOG_ERRORS_CE; do
+            VAL="${!VAR}"
+            echo "$VAR: ${VAL:-0}"
+            if [ "${VAL:-0}" -gt 0 ]; then
+              echo "$VAR FAILED"
+              FAILED=1
+            fi
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            exit 1
+          fi
+
+      - name: Delete EC2 Instance
+        if: always()
+        run: |
+          aws ec2 terminate-instances --instance-ids ${{ env.INSTANCE_ID }}
+          aws ec2 wait instance-terminated --instance-ids ${{ env.INSTANCE_ID }}
