@@ -105,7 +105,6 @@ jobs:
           sudo docker pull onlyoffice/documentserver-ee
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-release onlyoffice/documentserver-ee
           sleep 90
-          sudo docker exec ds-ee-release supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
