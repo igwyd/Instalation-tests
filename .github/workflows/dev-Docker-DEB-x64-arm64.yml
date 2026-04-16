@@ -196,7 +196,6 @@ jobs:
           sudo docker pull onlyoffice/4testing-documentserver-de:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-de-dev onlyoffice/4testing-documentserver-de:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           sleep 90
-          sudo docker exec ds-de-dev supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
@@ -303,7 +302,6 @@ jobs:
           sudo docker pull onlyoffice/4testing-documentserver:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-dev onlyoffice/4testing-documentserver:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           sleep 90
-          sudo docker exec ds-dev supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
