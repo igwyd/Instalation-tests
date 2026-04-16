@@ -194,7 +194,6 @@ jobs:
           sudo docker pull onlyoffice/documentserver-de
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-de-release onlyoffice/documentserver-de
           sleep 90
-          sudo docker exec ds-de-release supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
@@ -301,7 +300,6 @@ jobs:
           sudo docker pull onlyoffice/documentserver
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-release onlyoffice/documentserver
           sleep 90
-          sudo docker exec ds-release supervisorctl start all
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
