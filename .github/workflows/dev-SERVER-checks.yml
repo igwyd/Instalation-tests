@@ -107,7 +107,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
           sudo rm ~/local-production-linux.json
-          sudo supervisorctl restart ds:converter ds:docservice
+          sudo docker exec ds-ee-dev supervisorctl restart ds:converter ds:docservice
           sleep 30
           EOF
 
