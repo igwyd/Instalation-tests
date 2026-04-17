@@ -287,7 +287,7 @@ jobs:
         continue-on-error: true
         run: |
           ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") bash -c "grep -iEh \"\\[error\\]|typeerror|failed to load|load error\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
+            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") bash -c "grep -Ph \"\\[ERROR\\]|(?i)(typeerror|failed to load|load error)\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
           echo "DS log errors Docker: $ERRORS"
           echo "DS_LOG_ERRORS_DOCKER=$ERRORS" >> $GITHUB_ENV
 
@@ -414,7 +414,7 @@ jobs:
         continue-on-error: true
         run: |
           ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-            'sudo grep -iEh "\[error\]|typeerror|failed to load|load error" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
+            'sudo grep -Ph "\[ERROR\]|(?i)(typeerror|failed to load|load error)" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
           echo "DS log errors native: $ERRORS"
           echo "DS_LOG_ERRORS_NATIVE=$ERRORS" >> $GITHUB_ENV
 
