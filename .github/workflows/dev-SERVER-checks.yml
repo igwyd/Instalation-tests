@@ -1,0 +1,242 @@
+name: dev SERVER checks
+
+on:
+  schedule:
+    - cron: '0 13 * * 3'  # Wednesday 16:00 Moscow time (UTC+3)
+  workflow_dispatch:
+
+jobs:
+  check-server:
+    runs-on: ubuntu-24.04
+    name: dev SERVER checks x64
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Puppeteer
+        uses: ./.github/actions/setup-puppeteer
+        with:
+          git_ssh_private_key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
+
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-east-1
+
+      - name: Start EC2 Instance
+        run: |
+          aws ec2 start-instances --instance-ids ${{ secrets.AWS_DEV_SERVER_INSTANCE_ID }}
+          echo "Waiting for instance to start..."
+          aws ec2 wait instance-running --instance-ids ${{ secrets.AWS_DEV_SERVER_INSTANCE_ID }}
+
+      - name: Wait for SSH to be Ready
+        run: |
+          until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} exit 2>/dev/null; do
+            echo "Waiting for SSH..."
+            sleep 10
+          done
+
+      - name: Add SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Update EC2 Instance
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo apt-get update && sudo apt-get upgrade -y"
+
+      - name: Reboot EC2 Instance
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} "sudo reboot" || true
+
+      - name: Wait for instance to reboot
+        run: |
+          sleep 60
+          until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} exit 2>/dev/null; do
+            echo "Waiting for SSH..."
+            sleep 10
+          done
+
+      - name: Renew SSL certificates
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo certbot renew && sudo systemctl reload nginx"
+
+      - name: Docker cleanup before run
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true && sudo docker system prune -af"
+
+      - name: Docker run ONLYOFFICE-Docs EE
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sleep 120
+          EOF
+
+      - name: Configure AWS S3 storage useDirectStorageUrls-false
+        env:
+          AWS_DEV_SERVER_BUCKET_NAME: ${{ secrets.AWS_DEV_SERVER_BUCKET_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          envsubst '${AWS_DEV_SERVER_BUCKET_NAME} ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY}' \
+            < dev-SERVER-checks/aws-s3/useDirectStorageUrls-false/local-production-linux.json \
+            > /tmp/local-production-linux.json
+          scp -o StrictHostKeyChecking=no /tmp/local-production-linux.json \
+            ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo rm ~/local-production-linux.json
+          sudo supervisorctl restart ds:converter ds:docservice
+          sleep 30
+          EOF
+
+      - name: Info about installed Package
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI local--------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_EE=$HC" >> $GITHUB_ENV
+
+      - name: Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_EE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_EE_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_EE_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition EE
+
+      - name: Documentserver logs
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker logs --tail=1000 ds-ee-dev"
+
+      - name: Check DS logs for errors
+        continue-on-error: true
+        run: |
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            'sudo docker logs ds-ee-dev 2>&1 | grep -iEc "\[error\]|typeerror|failed to load|load error"' 2>/dev/null || echo "0")
+          echo "DS log errors: $ERRORS"
+          echo "DS_LOG_ERRORS_EE=$ERRORS" >> $GITHUB_ENV
+
+      - name: Final check
+        if: always()
+        run: |
+          FAILED=0
+
+          echo "=== Version results ==="
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Expected version: $EXPECTED"
+          echo "VERSION_EE_OK: ${VERSION_EE_OK:-not set} (actual: ${VERSION_EE_ACTUAL:-not set})"
+          if [ "${VERSION_EE_OK}" != "true" ]; then
+            echo "VERSION_EE_OK FAILED"
+            FAILED=1
+          fi
+
+          echo "=== Healthcheck results ==="
+          echo "HEALTHCHECK_EE: ${HEALTHCHECK_EE:-not set}"
+          if [ "${HEALTHCHECK_EE}" != "true" ]; then
+            echo "HEALTHCHECK_EE FAILED"
+            FAILED=1
+          fi
+
+          echo "=== Puppeteer results ==="
+          echo "PUPPETEER_EE_FAILED: ${PUPPETEER_EE_FAILED:-0}"
+          if [ "${PUPPETEER_EE_FAILED:-0}" -gt 5 ]; then
+            echo "PUPPETEER_EE_FAILED FAILED (threshold: 5)"
+            FAILED=1
+          else
+            echo "PUPPETEER_EE_FAILED OK (${PUPPETEER_EE_FAILED:-0} failures, threshold: 5)"
+          fi
+
+          echo "=== DS log errors ==="
+          echo "DS_LOG_ERRORS_EE: ${DS_LOG_ERRORS_EE:-0}"
+          if [ "${DS_LOG_ERRORS_EE:-0}" -gt 0 ]; then
+            echo "DS_LOG_ERRORS_EE FAILED"
+            FAILED=1
+          fi
+
+          if [ "$FAILED" -eq 1 ]; then
+            exit 1
+          fi
+
+      - name: Clear S3 bucket files folder
+        if: always()
+        run: |
+          aws s3 rm s3://${{ secrets.AWS_DEV_SERVER_BUCKET_NAME }}/files/ --recursive
+
+      - name: Docker cleanup after run
+        if: always()
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true && sudo docker system prune -af"
+
+      - name: Stop EC2 Instance
+        if: always()
+        run: |
+          aws ec2 stop-instances --instance-ids ${{ secrets.AWS_DEV_SERVER_INSTANCE_ID }}
+          aws ec2 wait instance-stopped --instance-ids ${{ secrets.AWS_DEV_SERVER_INSTANCE_ID }}
