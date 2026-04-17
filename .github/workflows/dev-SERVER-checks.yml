@@ -239,7 +239,7 @@ jobs:
       - name: Clear S3 bucket files folder
         if: always()
         run: |
-          aws s3 rm s3://${{ secrets.AWS_DEV_SERVER_BUCKET_NAME }}/files/ --recursive
+          sleep 10 && aws s3 rm s3://${{ secrets.AWS_DEV_SERVER_BUCKET_NAME }}/files/ --recursive
 
       - name: Docker cleanup after run
         if: always()
