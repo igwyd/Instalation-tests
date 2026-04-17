@@ -191,7 +191,7 @@ jobs:
         continue-on-error: true
         run: |
           ERRORS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
-            'sudo docker logs ds-ee-dev 2>&1 | grep -iEc "\[error\]|typeerror|failed to load|load error"' 2>/dev/null || echo "0")
+            'sudo docker logs ds-ee-dev 2>&1 | grep -Pc "\[ERROR\]|(?i)(typeerror|failed to load|load error)"' 2>/dev/null || echo "0")
           echo "DS log errors: $ERRORS"
           echo "DS_LOG_ERRORS_EE=$ERRORS" >> $GITHUB_ENV
 
@@ -239,7 +239,7 @@ jobs:
       - name: Clear S3 bucket files folder
         if: always()
         run: |
-          aws s3 rm s3://${{ secrets.AWS_DEV_SERVER_BUCKET_NAME }}/files/ --recursive
+          sleep 10 && aws s3 rm s3://${{ secrets.AWS_DEV_SERVER_BUCKET_NAME }}/files/ --recursive
 
       - name: Docker cleanup after run
         if: always()
