@@ -30,6 +30,14 @@ Pre-release builds from S3 dev repo.
 | dev-Docker-RPM (CentOS 9) | ![dev-Docker-RPM](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-RPM-x64-arm64.yml/badge.svg?branch=main) |
 
 
+### Server checks (1 runner at the same time)
+- Install dev Docker image with server tests (Scheduled every Wednesday at 16:00 UTC+3)
+
+| Test | Status |
+|------|--------|
+| dev-SERVER-checks | ![dev-SERVER-checks](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-SERVER-checks.yml/badge.svg?branch=main) |
+
+
 ### Backend tests (14 runners at the same time)
 * redis (Scheduled every Wednesday at 17:00 UTC+3)
 
