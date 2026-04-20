@@ -111,7 +111,7 @@ jobs:
           sleep 30
           EOF
 
-      - name: Info about installed Package
+      - name: Info about installed Package AWS_S3_FALSE
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
@@ -124,18 +124,18 @@ jobs:
           sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
-          echo "-------------WOPI local--------------"
+          echo "-------------WOPI--------------"
           curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
           EOF
 
-      - name: Check healthcheck
+      - name: Check healthcheck AWS_S3_FALSE
         continue-on-error: true
         run: |
           HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
           echo "Healthcheck: $HC"
-          echo "HEALTHCHECK_EE=$HC" >> $GITHUB_ENV
+          echo "HEALTHCHECK_AWS_S3_FALSE=$HC" >> $GITHUB_ENV
 
-      - name: Check version
+      - name: Check version AWS_S3_FALSE
         continue-on-error: true
         run: |
           VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
@@ -143,13 +143,13 @@ jobs:
           EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version: installed=$VERSION, expected=$EXPECTED"
           if [ "$VERSION" = "$EXPECTED" ]; then
-            echo "VERSION_EE_OK=true" >> $GITHUB_ENV
+            echo "VERSION_AWS_S3_FALSE_OK=true" >> $GITHUB_ENV
           else
-            echo "VERSION_EE_OK=false" >> $GITHUB_ENV
+            echo "VERSION_AWS_S3_FALSE_OK=false" >> $GITHUB_ENV
           fi
-          echo "VERSION_EE_ACTUAL=$VERSION" >> $GITHUB_ENV
+          echo "VERSION_AWS_S3_FALSE_ACTUAL=$VERSION" >> $GITHUB_ENV
 
-      - name: Start ds-example
+      - name: Start ds-example AWS_S3_FALSE
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
@@ -166,11 +166,7 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
-          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
-          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
-          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
-          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
       - name: Puppeteer WOPI tests AWS S3 useDirectStorageUrls-false
         continue-on-error: true
@@ -179,64 +175,201 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
-          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
-          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
-          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
-          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
-      - name: Parse puppeteer results
+      - name: Parse puppeteer results AWS_S3_FALSE
         if: always()
-        run: python3 .github/scripts/parse-puppeteer-results.py --edition EE
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition AWS_S3_FALSE
 
-      - name: Documentserver logs
+      - name: Documentserver logs AWS_S3_FALSE
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker logs --tail=1000 ds-ee-dev"
 
-      - name: Check DS logs for errors
+      - name: Check DS logs for errors AWS_S3_FALSE
         continue-on-error: true
         run: |
           ERRORS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
             'sudo docker logs ds-ee-dev 2>&1 | grep -Pc "\[ERROR\]|(?i)(typeerror|failed to load|load error)"' 2>/dev/null || echo "0")
           echo "DS log errors: $ERRORS"
-          echo "DS_LOG_ERRORS_EE=$ERRORS" >> $GITHUB_ENV
+          echo "DS_LOG_ERRORS_AWS_S3_FALSE=$ERRORS" >> $GITHUB_ENV
+
+      - name: Docker reInstall for AWS_S3_TRUE check
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker stop ds-ee-dev || true
+          sudo docker rm ds-ee-dev || true
+          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sleep 120
+          EOF
+
+      - name: Configure AWS S3 AWS_S3_TRUE
+        env:
+          AWS_DEV_SERVER_BUCKET_NAME: ${{ secrets.AWS_DEV_SERVER_BUCKET_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          envsubst '${AWS_DEV_SERVER_BUCKET_NAME} ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY}' \
+            < dev-SERVER-checks/aws-s3/useDirectStorageUrls-true/local-production-linux.json \
+            > /tmp/local-production-linux.json
+          scp -o StrictHostKeyChecking=no /tmp/local-production-linux.json \
+            ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo rm ~/local-production-linux.json
+          sudo docker exec ds-ee-dev supervisorctl restart ds:converter ds:docservice
+          sleep 30
+          EOF
+
+      - name: Info about installed Package AWS_S3_TRUE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: Check healthcheck AWS_S3_TRUE
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_AWS_S3_TRUE=$HC" >> $GITHUB_ENV
+
+      - name: Check version AWS_S3_TRUE
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_AWS_S3_TRUE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_AWS_S3_TRUE_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_AWS_S3_TRUE_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: Start ds-example AWS_S3_TRUE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: Puppeteer API tests AWS_S3_TRUE
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: Puppeteer WOPI tests AWS_S3_TRUE
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Parse puppeteer results AWS_S3_TRUE
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition AWS_S3_TRUE
+
+      - name: Documentserver logs AWS_S3_TRUE
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker logs --tail=1000 ds-ee-dev"
+
+      - name: Check DS logs for errors AWS_S3_TRUE
+        continue-on-error: true
+        run: |
+          ERRORS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            'sudo docker logs ds-ee-dev 2>&1 | grep -Pc "\[ERROR\]|(?i)(typeerror|failed to load|load error)"' 2>/dev/null || echo "0")
+          echo "DS log errors: $ERRORS"
+          echo "DS_LOG_ERRORS_AWS_S3_TRUE=$ERRORS" >> $GITHUB_ENV
 
       - name: Final check
         if: always()
         run: |
           FAILED=0
-
-          echo "=== Version results AWS S3 useDirectStorageUrls-false ==="
           EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+
+          echo "=== Version results AWS_S3_FALSE ==="
           echo "Expected version: $EXPECTED"
-          echo "VERSION_EE_OK: ${VERSION_EE_OK:-not set} (actual: ${VERSION_EE_ACTUAL:-not set})"
-          if [ "${VERSION_EE_OK}" != "true" ]; then
-            echo "VERSION_EE_OK FAILED"
+          echo "VERSION_AWS_S3_FALSE_OK: ${VERSION_AWS_S3_FALSE_OK:-not set} (actual: ${VERSION_AWS_S3_FALSE_ACTUAL:-not set})"
+          if [ "${VERSION_AWS_S3_FALSE_OK}" != "true" ]; then
+            echo "VERSION_AWS_S3_FALSE_OK FAILED"
             FAILED=1
           fi
 
-          echo "=== Healthcheck results AWS S3 useDirectStorageUrls-false ==="
-          echo "HEALTHCHECK_EE: ${HEALTHCHECK_EE:-not set}"
-          if [ "${HEALTHCHECK_EE}" != "true" ]; then
-            echo "HEALTHCHECK_EE FAILED"
+          echo "=== Healthcheck results AWS_S3_FALSE ==="
+          echo "HEALTHCHECK_AWS_S3_FALSE: ${HEALTHCHECK_AWS_S3_FALSE:-not set}"
+          if [ "${HEALTHCHECK_AWS_S3_FALSE}" != "true" ]; then
+            echo "HEALTHCHECK_AWS_S3_FALSE FAILED"
             FAILED=1
           fi
 
-          echo "=== Puppeteer results AWS S3 useDirectStorageUrls-false ==="
-          echo "PUPPETEER_EE_FAILED: ${PUPPETEER_EE_FAILED:-0}"
-          if [ "${PUPPETEER_EE_FAILED:-0}" -gt 5 ]; then
-            echo "PUPPETEER_EE_FAILED FAILED (threshold: 5)"
+          echo "=== Puppeteer results AWS_S3_FALSE ==="
+          echo "PUPPETEER_AWS_S3_FALSE_FAILED: ${PUPPETEER_AWS_S3_FALSE_FAILED:-0}"
+          if [ "${PUPPETEER_AWS_S3_FALSE_FAILED:-0}" -gt 5 ]; then
+            echo "PUPPETEER_AWS_S3_FALSE_FAILED FAILED (threshold: 5)"
             FAILED=1
           else
-            echo "PUPPETEER_EE_FAILED OK (${PUPPETEER_EE_FAILED:-0} failures, threshold: 5)"
+            echo "PUPPETEER_AWS_S3_FALSE_FAILED OK (${PUPPETEER_AWS_S3_FALSE_FAILED:-0} failures, threshold: 5)"
           fi
 
-          echo "=== DS log errors AWS S3 useDirectStorageUrls-false ==="
-          echo "DS_LOG_ERRORS_EE: ${DS_LOG_ERRORS_EE:-0}"
-          if [ "${DS_LOG_ERRORS_EE:-0}" -gt 0 ]; then
-            echo "DS_LOG_ERRORS_EE FAILED"
+          echo "=== DS log errors AWS_S3_FALSE ==="
+          echo "DS_LOG_ERRORS_AWS_S3_FALSE: ${DS_LOG_ERRORS_AWS_S3_FALSE:-0}"
+          if [ "${DS_LOG_ERRORS_AWS_S3_FALSE:-0}" -gt 0 ]; then
+            echo "DS_LOG_ERRORS_AWS_S3_FALSE FAILED"
+            FAILED=1
+          fi
+
+          echo "=== Version results AWS_S3_TRUE ==="
+          echo "Expected version: $EXPECTED"
+          echo "VERSION_AWS_S3_TRUE_OK: ${VERSION_AWS_S3_TRUE_OK:-not set} (actual: ${VERSION_AWS_S3_TRUE_ACTUAL:-not set})"
+          if [ "${VERSION_AWS_S3_TRUE_OK}" != "true" ]; then
+            echo "VERSION_AWS_S3_TRUE_OK FAILED"
+            FAILED=1
+          fi
+
+          echo "=== Healthcheck results AWS_S3_TRUE ==="
+          echo "HEALTHCHECK_AWS_S3_TRUE: ${HEALTHCHECK_AWS_S3_TRUE:-not set}"
+          if [ "${HEALTHCHECK_AWS_S3_TRUE}" != "true" ]; then
+            echo "HEALTHCHECK_AWS_S3_TRUE FAILED"
+            FAILED=1
+          fi
+
+          echo "=== Puppeteer results AWS_S3_TRUE ==="
+          echo "PUPPETEER_AWS_S3_TRUE_FAILED: ${PUPPETEER_AWS_S3_TRUE_FAILED:-0}"
+          if [ "${PUPPETEER_AWS_S3_TRUE_FAILED:-0}" -gt 5 ]; then
+            echo "PUPPETEER_AWS_S3_TRUE_FAILED FAILED (threshold: 5)"
+            FAILED=1
+          else
+            echo "PUPPETEER_AWS_S3_TRUE_FAILED OK (${PUPPETEER_AWS_S3_TRUE_FAILED:-0} failures, threshold: 5)"
+          fi
+
+          echo "=== DS log errors AWS_S3_TRUE ==="
+          echo "DS_LOG_ERRORS_AWS_S3_TRUE: ${DS_LOG_ERRORS_AWS_S3_TRUE:-0}"
+          if [ "${DS_LOG_ERRORS_AWS_S3_TRUE:-0}" -gt 0 ]; then
+            echo "DS_LOG_ERRORS_AWS_S3_TRUE FAILED"
             FAILED=1
           fi
 
