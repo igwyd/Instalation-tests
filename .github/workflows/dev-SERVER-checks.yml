@@ -166,7 +166,11 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
       - name: Puppeteer WOPI tests AWS S3 useDirectStorageUrls-false
         continue-on-error: true
@@ -175,7 +179,11 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
       - name: Parse puppeteer results
         if: always()
