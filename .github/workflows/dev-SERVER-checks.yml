@@ -93,7 +93,7 @@ jobs:
           sleep 120
           EOF
 
-      - name: Configure AWS S3 storage useDirectStorageUrls-false
+      - name: Configure AWS S3 useDirectStorageUrls-false
         env:
           AWS_DEV_SERVER_BUCKET_NAME: ${{ secrets.AWS_DEV_SERVER_BUCKET_NAME }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -158,7 +158,7 @@ jobs:
       - name: Clear puppeteer output
         run: rm -rf Dep.Tests/puppeteer/out
 
-      - name: Puppeteer API tests
+      - name: Puppeteer API tests AWS S3 useDirectStorageUrls-false
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -166,16 +166,24 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
-      - name: Puppeteer WOPI tests
+      - name: Puppeteer WOPI tests AWS S3 useDirectStorageUrls-false
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/word/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/smoke/ --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
       - name: Parse puppeteer results
         if: always()
@@ -200,7 +208,7 @@ jobs:
         run: |
           FAILED=0
 
-          echo "=== Version results ==="
+          echo "=== Version results AWS S3 useDirectStorageUrls-false ==="
           EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Expected version: $EXPECTED"
           echo "VERSION_EE_OK: ${VERSION_EE_OK:-not set} (actual: ${VERSION_EE_ACTUAL:-not set})"
@@ -209,14 +217,14 @@ jobs:
             FAILED=1
           fi
 
-          echo "=== Healthcheck results ==="
+          echo "=== Healthcheck results AWS S3 useDirectStorageUrls-false ==="
           echo "HEALTHCHECK_EE: ${HEALTHCHECK_EE:-not set}"
           if [ "${HEALTHCHECK_EE}" != "true" ]; then
             echo "HEALTHCHECK_EE FAILED"
             FAILED=1
           fi
 
-          echo "=== Puppeteer results ==="
+          echo "=== Puppeteer results AWS S3 useDirectStorageUrls-false ==="
           echo "PUPPETEER_EE_FAILED: ${PUPPETEER_EE_FAILED:-0}"
           if [ "${PUPPETEER_EE_FAILED:-0}" -gt 5 ]; then
             echo "PUPPETEER_EE_FAILED FAILED (threshold: 5)"
@@ -225,7 +233,7 @@ jobs:
             echo "PUPPETEER_EE_FAILED OK (${PUPPETEER_EE_FAILED:-0} failures, threshold: 5)"
           fi
 
-          echo "=== DS log errors ==="
+          echo "=== DS log errors AWS S3 useDirectStorageUrls-false ==="
           echo "DS_LOG_ERRORS_EE: ${DS_LOG_ERRORS_EE:-0}"
           if [ "${DS_LOG_ERRORS_EE:-0}" -gt 0 ]; then
             echo "DS_LOG_ERRORS_EE FAILED"
