@@ -158,7 +158,7 @@ jobs:
       - name: Clear puppeteer output
         run: rm -rf Dep.Tests/puppeteer/out
 
-      - name: Puppeteer API tests AWS S3 useDirectStorageUrls-false
+      - name: Puppeteer API tests AWS_S3_FALSE
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
@@ -172,7 +172,7 @@ jobs:
           python3 run.py ../tests/desktop/pdf/smoke/check_draw_after_delete_page.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
           python3 run.py ../tests/desktop/pdf-form/smoke/checkbox_with_one_key.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
-      - name: Puppeteer WOPI tests AWS S3 useDirectStorageUrls-false
+      - name: Puppeteer WOPI tests AWS_S3_FALSE
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
