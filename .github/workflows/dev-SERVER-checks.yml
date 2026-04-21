@@ -93,7 +93,7 @@ jobs:
           sleep 120
           EOF
 
-      - name: Configure AWS S3 useDirectStorageUrls-false
+      - name: Configure AWS_S3_FALSE
         env:
           AWS_DEV_SERVER_BUCKET_NAME: ${{ secrets.AWS_DEV_SERVER_BUCKET_NAME }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
