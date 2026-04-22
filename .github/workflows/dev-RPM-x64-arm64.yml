@@ -226,11 +226,13 @@ jobs:
 
       - name: Check DS logs for errors EE
         continue-on-error: true
-        run: |
-          ERRORS=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            'sudo grep -Ph "\[ERROR\]|(?i)(typeerror|failed to load|load error)" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
-          echo "DS log errors EE: $ERRORS"
-          echo "DS_LOG_ERRORS_EE=$ERRORS" >> $GITHUB_ENV
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ec2-user
+          env_var: DS_LOG_ERRORS_EE
+          label: EE
 
       - name: Remove ONLYOFFICE-Docs EE
         run: |
@@ -343,11 +345,13 @@ jobs:
 
       - name: Check DS logs for errors DE
         continue-on-error: true
-        run: |
-          ERRORS=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            'sudo grep -Ph "\[ERROR\]|(?i)(typeerror|failed to load|load error)" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
-          echo "DS log errors DE: $ERRORS"
-          echo "DS_LOG_ERRORS_DE=$ERRORS" >> $GITHUB_ENV
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ec2-user
+          env_var: DS_LOG_ERRORS_DE
+          label: DE
 
       - name: Remove ONLYOFFICE-Docs DE
         run: |
@@ -460,11 +464,13 @@ jobs:
 
       - name: Check DS logs for errors CE
         continue-on-error: true
-        run: |
-          ERRORS=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            'sudo grep -Ph "\[ERROR\]|(?i)(typeerror|failed to load|load error)" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
-          echo "DS log errors CE: $ERRORS"
-          echo "DS_LOG_ERRORS_CE=$ERRORS" >> $GITHUB_ENV
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ec2-user
+          env_var: DS_LOG_ERRORS_CE
+          label: CE
 
       - name: Remove ONLYOFFICE-Docs CE
         run: |
@@ -647,11 +653,13 @@ jobs:
 
       - name: Check DS logs for errors EE after UPGRADE
         continue-on-error: true
-        run: |
-          ERRORS=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            'sudo grep -Ph "\[ERROR\]|(?i)(typeerror|failed to load|load error)" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
-          echo "DS log errors EE_UPGRADE: $ERRORS"
-          echo "DS_LOG_ERRORS_EE_UPGRADE=$ERRORS" >> $GITHUB_ENV
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ec2-user
+          env_var: DS_LOG_ERRORS_EE_UPGRADE
+          label: EE_UPGRADE
 
       - name: Final check
         if: always()
