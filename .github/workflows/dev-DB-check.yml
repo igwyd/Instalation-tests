@@ -289,8 +289,11 @@ jobs:
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
       - name: Documentserver logs PUPPETEER TEST
-        run: |
-          docker logs -n 1000 onlyoffice
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: docker-local
+          container: onlyoffice
 
       - name: Parse PUPPETEER TEST results
         if: always()
@@ -324,8 +327,11 @@ jobs:
             -s "${{ matrix.k6_stage_ramp }}" -s "${{ matrix.k6_stage_main }}"
 
       - name: Documentserver logs
-        run: |
-          docker logs -n 1000 onlyoffice
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: docker-local
+          container: onlyoffice
 
       - name: Check DS logs for errors
         continue-on-error: true

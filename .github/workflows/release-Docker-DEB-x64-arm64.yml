@@ -172,10 +172,12 @@ jobs:
 
       - name: Documentserver logs ONLYOFFICE-Docs EE
         continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          sudo docker logs --tail=1000 ds-ee-release
-          EOF
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ubuntu
+          container: ds-ee-release
 
       - name: Check DS logs for errors EE
         continue-on-error: true
@@ -281,10 +283,12 @@ jobs:
 
       - name: Documentserver logs ONLYOFFICE-Docs DE
         continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          sudo docker logs --tail=1000 ds-de-release
-          EOF
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ubuntu
+          container: ds-de-release
 
       - name: Check DS logs for errors DE
         continue-on-error: true
@@ -390,10 +394,12 @@ jobs:
 
       - name: Documentserver logs ONLYOFFICE-Docs CE
         continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          sudo docker logs --tail=1000 ds-release
-          EOF
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ubuntu
+          container: ds-release
 
       - name: Check DS logs for errors CE
         continue-on-error: true

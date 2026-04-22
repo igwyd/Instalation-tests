@@ -196,10 +196,11 @@ jobs:
 
       - name: Documentserver logs ONLYOFFICE-Docs EE
         continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
-          EOF
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ubuntu
 
       - name: Check DS logs for errors EE
         continue-on-error: true
@@ -318,10 +319,11 @@ jobs:
 
       - name: Documentserver logs ONLYOFFICE-Docs DE
         continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
-          EOF
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ubuntu
 
       - name: Check DS logs for errors DE
         continue-on-error: true
@@ -440,10 +442,11 @@ jobs:
 
       - name: Documentserver logs ONLYOFFICE-Docs CE
         continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
-          EOF
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ubuntu
 
       - name: Check DS logs for errors CE
         continue-on-error: true

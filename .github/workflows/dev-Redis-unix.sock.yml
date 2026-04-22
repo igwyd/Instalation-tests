@@ -159,10 +159,15 @@ jobs:
           env_var: DS_LOG_ERRORS
           label: ${{ matrix.driver }}
 
-      - name: Documentserver logs and remove ${{ matrix.driver }} container
-        run: |
-          docker logs -n 1000 ${{ matrix.container }}
-          docker rm -fv ${{ matrix.container }}
+      - name: Documentserver logs ${{ matrix.driver }}
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: docker-local
+          container: ${{ matrix.container }}
+
+      - name: Remove ${{ matrix.driver }} container
+        run: docker rm -fv ${{ matrix.container }}
 
       - name: Parse puppeteer results
         if: always()
