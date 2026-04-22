@@ -145,7 +145,7 @@ jobs:
           echo "-------------------------------------"
           python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
-      - name: Documentserver logs PUPPETEER TEST
+      - name: Documentserver logs
         continue-on-error: true
         run: docker logs --tail 500 onlyoffice
 
