@@ -283,13 +283,23 @@ jobs:
           sudo docker logs $(sudo docker ps -q --filter "name=onlyoffice") 2>&1 | tail -n 1000 || true
           EOF
 
+      - name: Get DS container ID for Docker install check
+        id: ds-container
+        run: |
+          CONTAINER_ID=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo docker ps -q --filter "name=onlyoffice"')
+          echo "id=$CONTAINER_ID" >> $GITHUB_OUTPUT
+
       - name: Check DS logs for errors Docker install
         continue-on-error: true
-        run: |
-          ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") bash -c "grep -Ph \"\\[ERROR\\]|(?i)(typeerror|failed to load|load error)\" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l"' 2>/dev/null || echo "0")
-          echo "DS log errors Docker: $ERRORS"
-          echo "DS_LOG_ERRORS_DOCKER=$ERRORS" >> $GITHUB_ENV
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ${{ matrix.ssh_user }}
+          container: ${{ steps.ds-container.outputs.id }}
+          env_var: DS_LOG_ERRORS_DOCKER
+          label: Docker
 
       - name: Start ds:example Docker install
         continue-on-error: true
@@ -412,11 +422,13 @@ jobs:
 
       - name: Check DS logs for errors native install
         continue-on-error: true
-        run: |
-          ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-            'sudo grep -Ph "\[ERROR\]|(?i)(typeerror|failed to load|load error)" /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/nginx.error.log 2>/dev/null | wc -l' 2>/dev/null || echo "0")
-          echo "DS log errors native: $ERRORS"
-          echo "DS_LOG_ERRORS_NATIVE=$ERRORS" >> $GITHUB_ENV
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ${{ matrix.ssh_user }}
+          env_var: DS_LOG_ERRORS_NATIVE
+          label: native
 
       - name: Start ds:example native install
         continue-on-error: true

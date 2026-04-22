@@ -1,0 +1,73 @@
+name: 'Check DS logs for errors'
+description: 'Count error lines in DS logs and write result to GITHUB_ENV'
+
+inputs:
+  mode:
+    description: 'Execution mode: ssh-native | ssh-docker | docker-local | ssh-docker-logs'
+    required: true
+  ssh_host:
+    description: 'SSH host IP or domain'
+    required: false
+    default: ''
+  ssh_user:
+    description: 'SSH user'
+    required: false
+    default: 'ubuntu'
+  container:
+    description: 'Docker container name or ID (for docker modes)'
+    required: false
+    default: ''
+  env_var:
+    description: 'Name of the GITHUB_ENV variable to set with error count'
+    required: true
+  label:
+    description: 'Label for log output (e.g. EE, DE, CE)'
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Count DS log errors
+      shell: bash
+      run: |
+        PATTERN='(?i)(?:\[error\]|typeerror|failed to load|load error)'
+        # Known false-positives to exclude
+        EXCLUDE='sdkjs/pdf/src/annotations/stamps/'
+        LOG_FILES=(
+          /var/log/onlyoffice/documentserver/converter/out.log
+          /var/log/onlyoffice/documentserver/converter/err.log
+          /var/log/onlyoffice/documentserver/docservice/out.log
+          /var/log/onlyoffice/documentserver/docservice/err.log
+          /var/log/onlyoffice/documentserver/metrics/out.log
+          /var/log/onlyoffice/documentserver/metrics/err.log
+          /var/log/onlyoffice/documentserver/nginx.error.log
+          /var/log/onlyoffice/documentserver-example/out.log
+          /var/log/onlyoffice/documentserver/adminpanel/out.log
+          /var/log/onlyoffice/documentserver/adminpanel/err.log
+        )
+
+        case "${{ inputs.mode }}" in
+          ssh-native)
+            ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
+              "sudo grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" | wc -l" 2>/dev/null || echo "0")
+            ;;
+          ssh-docker)
+            ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
+              "sudo docker exec ${{ inputs.container }} bash -c 'grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" | wc -l'" 2>/dev/null || echo "0")
+            ;;
+          docker-local)
+            ERRORS=$(docker exec ${{ inputs.container }} bash -c "grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" | wc -l" 2>/dev/null || echo "0")
+            ;;
+          ssh-docker-logs)
+            ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
+              "sudo docker logs ${{ inputs.container }} 2>&1 | grep -Ph \"$PATTERN\" 2>/dev/null | grep -Pv \"$EXCLUDE\" | wc -l" 2>/dev/null || echo "0")
+            ;;
+          *)
+            echo "Unknown mode: ${{ inputs.mode }}"
+            ERRORS=0
+            ;;
+        esac
+
+        echo "DS log errors ${{ inputs.label }}: $ERRORS"
+        echo "${{ inputs.env_var }}=$ERRORS" >> $GITHUB_ENV
