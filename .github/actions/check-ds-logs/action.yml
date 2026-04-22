@@ -31,7 +31,9 @@ runs:
     - name: Count DS log errors
       shell: bash
       run: |
-        PATTERN='\[ERROR\]|(?i)(typeerror|failed to load|load error)'
+        PATTERN='(?i)(?:\[error\]|typeerror|failed to load|load error)'
+        # Known false-positives to exclude
+        EXCLUDE='sdkjs/pdf/src/annotations/stamps/'
         LOG_FILES=(
           /var/log/onlyoffice/documentserver/converter/out.log
           /var/log/onlyoffice/documentserver/converter/err.log
