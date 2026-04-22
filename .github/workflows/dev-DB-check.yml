@@ -323,7 +323,7 @@ jobs:
             --quiet \
             -s "${{ matrix.k6_stage_ramp }}" -s "${{ matrix.k6_stage_main }}"
 
-      - name: Documentserver logs LOAD TEST
+      - name: Documentserver logs
         run: |
           docker logs -n 1000 onlyoffice
 
