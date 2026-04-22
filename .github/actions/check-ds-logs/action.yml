@@ -50,18 +50,18 @@ runs:
         case "${{ inputs.mode }}" in
           ssh-native)
             ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
-              "sudo grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | wc -l" 2>/dev/null || echo "0")
+              "sudo grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" | wc -l" 2>/dev/null || echo "0")
             ;;
           ssh-docker)
             ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
-              "sudo docker exec ${{ inputs.container }} bash -c 'grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | wc -l'" 2>/dev/null || echo "0")
+              "sudo docker exec ${{ inputs.container }} bash -c 'grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" | wc -l'" 2>/dev/null || echo "0")
             ;;
           docker-local)
-            ERRORS=$(docker exec ${{ inputs.container }} bash -c "grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | wc -l" 2>/dev/null || echo "0")
+            ERRORS=$(docker exec ${{ inputs.container }} bash -c "grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" | wc -l" 2>/dev/null || echo "0")
             ;;
           ssh-docker-logs)
             ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
-              "sudo docker logs ${{ inputs.container }} 2>&1 | grep -Ph \"$PATTERN\" 2>/dev/null | wc -l" 2>/dev/null || echo "0")
+              "sudo docker logs ${{ inputs.container }} 2>&1 | grep -Ph \"$PATTERN\" 2>/dev/null | grep -Pv \"$EXCLUDE\" | wc -l" 2>/dev/null || echo "0")
             ;;
           *)
             echo "Unknown mode: ${{ inputs.mode }}"
