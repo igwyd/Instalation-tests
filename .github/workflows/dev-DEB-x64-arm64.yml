@@ -139,7 +139,7 @@ jobs:
         continue-on-error: true
         run: |
           UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); if [ "$s" = "enabled" ]; then echo "$svc"; fi; done')
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_EE_OK=true" >> $GITHUB_ENV
           else
@@ -259,7 +259,7 @@ jobs:
         continue-on-error: true
         run: |
           UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); if [ "$s" = "enabled" ]; then echo "$svc"; fi; done')
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_DE_OK=true" >> $GITHUB_ENV
           else
@@ -378,7 +378,7 @@ jobs:
         continue-on-error: true
         run: |
           UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); if [ "$s" = "enabled" ]; then echo "$svc"; fi; done')
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_CE_OK=true" >> $GITHUB_ENV
           else
@@ -501,7 +501,7 @@ jobs:
         continue-on-error: true
         run: |
           UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); if [ "$s" = "enabled" ]; then echo "$svc"; fi; done')
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_EE_RELEASE_OK=true" >> $GITHUB_ENV
           else
@@ -555,7 +555,7 @@ jobs:
         continue-on-error: true
         run: |
           UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); if [ "$s" = "enabled" ]; then echo "$svc"; fi; done')
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_EE_UPGRADE_OK=true" >> $GITHUB_ENV
           else
