@@ -9,7 +9,7 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     name: ${{ matrix.os_name }} ${{ matrix.arch }}
-    timeout-minutes: 90
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
