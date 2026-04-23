@@ -122,7 +122,8 @@ jobs:
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
           sudo sleep 10
-          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echoecho "-------------DS services-------------"
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
           sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
