@@ -191,9 +191,11 @@ jobs:
 
       - name: Documentserver logs AWS_S3_FALSE
         continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
-            "sudo docker logs --tail=1000 ds-ee-dev"
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
 
       - name: Check DS logs for errors AWS_S3_FALSE
         continue-on-error: true
@@ -311,9 +313,11 @@ jobs:
 
       - name: Documentserver logs AWS_S3_TRUE
         continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
-            "sudo docker logs --tail=1000 ds-ee-dev"
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
 
       - name: Check DS logs for errors AWS_S3_TRUE
         continue-on-error: true

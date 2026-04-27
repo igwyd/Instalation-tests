@@ -9,7 +9,7 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     name: ${{ matrix.os_name }} ${{ matrix.arch }}
-    timeout-minutes: 90
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -276,19 +276,21 @@ jobs:
             echo "DOCKER_VERSION_OK=false" >> $GITHUB_ENV
           fi
 
-      - name: Documentserver logs Docker install
-        continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
-          sudo docker logs $(sudo docker ps -q --filter "name=onlyoffice") 2>&1 | tail -n 1000 || true
-          EOF
-
       - name: Get DS container ID for Docker install check
         id: ds-container
         run: |
           CONTAINER_ID=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
             'sudo docker ps -q --filter "name=onlyoffice"')
           echo "id=$CONTAINER_ID" >> $GITHUB_OUTPUT
+
+      - name: Documentserver logs Docker install
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ${{ matrix.ssh_user }}
+          container: ${{ steps.ds-container.outputs.id }}
 
       - name: Check DS logs for errors Docker install
         continue-on-error: true
@@ -415,10 +417,11 @@ jobs:
 
       - name: Documentserver logs native install
         continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
-          sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log /var/log/onlyoffice/documentserver/docservice/out.log /var/log/onlyoffice/documentserver/docservice/err.log /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
-          EOF
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ${{ matrix.ssh_user }}
 
       - name: Check DS logs for errors native install
         continue-on-error: true

@@ -122,7 +122,8 @@ jobs:
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
           sudo sleep 10
-          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echoecho "-------------DS services-------------"
+          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
           sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
           sudo dpkg-query -l | grep onlyoffice-documentserver
@@ -138,7 +139,7 @@ jobs:
         continue-on-error: true
         run: |
           UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); if [ "$s" = "enabled" ]; then echo "$svc"; fi; done')
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_EE_OK=true" >> $GITHUB_ENV
           else
@@ -198,10 +199,11 @@ jobs:
 
       - name: Documentserver logs ONLYOFFICE-Docs EE
         continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
-          EOF
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ubuntu
 
       - name: Check DS logs for errors EE
         continue-on-error: true
@@ -257,7 +259,7 @@ jobs:
         continue-on-error: true
         run: |
           UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); if [ "$s" = "enabled" ]; then echo "$svc"; fi; done')
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_DE_OK=true" >> $GITHUB_ENV
           else
@@ -316,10 +318,11 @@ jobs:
 
       - name: Documentserver logs ONLYOFFICE-Docs DE
         continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
-          EOF
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ubuntu
 
       - name: Check DS logs for errors DE
         continue-on-error: true
@@ -375,7 +378,7 @@ jobs:
         continue-on-error: true
         run: |
           UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); if [ "$s" = "enabled" ]; then echo "$svc"; fi; done')
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_CE_OK=true" >> $GITHUB_ENV
           else
@@ -434,10 +437,11 @@ jobs:
 
       - name: Documentserver logs ONLYOFFICE-Docs CE
         continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
-          EOF
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ubuntu
 
       - name: Check DS logs for errors CE
         continue-on-error: true
@@ -497,7 +501,7 @@ jobs:
         continue-on-error: true
         run: |
           UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); if [ "$s" = "enabled" ]; then echo "$svc"; fi; done')
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_EE_RELEASE_OK=true" >> $GITHUB_ENV
           else
@@ -551,7 +555,7 @@ jobs:
         continue-on-error: true
         run: |
           UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
+            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); if [ "$s" = "enabled" ]; then echo "$svc"; fi; done')
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_EE_UPGRADE_OK=true" >> $GITHUB_ENV
           else
@@ -622,10 +626,11 @@ jobs:
 
       - name: Documentserver logs ONLYOFFICE-Docs EE after UPGRADE
         continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          sudo tail -n 1000 /var/log/onlyoffice/documentserver/converter/out.log /var/log/onlyoffice/documentserver/converter/err.log  /var/log/onlyoffice/documentserver/docservice/out.log  /var/log/onlyoffice/documentserver/docservice/err.log  /var/log/onlyoffice/documentserver/metrics/out.log /var/log/onlyoffice/documentserver/metrics/err.log /var/log/onlyoffice/documentserver/nginx.error.log  /var/log/onlyoffice/documentserver-example/out.log /var/log/onlyoffice/documentserver/adminpanel/out.log /var/log/onlyoffice/documentserver/adminpanel/err.log
-          EOF
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ubuntu
 
       - name: Check DS logs for errors EE after UPGRADE
         continue-on-error: true
