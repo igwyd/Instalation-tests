@@ -90,8 +90,10 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
-          sleep 120
           EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
 
       - name: Configure AWS_S3_FALSE
         env:
@@ -213,8 +215,10 @@ jobs:
           sudo docker stop ds-ee-dev || true
           sudo docker rm ds-ee-dev || true
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
-          sleep 120
           EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
 
       - name: Configure AWS S3 AWS_S3_TRUE
         env:
