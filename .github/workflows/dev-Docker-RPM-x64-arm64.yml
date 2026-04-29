@@ -108,8 +108,8 @@ jobs:
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
 
-      - name: Wait for DS startup 400
-        run: sleep 400
+      - name: Wait for DS startup 240
+        run: sleep 240
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         continue-on-error: true
@@ -223,8 +223,8 @@ jobs:
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-de-dev onlyoffice/4testing-documentserver-de:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
 
-      - name: Wait for DS startup 90
-        run: sleep 90
+      - name: Wait for DS startup 240
+        run: sleep 240
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         continue-on-error: true
@@ -336,8 +336,8 @@ jobs:
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-dev onlyoffice/4testing-documentserver:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
 
-      - name: Wait for DS startup 90
-        run: sleep 90
+      - name: Wait for DS startup 240
+        run: sleep 240
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
         continue-on-error: true

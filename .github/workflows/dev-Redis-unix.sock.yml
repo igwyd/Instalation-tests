@@ -42,9 +42,9 @@ jobs:
       - name: Docker run ONLYOFFICE-Docs EE for test ${{ matrix.driver }}
         run: |
           docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ${{ matrix.container }} onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
-          sleep 180
-          echo "-------------healthcheck-------------"
-          curl -s http://${RUNNER_IP}/healthcheck; echo
+
+      - name: Wait for DS startup 240
+        run: sleep 240
 
       - name: Check DS default services
         continue-on-error: true

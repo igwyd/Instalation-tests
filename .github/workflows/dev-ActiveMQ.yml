@@ -59,7 +59,7 @@ jobs:
         run: docker ps -a
 
       - name: Wait for ${{ matrix.mq }} and ONLYOFFICE to be ready
-        run: sleep 180
+        run: sleep 240
 
       - name: Get runner IP
         run: |

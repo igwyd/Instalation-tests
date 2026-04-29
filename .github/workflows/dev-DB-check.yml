@@ -175,7 +175,7 @@ jobs:
           docker ps -a
 
       - name: Wait for ${{ matrix.db }} DB and ONLYOFFICE to be ready
-        run: sleep 180
+        run: sleep 240
 
       - name: Get runner IP
         id: runner_ip

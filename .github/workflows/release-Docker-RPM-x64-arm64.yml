@@ -104,8 +104,10 @@ jobs:
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << 'EOF'
           sudo docker pull onlyoffice/documentserver-ee
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-release onlyoffice/documentserver-ee
-          sleep 90
           EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         continue-on-error: true
@@ -217,8 +219,10 @@ jobs:
           sudo docker rmi onlyoffice/documentserver-ee
           sudo docker pull onlyoffice/documentserver-de
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-de-release onlyoffice/documentserver-de
-          sleep 90
           EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         continue-on-error: true
@@ -328,8 +332,10 @@ jobs:
           sudo docker rmi onlyoffice/documentserver-de
           sudo docker pull onlyoffice/documentserver
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-release onlyoffice/documentserver
-          sleep 90
           EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
         continue-on-error: true
