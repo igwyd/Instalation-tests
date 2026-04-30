@@ -48,20 +48,28 @@ Pre-release builds from S3 dev repo.
 
 * Tests with different DBs (Scheduled every Wednesday at 17:00 UTC+3)
 
-| Test | Status |
-|------|--------|
-| MySQL, PostgreSQL (14,15,16,17,18), MSSQL, Oracle, Dameng, MariaDB | ![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main) |
+<!-- db-status-start -->
+| [![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml) | Healthcheck | Version | Puppeteer | DS Log Errors | Last run |
+|-------|-------------|---------|-----------|---------------|----------|
+| MySQL         | — | — | — | — | — |
+| PostgreSQL    | — | — | — | — | — |
+| PostgreSQL 14 | — | — | — | — | — |
+| PostgreSQL 15 | — | — | — | — | — |
+| PostgreSQL 16 | — | — | — | — | — |
+| PostgreSQL 17 | — | — | — | — | — |
+| MSSQL         | — | — | — | — | — |
+| Oracle        | — | — | — | — | — |
+| Dameng        | — | — | — | — | — |
+| MariaDB       | — | — | — | — | — |
+<!-- db-status-end -->
 
 * Tests with ActiveMQ-Classic and ActiveMQ-Artemis (Scheduled every Wednesday at 17:00 UTC+3)
 
 <!-- activemq-status-start -->
-| [![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml) | Artemis | Classic |
-|---------------------------------------|---------|---------|
-| Healthcheck   | — | — |
-| Version       | — | — |
-| Puppeteer     | — | — |
-| DS Log Errors | — | — |
-| Last run      | — | — |
+| [![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml) | Healthcheck | Version | Puppeteer | DS Log Errors | Last run |
+|-------|-------------|---------|-----------|---------------|----------|
+| Artemis | — | — | — | — | — |
+| Classic | — | — | — | — | — |
 <!-- activemq-status-end -->
 
 

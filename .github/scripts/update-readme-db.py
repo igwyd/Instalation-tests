@@ -1,6 +1,19 @@
 import json
 import re
 
+DBS = [
+    ("MySQL",         "mysql"),
+    ("PostgreSQL",    "postgres"),
+    ("PostgreSQL 14", "postgres14"),
+    ("PostgreSQL 15", "postgres15"),
+    ("PostgreSQL 16", "postgres16"),
+    ("PostgreSQL 17", "postgres17"),
+    ("MSSQL",         "mssql"),
+    ("Oracle",        "oracle"),
+    ("Dameng",        "dameng"),
+    ("MariaDB",       "mariadb"),
+]
+
 
 def load(path):
     try:
@@ -39,7 +52,7 @@ def ds_errors_cell(data):
     if data is None:
         return "—"
     n = data.get('ds_log_errors', 0)
-    return "✅ 0 errors" if n == 0 else f"❌ {n} errors"
+    return "✅ 0" if n == 0 else f"❌ {n}"
 
 
 def date_cell(data):
@@ -48,27 +61,31 @@ def date_cell(data):
     return data.get('run_date', '—')
 
 
-a = load('.github/workflow-results/dev-activemq-artemis.json')
-c = load('.github/workflow-results/dev-activemq-classic.json')
-
 BADGE = (
-    "[![dev-ActiveMQ]"
-    "(https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main)]"
-    "(https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml)"
+    "[![dev-DB-check]"
+    "(https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main)]"
+    "(https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml)"
 )
 
-table = "\n".join([
+rows = [
     f"| {BADGE} | Healthcheck | Version | Puppeteer | DS Log Errors | Last run |",
     "|-------|-------------|---------|-----------|---------------|----------|",
-    f"| Artemis | {bool_cell(a, 'healthy')} | {version_cell(a)} | {puppeteer_cell(a)} | {ds_errors_cell(a)} | {date_cell(a)} |",
-    f"| Classic | {bool_cell(c, 'healthy')} | {version_cell(c)} | {puppeteer_cell(c)} | {ds_errors_cell(c)} | {date_cell(c)} |",
-])
+]
+
+for label, key in DBS:
+    d = load(f'.github/workflow-results/dev-db-{key}.json')
+    rows.append(
+        f"| {label} | {bool_cell(d, 'healthy')} | {version_cell(d)}"
+        f" | {puppeteer_cell(d)} | {ds_errors_cell(d)} | {date_cell(d)} |"
+    )
+
+table = "\n".join(rows)
 
 with open('README.md') as f:
     content = f.read()
 
 new_content = re.sub(
-    r'(<!-- activemq-status-start -->).*?(<!-- activemq-status-end -->)',
+    r'(<!-- db-status-start -->).*?(<!-- db-status-end -->)',
     f'\\1\n{table}\n\\2',
     content,
     flags=re.DOTALL,

@@ -42,6 +42,9 @@ jobs:
       - name: Update ActiveMQ status in README
         run: python3 .github/scripts/update-readme-activemq.py
 
+      - name: Update DB status in README
+        run: python3 .github/scripts/update-readme-db.py
+
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions"
