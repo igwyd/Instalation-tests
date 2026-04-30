@@ -10,6 +10,13 @@ def load(path):
         return None
 
 
+def bool_cell(data, key):
+    if data is None:
+        return "—"
+    val = data.get(key, False)
+    return "✅ OK" if val else "❌ FAILED"
+
+
 def version_cell(data):
     if data is None:
         return "—"
@@ -53,6 +60,7 @@ BADGE = (
 table = "\n".join([
     f"| {BADGE} | Artemis | Classic |",
     "|---------------------------------------|---------|---------|",
+    f"| Healthcheck   | {bool_cell(a, 'healthy')} | {bool_cell(c, 'healthy')} |",
     f"| Version       | {version_cell(a)}   | {version_cell(c)} |",
     f"| Puppeteer     | {puppeteer_cell(a)} | {puppeteer_cell(c)} |",
     f"| DS Log Errors | {ds_errors_cell(a)} | {ds_errors_cell(c)} |",

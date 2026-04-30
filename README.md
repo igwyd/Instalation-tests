@@ -57,10 +57,11 @@ Pre-release builds from S3 dev repo.
 <!-- activemq-status-start -->
 | [![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml) | Artemis | Classic |
 |---------------------------------------|---------|---------|
-| Version       | ✅ 9.4.0-76   | ✅ 9.4.0-76 |
-| Puppeteer     | ✅ 0 (API: 0, WOPI: 0) | ✅ 0 (API: 0, WOPI: 0) |
-| DS Log Errors | ❌ 3 errors | ❌ 1 errors |
-| Last run      | 2026-04-30 09:33 UTC      | 2026-04-30 09:33 UTC |
+| Healthcheck   | — | — |
+| Version       | — | — |
+| Puppeteer     | — | — |
+| DS Log Errors | — | — |
+| Last run      | — | — |
 <!-- activemq-status-end -->
 
 
