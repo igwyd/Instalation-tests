@@ -42,12 +42,6 @@ def ds_errors_cell(data):
     return "✅ 0 errors" if n == 0 else f"❌ {n} errors"
 
 
-def date_cell(data):
-    if data is None:
-        return "—"
-    return data.get('run_date', '—')
-
-
 a = load('.github/workflow-results/dev-activemq-artemis.json')
 c = load('.github/workflow-results/dev-activemq-classic.json')
 
@@ -58,10 +52,10 @@ BADGE = (
 )
 
 table = "\n".join([
-    f"| {BADGE} | Healthcheck | Version | Puppeteer | DS Log Errors | Last run |",
-    "|-------|-------------|---------|-----------|---------------|----------|",
-    f"| Artemis | {bool_cell(a, 'healthy')} | {version_cell(a)} | {puppeteer_cell(a)} | {ds_errors_cell(a)} | {date_cell(a)} |",
-    f"| Classic | {bool_cell(c, 'healthy')} | {version_cell(c)} | {puppeteer_cell(c)} | {ds_errors_cell(c)} | {date_cell(c)} |",
+    f"| {BADGE} | Healthcheck | Version | Puppeteer | DS Log Errors |",
+    "|-------|-------------|---------|-----------|---------------|",
+    f"| Artemis | {bool_cell(a, 'healthy')} | {version_cell(a)} | {puppeteer_cell(a)} | {ds_errors_cell(a)} |",
+    f"| Classic | {bool_cell(c, 'healthy')} | {version_cell(c)} | {puppeteer_cell(c)} | {ds_errors_cell(c)} |",
 ])
 
 with open('README.md') as f:

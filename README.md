@@ -49,27 +49,27 @@ Pre-release builds from S3 dev repo.
 * Tests with different DBs (Scheduled every Wednesday at 17:00 UTC+3)
 
 <!-- db-status-start -->
-| [![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml) | Healthcheck | Version | Puppeteer | DS Log Errors | Last run |
-|-------|-------------|---------|-----------|---------------|----------|
-| MySQL | — | — | — | — | — |
-| PostgreSQL | — | — | — | — | — |
-| PostgreSQL 14 | — | — | — | — | — |
-| PostgreSQL 15 | — | — | — | — | — |
-| PostgreSQL 16 | — | — | — | — | — |
-| PostgreSQL 17 | — | — | — | — | — |
-| MSSQL | — | — | — | — | — |
-| Oracle | — | — | — | — | — |
-| Dameng | — | — | — | — | — |
-| MariaDB | — | — | — | — | — |
+| [![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml) | Healthcheck | Version | Puppeteer | DS Log Errors |
+|-------|-------------|---------|-----------|---------------|
+| MySQL         | — | — | — | — |
+| PostgreSQL    | — | — | — | — |
+| PostgreSQL 14 | — | — | — | — |
+| PostgreSQL 15 | — | — | — | — |
+| PostgreSQL 16 | — | — | — | — |
+| PostgreSQL 17 | — | — | — | — |
+| MSSQL         | — | — | — | — |
+| Oracle        | — | — | — | — |
+| Dameng        | — | — | — | — |
+| MariaDB       | — | — | — | — |
 <!-- db-status-end -->
 
 * Tests with ActiveMQ-Classic and ActiveMQ-Artemis (Scheduled every Wednesday at 17:00 UTC+3)
 
 <!-- activemq-status-start -->
-| [![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml) | Healthcheck | Version | Puppeteer | DS Log Errors | Last run |
-|-------|-------------|---------|-----------|---------------|----------|
-| Artemis | ❌ FAILED | ✅ 9.4.0-76 | ✅ 0 (API: 0, WOPI: 0) | ❌ 2 errors | 2026-04-30 10:24 UTC |
-| Classic | ❌ FAILED | ✅ 9.4.0-76 | ✅ 0 (API: 0, WOPI: 0) | ❌ 2 errors | 2026-04-30 10:24 UTC |
+| [![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml) | Healthcheck | Version | Puppeteer | DS Log Errors |
+|-------|-------------|---------|-----------|---------------|
+| Artemis | — | — | — | — |
+| Classic | — | — | — | — |
 <!-- activemq-status-end -->
 
 
