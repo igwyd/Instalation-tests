@@ -1,4 +1,4 @@
-name: Update version in README
+name: Update data in README
 
 on:
   schedule:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  update-version:
+  update-data:
     runs-on: ubuntu-latest
 
     steps:
@@ -39,10 +39,10 @@ jobs:
             echo "Version is up to date, skipping change."
           fi
 
-      - name: Update ActiveMQ status in README
+      - name: Update dev-ActiveMQ.yml status in README
         run: python3 .github/scripts/update-readme-activemq.py
 
-      - name: Update DB status in README
+      - name: Update dev-DB-check.yml status in README
         run: python3 .github/scripts/update-readme-db.py
 
       - name: Commit and push if changed
@@ -54,6 +54,6 @@ jobs:
             echo "No changes to commit"
           else
             git add README.md
-            git commit -m "Update ONLYOFFICE version to $VERSION"
+            git commit -m "Update data in README.md, ONLYOFFICE version to $VERSION"
             git push
           fi
