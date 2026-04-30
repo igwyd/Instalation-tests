@@ -168,51 +168,74 @@ jobs:
         if: always()
         run: |
           FAILED=0
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
 
-          echo "=== Healthcheck ==="
-          echo "Healthcheck: ${HEALTHY:-not set}"
-          if [ "${HEALTHY}" != "true" ]; then
-            echo "Healthcheck FAILED"
-            FAILED=1
+          # --- Evaluate each check ---
+          if [ "${HEALTHY}" = "true" ]; then
+            HC_ICON="✅"; HC_LABEL="OK";     HC_DETAIL="${HEALTHY}"
           else
-            echo "Healthcheck passed"
+            HC_ICON="❌"; HC_LABEL="FAILED"; HC_DETAIL="${HEALTHY:-not set}"; FAILED=1
           fi
 
-          echo "=== Version ==="
-          echo "Expected version: ${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
-          echo "Actual version:   ${VERSION_ACTUAL:-not set}"
-          echo "Version OK: ${VERSION_OK:-not set}"
-          if [ "${VERSION_OK}" != "true" ]; then
-            echo "Version check FAILED"
-            FAILED=1
+          if [ "${VERSION_OK}" = "true" ]; then
+            VER_ICON="✅"; VER_LABEL="OK"
           else
-            echo "Version check passed"
+            VER_ICON="❌"; VER_LABEL="FAILED"; FAILED=1
           fi
+          VER_DETAIL="exp: ${EXPECTED}, act: ${VERSION_ACTUAL:-not set}"
 
-          echo "=== DS services check ==="
-          echo "Services OK: ${SERVICES_OK:-not set}"
-          if [ "${SERVICES_OK}" != "true" ]; then
-            echo "DS services check FAILED — unexpected services running after install"
-            FAILED=1
-          fi
-
-          echo "=== Puppeteer results ==="
-          echo "Puppeteer API  failed: ${PUPPETEER_API_FAILED:-0}"
-          echo "Puppeteer WOPI failed: ${PUPPETEER_WOPI_FAILED:-0}"
-          echo "Puppeteer total failed: ${PUPPETEER_FAILED:-0}"
-          if [ "${PUPPETEER_FAILED:-0}" -gt 5 ]; then
-            echo "Too many puppeteer failures: ${PUPPETEER_FAILED} (threshold: 5)"
-            FAILED=1
+          if [ "${SERVICES_OK}" = "true" ]; then
+            SVC_ICON="✅"; SVC_LABEL="OK";     SVC_DETAIL="—"
           else
-            echo "Puppeteer tests OK: ${PUPPETEER_FAILED:-0} failures (threshold: 5)"
+            SVC_ICON="❌"; SVC_LABEL="FAILED"; SVC_DETAIL="unexpected services running"; FAILED=1
           fi
 
-          echo "=== DS log errors ==="
-          echo "DS log errors: ${DS_LOG_ERRORS:-0}"
-          if [ "${DS_LOG_ERRORS:-0}" -gt 0 ]; then
-            echo "DS log errors FAILED"
-            FAILED=1
+          PPTR_TOTAL="${PUPPETEER_FAILED:-0}"
+          PPT_DETAIL="API: ${PUPPETEER_API_FAILED:-0}, WOPI: ${PUPPETEER_WOPI_FAILED:-0}, Total: ${PPTR_TOTAL} (threshold: 5)"
+          if [ "$PPTR_TOTAL" -gt 5 ]; then
+            PPT_ICON="❌"; PPT_LABEL="FAILED"; FAILED=1
+          else
+            PPT_ICON="✅"; PPT_LABEL="OK"
           fi
+
+          DS_ERRORS="${DS_LOG_ERRORS:-0}"
+          DS_DETAIL="${DS_ERRORS} errors"
+          if [ "$DS_ERRORS" -gt 0 ]; then
+            DS_ICON="❌"; DS_LABEL="FAILED"; FAILED=1
+          else
+            DS_ICON="✅"; DS_LABEL="OK"
+          fi
+
+          # --- GITHUB_STEP_SUMMARY (markdown table) ---
+          {
+            echo "## Final Check — ${{ matrix.mq }}"
+            echo ""
+            echo "| Check | Result | Details |"
+            echo "|-------|--------|---------|"
+            echo "| Healthcheck   | ${HC_ICON} ${HC_LABEL}  | ${HC_DETAIL} |"
+            echo "| Version       | ${VER_ICON} ${VER_LABEL} | \`${EXPECTED}\` → \`${VERSION_ACTUAL:-not set}\` |"
+            echo "| DS Services   | ${SVC_ICON} ${SVC_LABEL} | ${SVC_DETAIL} |"
+            echo "| Puppeteer     | ${PPT_ICON} ${PPT_LABEL} | ${PPT_DETAIL} |"
+            echo "| DS Log Errors | ${DS_ICON} ${DS_LABEL}  | ${DS_DETAIL} |"
+            echo ""
+            if [ "$FAILED" -eq 1 ]; then
+              echo "> ❌ **Final check FAILED**"
+            else
+              echo "> ✅ **All checks passed**"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # --- Console log (ASCII table) ---
+          SEP="+----------------------+--------+--------------------------------------------+"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC_LABEL}"  "${HC_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER_LABEL}" "${VER_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Services"   "${SVC_LABEL}" "${SVC_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT_LABEL}" "${PPT_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" "${DS_LABEL}"  "${DS_DETAIL}"
+          echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
             exit 1
