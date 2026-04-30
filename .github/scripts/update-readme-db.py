@@ -55,12 +55,6 @@ def ds_errors_cell(data):
     return "✅ 0" if n == 0 else f"❌ {n}"
 
 
-def date_cell(data):
-    if data is None:
-        return "—"
-    return data.get('run_date', '—')
-
-
 BADGE = (
     "[![dev-DB-check]"
     "(https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main)]"
@@ -68,15 +62,15 @@ BADGE = (
 )
 
 rows = [
-    f"| {BADGE} | Healthcheck | Version | Puppeteer | DS Log Errors | Last run |",
-    "|-------|-------------|---------|-----------|---------------|----------|",
+    f"| {BADGE} | Healthcheck | Version | Puppeteer | DS Log Errors |",
+    "|-------|-------------|---------|-----------|---------------|",
 ]
 
 for label, key in DBS:
     d = load(f'.github/workflow-results/dev-db-{key}.json')
     rows.append(
         f"| {label} | {bool_cell(d, 'healthy')} | {version_cell(d)}"
-        f" | {puppeteer_cell(d)} | {ds_errors_cell(d)} | {date_cell(d)} |"
+        f" | {puppeteer_cell(d)} | {ds_errors_cell(d)} |"
     )
 
 table = "\n".join(rows)
