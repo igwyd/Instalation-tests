@@ -51,16 +51,16 @@ Pre-release builds from S3 dev repo.
 <!-- db-status-start -->
 | [![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml) | Healthcheck | Version | Puppeteer | DS Log Errors |
 |-------|-------------|---------|-----------|---------------|
-| MySQL         | — | — | — | — |
-| PostgreSQL    | — | — | — | — |
-| PostgreSQL 14 | — | — | — | — |
-| PostgreSQL 15 | — | — | — | — |
-| PostgreSQL 16 | — | — | — | — |
-| PostgreSQL 17 | — | — | — | — |
-| MSSQL         | — | — | — | — |
-| Oracle        | — | — | — | — |
-| Dameng        | — | — | — | — |
-| MariaDB       | — | — | — | — |
+| MySQL | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 1 |
+| PostgreSQL | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 2 |
+| PostgreSQL 14 | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ✅ 0 |
+| PostgreSQL 15 | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 3 |
+| PostgreSQL 16 | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 3 |
+| PostgreSQL 17 | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 1 |
+| MSSQL | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 1 |
+| Oracle | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 1 |
+| Dameng | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 1 |
+| MariaDB | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 1 |
 <!-- db-status-end -->
 
 * Tests with ActiveMQ-Classic and ActiveMQ-Artemis (Scheduled every Wednesday at 17:00 UTC+3)
@@ -68,8 +68,8 @@ Pre-release builds from S3 dev repo.
 <!-- activemq-status-start -->
 | [![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml) | Healthcheck | Version | Puppeteer | DS Log Errors |
 |-------|-------------|---------|-----------|---------------|
-| Artemis | — | — | — | — |
-| Classic | — | — | — | — |
+| Artemis | ❌ FAILED | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 4 errors |
+| Classic | ❌ FAILED | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 4 errors |
 <!-- activemq-status-end -->
 
 
