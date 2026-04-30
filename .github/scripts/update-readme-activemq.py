@@ -10,13 +10,6 @@ def load(path):
         return None
 
 
-def bool_cell(data, key):
-    if data is None:
-        return "—"
-    val = data.get(key, False)
-    return "✅ OK" if val else "❌ FAILED"
-
-
 def version_cell(data):
     if data is None:
         return "—"
@@ -42,13 +35,6 @@ def ds_errors_cell(data):
     return "✅ 0 errors" if n == 0 else f"❌ {n} errors"
 
 
-def result_cell(data):
-    if data is None:
-        return "—"
-    ok = data.get('conclusion') == 'success'
-    return "**✅ success**" if ok else "**❌ failure**"
-
-
 def date_cell(data):
     if data is None:
         return "—"
@@ -58,16 +44,19 @@ def date_cell(data):
 a = load('.github/workflow-results/dev-activemq-artemis.json')
 c = load('.github/workflow-results/dev-activemq-classic.json')
 
+BADGE = (
+    "[![dev-ActiveMQ]"
+    "(https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main)]"
+    "(https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml)"
+)
+
 table = "\n".join([
-    "| Check | Artemis | Classic |",
-    "|-------|---------|---------|",
-    f"| Healthcheck   | {bool_cell(a, 'healthy')}   | {bool_cell(c, 'healthy')} |",
-    f"| Version       | {version_cell(a)}            | {version_cell(c)} |",
-    f"| DS Services   | {bool_cell(a, 'services_ok')} | {bool_cell(c, 'services_ok')} |",
-    f"| Puppeteer     | {puppeteer_cell(a)}          | {puppeteer_cell(c)} |",
-    f"| DS Log Errors | {ds_errors_cell(a)}          | {ds_errors_cell(c)} |",
-    f"| **Result**    | {result_cell(a)}             | {result_cell(c)} |",
-    f"| Last run      | {date_cell(a)}               | {date_cell(c)} |",
+    f"| {BADGE} | Artemis | Classic |",
+    "|---------------------------------------|---------|---------|",
+    f"| Version       | {version_cell(a)}   | {version_cell(c)} |",
+    f"| Puppeteer     | {puppeteer_cell(a)} | {puppeteer_cell(c)} |",
+    f"| DS Log Errors | {ds_errors_cell(a)} | {ds_errors_cell(c)} |",
+    f"| Last run      | {date_cell(a)}      | {date_cell(c)} |",
 ])
 
 with open('README.md') as f:

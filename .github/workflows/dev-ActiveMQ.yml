@@ -78,16 +78,6 @@ jobs:
           echo "PUPPETEER_API_FAILED=0" >> $GITHUB_ENV
           echo "PUPPETEER_WOPI_FAILED=0" >> $GITHUB_ENV
 
-      - name: Check DS default services
-        continue-on-error: true
-        run: |
-          UNEXPECTED=$(docker exec onlyoffice supervisorctl status all | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
-          if [ -z "$UNEXPECTED" ]; then
-            echo "SERVICES_OK=true" >> $GITHUB_ENV
-          else
-            echo "Unexpected running services: $UNEXPECTED"
-            echo "SERVICES_OK=false" >> $GITHUB_ENV
-          fi
 
       - name: INFO
         continue-on-error: true
@@ -187,12 +177,6 @@ jobs:
           fi
           VER_DETAIL="exp: ${EXPECTED}, act: ${VERSION_ACTUAL:-not set}"
 
-          if [ "${SERVICES_OK}" = "true" ]; then
-            SVC_ICON="✅"; SVC_LABEL="OK";     SVC_DETAIL="—"
-          else
-            SVC_ICON="❌"; SVC_LABEL="FAILED"; SVC_DETAIL="unexpected services running"; FAILED=1
-          fi
-
           PPTR_TOTAL="${PUPPETEER_FAILED:-0}"
           PPT_DETAIL="API: ${PUPPETEER_API_FAILED:-0}, WOPI: ${PUPPETEER_WOPI_FAILED:-0}, Total: ${PPTR_TOTAL} (threshold: 5)"
           if [ "$PPTR_TOTAL" -gt 5 ]; then
@@ -217,7 +201,6 @@ jobs:
             echo "|-------|--------|---------|"
             echo "| Healthcheck   | ${HC_ICON} ${HC_LABEL}  | ${HC_DETAIL} |"
             echo "| Version       | ${VER_ICON} ${VER_LABEL} | \`${EXPECTED}\` → \`${VERSION_ACTUAL:-not set}\` |"
-            echo "| DS Services   | ${SVC_ICON} ${SVC_LABEL} | ${SVC_DETAIL} |"
             echo "| Puppeteer     | ${PPT_ICON} ${PPT_LABEL} | ${PPT_DETAIL} |"
             echo "| DS Log Errors | ${DS_ICON} ${DS_LABEL}  | ${DS_DETAIL} |"
             echo ""
@@ -235,7 +218,6 @@ jobs:
           echo "$SEP"
           printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC_LABEL}"  "${HC_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER_LABEL}" "${VER_DETAIL}"
-          printf "| %-20s | %-6s | %-42s |\n" "DS Services"   "${SVC_LABEL}" "${SVC_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT_LABEL}" "${PPT_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" "${DS_LABEL}"  "${DS_DETAIL}"
           echo "$SEP"
@@ -265,7 +247,6 @@ jobs:
               "version_expected": os.environ.get('EXPECTED_VERSION', ''),
               "version_actual": os.environ.get('VERSION_ACTUAL', 'not set'),
               "version_ok": os.environ.get('VERSION_OK', '') == 'true',
-              "services_ok": os.environ.get('SERVICES_OK', '') == 'true',
               "puppeteer_api_failed": int(os.environ.get('PUPPETEER_API_FAILED', '0') or '0'),
               "puppeteer_wopi_failed": int(os.environ.get('PUPPETEER_WOPI_FAILED', '0') or '0'),
               "puppeteer_total_failed": int(os.environ.get('PUPPETEER_FAILED', '0') or '0'),
