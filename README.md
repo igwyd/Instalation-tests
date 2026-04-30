@@ -54,9 +54,14 @@ Pre-release builds from S3 dev repo.
 
 * Tests with ActiveMQ-Classic and ActiveMQ-Artemis (Scheduled every Wednesday at 17:00 UTC+3)
 
-| Test | Status |
-|------|--------|
-| dev-ActiveMQ Classic and Artemis | ![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main) |
+<!-- activemq-status-start -->
+| [![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml) | Artemis | Classic |
+|---------------------------------------|---------|---------|
+| Version       | — | — |
+| Puppeteer     | — | — |
+| DS Log Errors | — | — |
+| Last run      | — | — |
+<!-- activemq-status-end -->
 
 
 ## Release
