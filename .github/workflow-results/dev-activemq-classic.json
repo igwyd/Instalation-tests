@@ -1,5 +1,5 @@
 {
-  "run_date": "2026-04-30 09:33 UTC",
+  "run_date": "2026-04-30 10:24 UTC",
   "healthy": false,
   "version_expected": "9.4.0-76",
   "version_actual": "9.4.0-76",
@@ -7,6 +7,6 @@
   "puppeteer_api_failed": 0,
   "puppeteer_wopi_failed": 0,
   "puppeteer_total_failed": 0,
-  "ds_log_errors": 1,
+  "ds_log_errors": 2,
   "conclusion": "failure"
 }
