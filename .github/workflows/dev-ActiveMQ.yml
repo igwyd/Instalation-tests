@@ -5,6 +5,9 @@ on:
     - cron: '0 14 * * 3'  # Wednesday 17:00 Moscow time (UTC+3)
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-24.04
@@ -238,5 +241,54 @@ jobs:
           echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
+            echo "FINAL_CONCLUSION=failure" >> "$GITHUB_ENV"
             exit 1
+          else
+            echo "FINAL_CONCLUSION=success" >> "$GITHUB_ENV"
+          fi
+
+      - name: Save results
+        if: always()
+        continue-on-error: true
+        env:
+          MQ_NAME: ${{ matrix.mq }}
+          EXPECTED_VERSION: ${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}
+        run: |
+          mkdir -p .github/workflow-results
+          python3 - << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+
+          data = {
+              "run_date": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              "healthy": os.environ.get('HEALTHY', '') == 'true',
+              "version_expected": os.environ.get('EXPECTED_VERSION', ''),
+              "version_actual": os.environ.get('VERSION_ACTUAL', 'not set'),
+              "version_ok": os.environ.get('VERSION_OK', '') == 'true',
+              "services_ok": os.environ.get('SERVICES_OK', '') == 'true',
+              "puppeteer_api_failed": int(os.environ.get('PUPPETEER_API_FAILED', '0') or '0'),
+              "puppeteer_wopi_failed": int(os.environ.get('PUPPETEER_WOPI_FAILED', '0') or '0'),
+              "puppeteer_total_failed": int(os.environ.get('PUPPETEER_FAILED', '0') or '0'),
+              "ds_log_errors": int(os.environ.get('DS_LOG_ERRORS', '0') or '0'),
+              "conclusion": os.environ.get('FINAL_CONCLUSION', 'failure'),
+          }
+          mq = os.environ.get('MQ_NAME', 'unknown')
+          path = f'.github/workflow-results/dev-activemq-{mq}.json'
+          with open(path, 'w') as f:
+              json.dump(data, f, indent=2)
+          print(f"Saved: {path}")
+          PYEOF
+
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add .github/workflow-results/dev-activemq-${{ matrix.mq }}.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "[dev ActiveMQ x64] Save ${{ matrix.mq }} results"
+            for i in 1 2 3; do
+              git pull --rebase origin ${{ github.ref_name }} && git push origin HEAD && break
+              echo "Attempt $i failed, retrying..."
+              sleep $((5 + RANDOM % 10))
+            done
           fi

@@ -58,6 +58,18 @@ Pre-release builds from S3 dev repo.
 |------|--------|
 | dev-ActiveMQ Classic and Artemis | ![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main) |
 
+<!-- activemq-status-start -->
+| Check | Artemis | Classic |
+|-------|---------|---------|
+| Healthcheck   | — | — |
+| Version       | — | — |
+| DS Services   | — | — |
+| Puppeteer     | — | — |
+| DS Log Errors | — | — |
+| **Result**    | — | — |
+| Last run      | — | — |
+<!-- activemq-status-end -->
+
 
 ## Release
 
