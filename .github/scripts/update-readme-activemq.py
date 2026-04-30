@@ -58,13 +58,10 @@ BADGE = (
 )
 
 table = "\n".join([
-    f"| {BADGE} | Artemis | Classic |",
-    "|---------------------------------------|---------|---------|",
-    f"| Healthcheck   | {bool_cell(a, 'healthy')} | {bool_cell(c, 'healthy')} |",
-    f"| Version       | {version_cell(a)}   | {version_cell(c)} |",
-    f"| Puppeteer     | {puppeteer_cell(a)} | {puppeteer_cell(c)} |",
-    f"| DS Log Errors | {ds_errors_cell(a)} | {ds_errors_cell(c)} |",
-    f"| Last run      | {date_cell(a)}      | {date_cell(c)} |",
+    f"| {BADGE} | Healthcheck | Version | Puppeteer | DS Log Errors | Last run |",
+    "|-------|-------------|---------|-----------|---------------|----------|",
+    f"| Artemis | {bool_cell(a, 'healthy')} | {version_cell(a)} | {puppeteer_cell(a)} | {ds_errors_cell(a)} | {date_cell(a)} |",
+    f"| Classic | {bool_cell(c, 'healthy')} | {version_cell(c)} | {puppeteer_cell(c)} | {ds_errors_cell(c)} | {date_cell(c)} |",
 ])
 
 with open('README.md') as f:
