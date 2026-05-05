@@ -1,8 +1,41 @@
 {
-  "run_date": null,
-  "ee":         null,
-  "de":         null,
-  "ce":         null,
-  "ee_upgrade": null,
-  "conclusion": null
+  "run_date": "2026-05-05 14:36 UTC",
+  "ee": {
+    "healthy": true,
+    "version_ok": true,
+    "version_actual": "9.4.0-76",
+    "services_ok": true,
+    "puppeteer_failed": 2,
+    "ds_log_errors": 5,
+    "conclusion": "failure"
+  },
+  "de": {
+    "healthy": true,
+    "version_ok": true,
+    "version_actual": "9.4.0-76",
+    "services_ok": true,
+    "puppeteer_failed": 2,
+    "ds_log_errors": 2,
+    "conclusion": "failure"
+  },
+  "ce": {
+    "healthy": true,
+    "version_ok": true,
+    "version_actual": "9.4.0-76",
+    "services_ok": true,
+    "puppeteer_failed": 2,
+    "ds_log_errors": 4,
+    "conclusion": "failure"
+  },
+  "ee_upgrade": {
+    "healthy_release": true,
+    "healthy_upgrade": true,
+    "version_ok": true,
+    "version_actual": "9.4.0-76",
+    "jwt_match": true,
+    "puppeteer_failed": 2,
+    "ds_log_errors": 2,
+    "conclusion": "failure"
+  },
+  "conclusion": "failure"
 }
