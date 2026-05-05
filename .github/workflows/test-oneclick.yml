@@ -12,21 +12,39 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os_name: Ubuntu 24.04
+          - os_name: Ubuntu 24.04 x64
             os_type: deb
             ssh_user: ubuntu
             ami: ami-0b6c6ebed2801a5cb
             instance_type: t2.medium
             tag: test-ubuntu2404-x64
-            installationtype: enterprise
-            package_name: onlyoffice-documentserver-ee
+            installationtype: community
+            package_name: onlyoffice-documentserver
 
-          - os_name: CentOS 9
+          - os_name: Ubuntu 24.04 arm64
+            os_type: deb
+            ssh_user: ubuntu
+            ami: ami-0a7a4e87939439934
+            instance_type: t4g.medium
+            tag: test-ubuntu2404-arm64
+            installationtype: community
+            package_name: onlyoffice-documentserver
+
+          - os_name: CentOS 9 x64
             os_type: rpm
             ssh_user: ec2-user
             ami: ami-04331ec57720ee626
             instance_type: t2.medium
             tag: test-centos9-x64
+            installationtype: developer
+            package_name: onlyoffice-documentserver-de
+
+          - os_name: CentOS 9 arm64
+            os_type: rpm
+            ssh_user: ec2-user
+            ami: ami-058dc7e5ef5f28287
+            instance_type: t4g.medium
+            tag: test-centos9-arm64
             installationtype: developer
             package_name: onlyoffice-documentserver-de
 
@@ -184,10 +202,10 @@ jobs:
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py ../tests/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
-          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
           python3 run.py ../tests/desktop/presentation/smoke/smoke_test_presentation.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
           python3 run.py ../tests/desktop/pdf/smoke/check_draw_after_delete_page.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
           python3 run.py ../tests/desktop/pdf-form/smoke/checkbox_with_one_key.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
       - name: Puppeteer WOPI tests Docker install
         continue-on-error: true
@@ -197,10 +215,10 @@ jobs:
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py ../tests/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
-          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
           python3 run.py ../tests/desktop/presentation/smoke/smoke_test_presentation.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
           python3 run.py ../tests/desktop/pdf/smoke/check_draw_after_delete_page.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
           python3 run.py ../tests/desktop/pdf-form/smoke/checkbox_with_one_key.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
       - name: Parse puppeteer results Docker
         if: always()
