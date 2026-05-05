@@ -5,6 +5,9 @@ on:
     - cron: '0 11 * * 3'  # Wednesday 14:00 Mosсow time (UTC+3)
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   test-install-RPM:
     runs-on: ubuntu-24.04
@@ -67,6 +70,34 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
+
+      - name: Initialize check defaults
+        run: |
+          echo "HEALTHCHECK_EE=false"          >> $GITHUB_ENV
+          echo "HEALTHCHECK_DE=false"          >> $GITHUB_ENV
+          echo "HEALTHCHECK_CE=false"          >> $GITHUB_ENV
+          echo "HEALTHCHECK_EE_RELEASE=false"  >> $GITHUB_ENV
+          echo "HEALTHCHECK_EE_UPGRADE=false"  >> $GITHUB_ENV
+          echo "VERSION_EE_OK=false"           >> $GITHUB_ENV
+          echo "VERSION_DE_OK=false"           >> $GITHUB_ENV
+          echo "VERSION_CE_OK=false"           >> $GITHUB_ENV
+          echo "VERSION_EE_UPGRADE_OK=false"   >> $GITHUB_ENV
+          echo "VERSION_EE_ACTUAL=not set"     >> $GITHUB_ENV
+          echo "VERSION_DE_ACTUAL=not set"     >> $GITHUB_ENV
+          echo "VERSION_CE_ACTUAL=not set"     >> $GITHUB_ENV
+          echo "VERSION_EE_UPGRADE_ACTUAL=not set" >> $GITHUB_ENV
+          echo "SERVICES_EE_OK=false"          >> $GITHUB_ENV
+          echo "SERVICES_DE_OK=false"          >> $GITHUB_ENV
+          echo "SERVICES_CE_OK=false"          >> $GITHUB_ENV
+          echo "JWT_MATCH=false"               >> $GITHUB_ENV
+          echo "PUPPETEER_EE_FAILED=0"         >> $GITHUB_ENV
+          echo "PUPPETEER_DE_FAILED=0"         >> $GITHUB_ENV
+          echo "PUPPETEER_CE_FAILED=0"         >> $GITHUB_ENV
+          echo "PUPPETEER_EE_UPGRADE_FAILED=0" >> $GITHUB_ENV
+          echo "DS_LOG_ERRORS_EE=0"            >> $GITHUB_ENV
+          echo "DS_LOG_ERRORS_DE=0"            >> $GITHUB_ENV
+          echo "DS_LOG_ERRORS_CE=0"            >> $GITHUB_ENV
+          echo "DS_LOG_ERRORS_EE_UPGRADE=0"    >> $GITHUB_ENV
 
       - name: Upgrade RPM packages
         run: |
@@ -645,72 +676,248 @@ jobs:
         if: always()
         run: |
           FAILED=0
-
-          echo "=== Healthcheck results ==="
-          for VAR in HEALTHCHECK_EE HEALTHCHECK_DE HEALTHCHECK_CE HEALTHCHECK_EE_RELEASE HEALTHCHECK_EE_UPGRADE; do
-            VAL="${!VAR}"
-            echo "$VAR: ${VAL:-not set}"
-            if [ "${VAL}" != "true" ]; then
-              echo "$VAR FAILED"
-              FAILED=1
-            fi
-          done
-
-          echo "=== Version check results ==="
           EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
-          echo "Expected version: $EXPECTED"
-          for VAR in VERSION_EE_OK VERSION_DE_OK VERSION_CE_OK VERSION_EE_UPGRADE_OK; do
-            VAL="${!VAR}"
-            ACTUAL_VAR="${VAR/_OK/_ACTUAL}"
-            ACTUAL="${!ACTUAL_VAR}"
-            echo "$VAR: ${VAL:-not set} (actual: ${ACTUAL:-not set})"
-            if [ "${VAL}" != "true" ]; then
-              echo "$VAR FAILED"
-              FAILED=1
-            fi
-          done
 
-          echo "=== JWT check ==="
-          echo "JWT_MATCH: ${JWT_MATCH:-not set}"
-          if [ "${JWT_MATCH}" != "true" ]; then
-            echo "JWT check FAILED — JWT settings changed after upgrade"
-            FAILED=1
+          # ── EE ──────────────────────────────────────────────────────────
+          if [ "${HEALTHCHECK_EE}" = "true" ]; then
+            EE_HC_ICON="✅"; EE_HC_LABEL="OK"
+          else
+            EE_HC_ICON="❌"; EE_HC_LABEL="FAILED"; FAILED=1
+          fi
+          if [ "${VERSION_EE_OK}" = "true" ]; then
+            EE_VER_ICON="✅"; EE_VER_LABEL="OK"
+          else
+            EE_VER_ICON="❌"; EE_VER_LABEL="FAILED"; FAILED=1
+          fi
+          if [ "${SERVICES_EE_OK}" = "true" ]; then
+            EE_SVC_ICON="✅"; EE_SVC_LABEL="OK"
+          else
+            EE_SVC_ICON="❌"; EE_SVC_LABEL="FAILED"; FAILED=1
+          fi
+          EE_P="${PUPPETEER_EE_FAILED:-0}"
+          if [ "${EE_P}" -gt 5 ]; then
+            EE_PPT_ICON="❌"; EE_PPT_LABEL="FAILED"; FAILED=1
+          else
+            EE_PPT_ICON="✅"; EE_PPT_LABEL="OK"
+          fi
+          EE_D="${DS_LOG_ERRORS_EE:-0}"
+          if [ "${EE_D}" -gt 0 ]; then
+            EE_DS_ICON="❌"; EE_DS_LABEL="FAILED"; FAILED=1
+          else
+            EE_DS_ICON="✅"; EE_DS_LABEL="OK"
           fi
 
-          echo "=== DS services check ==="
-          for VAR in SERVICES_EE_OK SERVICES_DE_OK SERVICES_CE_OK; do
-            VAL="${!VAR}"
-            echo "$VAR: ${VAL:-not set}"
-            if [ "${VAL}" != "true" ]; then
-              echo "$VAR FAILED — unexpected services enabled after install"
-              FAILED=1
-            fi
-          done
+          # ── DE ──────────────────────────────────────────────────────────
+          if [ "${HEALTHCHECK_DE}" = "true" ]; then
+            DE_HC_ICON="✅"; DE_HC_LABEL="OK"
+          else
+            DE_HC_ICON="❌"; DE_HC_LABEL="FAILED"; FAILED=1
+          fi
+          if [ "${VERSION_DE_OK}" = "true" ]; then
+            DE_VER_ICON="✅"; DE_VER_LABEL="OK"
+          else
+            DE_VER_ICON="❌"; DE_VER_LABEL="FAILED"; FAILED=1
+          fi
+          if [ "${SERVICES_DE_OK}" = "true" ]; then
+            DE_SVC_ICON="✅"; DE_SVC_LABEL="OK"
+          else
+            DE_SVC_ICON="❌"; DE_SVC_LABEL="FAILED"; FAILED=1
+          fi
+          DE_P="${PUPPETEER_DE_FAILED:-0}"
+          if [ "${DE_P}" -gt 5 ]; then
+            DE_PPT_ICON="❌"; DE_PPT_LABEL="FAILED"; FAILED=1
+          else
+            DE_PPT_ICON="✅"; DE_PPT_LABEL="OK"
+          fi
+          DE_D="${DS_LOG_ERRORS_DE:-0}"
+          if [ "${DE_D}" -gt 0 ]; then
+            DE_DS_ICON="❌"; DE_DS_LABEL="FAILED"; FAILED=1
+          else
+            DE_DS_ICON="✅"; DE_DS_LABEL="OK"
+          fi
 
-          echo "=== Puppeteer results ==="
-          for VAR in PUPPETEER_EE_FAILED PUPPETEER_DE_FAILED PUPPETEER_CE_FAILED PUPPETEER_EE_UPGRADE_FAILED; do
-            VAL="${!VAR}"
-            echo "$VAR: ${VAL:-0}"
-            if [ "${VAL:-0}" -gt 5 ]; then
-              echo "$VAR FAILED (threshold: 5)"
-              FAILED=1
+          # ── CE ──────────────────────────────────────────────────────────
+          if [ "${HEALTHCHECK_CE}" = "true" ]; then
+            CE_HC_ICON="✅"; CE_HC_LABEL="OK"
+          else
+            CE_HC_ICON="❌"; CE_HC_LABEL="FAILED"; FAILED=1
+          fi
+          if [ "${VERSION_CE_OK}" = "true" ]; then
+            CE_VER_ICON="✅"; CE_VER_LABEL="OK"
+          else
+            CE_VER_ICON="❌"; CE_VER_LABEL="FAILED"; FAILED=1
+          fi
+          if [ "${SERVICES_CE_OK}" = "true" ]; then
+            CE_SVC_ICON="✅"; CE_SVC_LABEL="OK"
+          else
+            CE_SVC_ICON="❌"; CE_SVC_LABEL="FAILED"; FAILED=1
+          fi
+          CE_P="${PUPPETEER_CE_FAILED:-0}"
+          if [ "${CE_P}" -gt 5 ]; then
+            CE_PPT_ICON="❌"; CE_PPT_LABEL="FAILED"; FAILED=1
+          else
+            CE_PPT_ICON="✅"; CE_PPT_LABEL="OK"
+          fi
+          CE_D="${DS_LOG_ERRORS_CE:-0}"
+          if [ "${CE_D}" -gt 0 ]; then
+            CE_DS_ICON="❌"; CE_DS_LABEL="FAILED"; FAILED=1
+          else
+            CE_DS_ICON="✅"; CE_DS_LABEL="OK"
+          fi
+
+          # ── EE Release HC ────────────────────────────────────────────────
+          if [ "${HEALTHCHECK_EE_RELEASE}" = "true" ]; then
+            RH_HC_ICON="✅"; RH_HC_LABEL="OK"
+          else
+            RH_HC_ICON="❌"; RH_HC_LABEL="FAILED"; FAILED=1
+          fi
+
+          # ── EE Upgrade ───────────────────────────────────────────────────
+          if [ "${HEALTHCHECK_EE_UPGRADE}" = "true" ]; then
+            UG_HC_ICON="✅"; UG_HC_LABEL="OK"
+          else
+            UG_HC_ICON="❌"; UG_HC_LABEL="FAILED"; FAILED=1
+          fi
+          if [ "${VERSION_EE_UPGRADE_OK}" = "true" ]; then
+            UG_VER_ICON="✅"; UG_VER_LABEL="OK"
+          else
+            UG_VER_ICON="❌"; UG_VER_LABEL="FAILED"; FAILED=1
+          fi
+          if [ "${JWT_MATCH}" = "true" ]; then
+            JWT_ICON="✅"; JWT_LABEL="OK"
+          else
+            JWT_ICON="❌"; JWT_LABEL="FAILED"; FAILED=1
+          fi
+          UG_P="${PUPPETEER_EE_UPGRADE_FAILED:-0}"
+          if [ "${UG_P}" -gt 5 ]; then
+            UG_PPT_ICON="❌"; UG_PPT_LABEL="FAILED"; FAILED=1
+          else
+            UG_PPT_ICON="✅"; UG_PPT_LABEL="OK"
+          fi
+          UG_D="${DS_LOG_ERRORS_EE_UPGRADE:-0}"
+          if [ "${UG_D}" -gt 0 ]; then
+            UG_DS_ICON="❌"; UG_DS_LABEL="FAILED"; FAILED=1
+          else
+            UG_DS_ICON="✅"; UG_DS_LABEL="OK"
+          fi
+
+          # ── GITHUB_STEP_SUMMARY ──────────────────────────────────────────
+          {
+            echo "## Final Check — ${{ matrix.arch }}"
+            echo ""
+            echo "**Expected version:** \`${EXPECTED}\`"
+            echo ""
+            echo "| Edition | Healthcheck | Version | Services | Puppeteer (≤5) | DS Log Errors |"
+            echo "|---------|-------------|---------|----------|----------------|---------------|"
+            echo "| EE         | ${EE_HC_ICON} ${EE_HC_LABEL}  | ${EE_VER_ICON} \`${VERSION_EE_ACTUAL:-?}\`            | ${EE_SVC_ICON} ${EE_SVC_LABEL}  | ${EE_PPT_ICON} ${EE_PPT_LABEL} (${EE_P})  | ${EE_DS_ICON} ${EE_DS_LABEL} (${EE_D})  |"
+            echo "| DE         | ${DE_HC_ICON} ${DE_HC_LABEL}  | ${DE_VER_ICON} \`${VERSION_DE_ACTUAL:-?}\`            | ${DE_SVC_ICON} ${DE_SVC_LABEL}  | ${DE_PPT_ICON} ${DE_PPT_LABEL} (${DE_P})  | ${DE_DS_ICON} ${DE_DS_LABEL} (${DE_D})  |"
+            echo "| CE         | ${CE_HC_ICON} ${CE_HC_LABEL}  | ${CE_VER_ICON} \`${VERSION_CE_ACTUAL:-?}\`            | ${CE_SVC_ICON} ${CE_SVC_LABEL}  | ${CE_PPT_ICON} ${CE_PPT_LABEL} (${CE_P})  | ${CE_DS_ICON} ${CE_DS_LABEL} (${CE_D})  |"
+            echo "| EE Release | ${RH_HC_ICON} ${RH_HC_LABEL}  | —                                          | —                   | —                         | —                       |"
+            echo "| EE Upgrade | ${UG_HC_ICON} ${UG_HC_LABEL}  | ${UG_VER_ICON} \`${VERSION_EE_UPGRADE_ACTUAL:-?}\` | JWT: ${JWT_ICON} ${JWT_LABEL}  | ${UG_PPT_ICON} ${UG_PPT_LABEL} (${UG_P}) | ${UG_DS_ICON} ${UG_DS_LABEL} (${UG_D}) |"
+            echo ""
+            if [ "$FAILED" -eq 1 ]; then
+              echo "> ❌ **Final check FAILED**"
             else
-              echo "$VAR OK (${VAL:-0} failures, threshold: 5)"
+              echo "> ✅ **All checks passed**"
             fi
-          done
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "=== DS log errors ==="
-          for VAR in DS_LOG_ERRORS_EE DS_LOG_ERRORS_DE DS_LOG_ERRORS_CE DS_LOG_ERRORS_EE_UPGRADE; do
-            VAL="${!VAR}"
-            echo "$VAR: ${VAL:-0}"
-            if [ "${VAL:-0}" -gt 0 ]; then
-              echo "$VAR FAILED"
-              FAILED=1
-            fi
-          done
+          # ── Console (ASCII table) ────────────────────────────────────────
+          SEP="+---------------+--------+---------+--------+----------+-----------+"
+          echo "$SEP"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "Edition" "HC" "Version" "Svc/JWT" "Puppeteer" "DS Errors"
+          echo "$SEP"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "EE"          "${EE_HC_LABEL}"  "${EE_VER_LABEL}"  "${EE_SVC_LABEL}"  "${EE_PPT_LABEL}(${EE_P})"  "${EE_DS_LABEL}(${EE_D})"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "DE"          "${DE_HC_LABEL}"  "${DE_VER_LABEL}"  "${DE_SVC_LABEL}"  "${DE_PPT_LABEL}(${DE_P})"  "${DE_DS_LABEL}(${DE_D})"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "CE"          "${CE_HC_LABEL}"  "${CE_VER_LABEL}"  "${CE_SVC_LABEL}"  "${CE_PPT_LABEL}(${CE_P})"  "${CE_DS_LABEL}(${CE_D})"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "EE Release"  "${RH_HC_LABEL}"  "—"                "—"                "—"                         "—"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "EE Upgrade"  "${UG_HC_LABEL}"  "${UG_VER_LABEL}"  "${JWT_LABEL}"     "${UG_PPT_LABEL}(${UG_P})"  "${UG_DS_LABEL}(${UG_D})"
+          echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
+            echo "FINAL_CONCLUSION=failure" >> "$GITHUB_ENV"
             exit 1
+          else
+            echo "FINAL_CONCLUSION=success" >> "$GITHUB_ENV"
+          fi
+
+      - name: Save results
+        if: always()
+        continue-on-error: true
+        env:
+          ARCH: ${{ matrix.arch }}
+          EXPECTED_VERSION: ${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}
+        run: |
+          mkdir -p .github/workflow-results
+          python3 - << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+
+          def b(v):   return os.environ.get(v, 'false') == 'true'
+          def n(v):   return int(os.environ.get(v, '0') or '0')
+          def s(v):   return os.environ.get(v, 'not set')
+          def ok5(v): return n(v) <= 5
+
+          arch = s('ARCH')
+          data = {
+              'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              'ee': {
+                  'healthy':          b('HEALTHCHECK_EE'),
+                  'version_ok':       b('VERSION_EE_OK'),
+                  'version_actual':   s('VERSION_EE_ACTUAL'),
+                  'services_ok':      b('SERVICES_EE_OK'),
+                  'puppeteer_failed': n('PUPPETEER_EE_FAILED'),
+                  'ds_log_errors':    n('DS_LOG_ERRORS_EE'),
+                  'conclusion': 'success' if (b('HEALTHCHECK_EE') and b('VERSION_EE_OK') and b('SERVICES_EE_OK') and ok5('PUPPETEER_EE_FAILED') and n('DS_LOG_ERRORS_EE') == 0) else 'failure',
+              },
+              'de': {
+                  'healthy':          b('HEALTHCHECK_DE'),
+                  'version_ok':       b('VERSION_DE_OK'),
+                  'version_actual':   s('VERSION_DE_ACTUAL'),
+                  'services_ok':      b('SERVICES_DE_OK'),
+                  'puppeteer_failed': n('PUPPETEER_DE_FAILED'),
+                  'ds_log_errors':    n('DS_LOG_ERRORS_DE'),
+                  'conclusion': 'success' if (b('HEALTHCHECK_DE') and b('VERSION_DE_OK') and b('SERVICES_DE_OK') and ok5('PUPPETEER_DE_FAILED') and n('DS_LOG_ERRORS_DE') == 0) else 'failure',
+              },
+              'ce': {
+                  'healthy':          b('HEALTHCHECK_CE'),
+                  'version_ok':       b('VERSION_CE_OK'),
+                  'version_actual':   s('VERSION_CE_ACTUAL'),
+                  'services_ok':      b('SERVICES_CE_OK'),
+                  'puppeteer_failed': n('PUPPETEER_CE_FAILED'),
+                  'ds_log_errors':    n('DS_LOG_ERRORS_CE'),
+                  'conclusion': 'success' if (b('HEALTHCHECK_CE') and b('VERSION_CE_OK') and b('SERVICES_CE_OK') and ok5('PUPPETEER_CE_FAILED') and n('DS_LOG_ERRORS_CE') == 0) else 'failure',
+              },
+              'ee_upgrade': {
+                  'healthy_release':  b('HEALTHCHECK_EE_RELEASE'),
+                  'healthy_upgrade':  b('HEALTHCHECK_EE_UPGRADE'),
+                  'version_ok':       b('VERSION_EE_UPGRADE_OK'),
+                  'version_actual':   s('VERSION_EE_UPGRADE_ACTUAL'),
+                  'jwt_match':        b('JWT_MATCH'),
+                  'puppeteer_failed': n('PUPPETEER_EE_UPGRADE_FAILED'),
+                  'ds_log_errors':    n('DS_LOG_ERRORS_EE_UPGRADE'),
+                  'conclusion': 'success' if (b('HEALTHCHECK_EE_RELEASE') and b('HEALTHCHECK_EE_UPGRADE') and b('VERSION_EE_UPGRADE_OK') and b('JWT_MATCH') and ok5('PUPPETEER_EE_UPGRADE_FAILED') and n('DS_LOG_ERRORS_EE_UPGRADE') == 0) else 'failure',
+              },
+              'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
+          }
+          path = f'.github/workflow-results/dev-rpm-{arch}.json'
+          with open(path, 'w') as f:
+              json.dump(data, f, indent=2)
+          print(f'Saved: {path}')
+          PYEOF
+
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add .github/workflow-results/dev-rpm-${{ matrix.arch }}.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "[dev RPM x64-arm64] Save ${{ matrix.arch }} results"
+            for i in 1 2 3; do
+              git pull --rebase origin ${{ github.ref_name }} && git push origin HEAD && break
+              echo "Attempt $i failed, retrying..."
+              sleep $((5 + RANDOM % 10))
+            done
           fi
 
       - name: Delete EC2 Instance
