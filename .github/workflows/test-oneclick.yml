@@ -1,0 +1,354 @@
+name: test oneclick --wopienabled
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    name: ${{ matrix.os_name }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os_name: Ubuntu 24.04
+            os_type: deb
+            ssh_user: ubuntu
+            ami: ami-0b6c6ebed2801a5cb
+            instance_type: t2.medium
+            tag: test-ubuntu2404-x64
+            installationtype: enterprise
+            package_name: onlyoffice-documentserver-ee
+
+          - os_name: CentOS 9
+            os_type: rpm
+            ssh_user: ec2-user
+            ami: ami-04331ec57720ee626
+            instance_type: t2.medium
+            tag: test-centos9-x64
+            installationtype: developer
+            package_name: onlyoffice-documentserver-de
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Puppeteer
+        uses: ./.github/actions/setup-puppeteer
+        with:
+          git_ssh_private_key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
+
+      - name: Initialize check defaults
+        run: |
+          echo "DOCKER_HEALTHY=false" >> $GITHUB_ENV
+          echo "NATIVE_HEALTHY=false" >> $GITHUB_ENV
+          echo "PUPPETEER_TOTAL_FAILED=0" >> $GITHUB_ENV
+
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-east-1
+
+      - name: Create EC2 Instance
+        run: |
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id ${{ matrix.ami }} \
+            --instance-type ${{ matrix.instance_type }} \
+            --key-name demin \
+            --security-groups AllPortsOpened \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_${{ matrix.tag }}}]' \
+            --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":50,"VolumeType":"gp3"}}]' \
+            --query "Instances[0].InstanceId" --output text)
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+          echo "Waiting for instance to start..."
+          aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+
+      - name: Get EC2 Public IP
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ env.INSTANCE_ID }} \
+            --query "Reservations[].Instances[].PublicIpAddress" --output text)
+          echo "EC2 Public IP: $IP"
+          echo "EC2_IP=$IP" >> $GITHUB_ENV
+
+      - name: Wait for SSH to be Ready
+        run: sleep 120
+
+      - name: Add SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Upgrade packages
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
+          if command -v apt-get &>/dev/null; then
+            sudo apt-get update && sudo apt-get upgrade -y
+          else
+            sudo dnf -y clean all && sudo dnf -y update
+          fi
+          EOF
+
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Wait for instance to reboot after upgrade
+        run: sleep 180
+
+      - name: Clone OneClickInstall-Docs
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'git clone --branch release/v9.4.0 --depth 1 https://github.com/ONLYOFFICE/OneClickInstall-Docs'
+
+      # ==================== Docker install (printf "y") ====================
+      - name: Install ONLYOFFICE Docs in Docker
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
+          cd OneClickInstall-Docs
+          printf "y\n" | sudo bash docs-install.sh -ls true --wopienabled true --installationtype ${{ matrix.installationtype }}
+          EOF
+
+      - name: Wait for DS Docker startup
+        run: sleep 300
+
+      - name: Info Docker install
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
+          echo "-------------healthcheck-------------"
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec \$(sudo docker ps -q --filter "name=onlyoffice") supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec \$(sudo docker ps -q --filter "name=onlyoffice") bash -c "dpkg -l | grep onlyoffice" || true
+          echo "--------packageType--------"
+          sudo docker exec \$(sudo docker ps -q --filter "name=onlyoffice") curl -s http://127.0.0.1/info/info.json | grep -i -e buildVersion -e buildNumber -e packageType || true
+          echo "-------------WOPI--------------"
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: Check healthcheck Docker install
+        continue-on-error: true
+        run: |
+          RESULT=$(curl -s http://${{ env.EC2_IP }}/healthcheck)
+          echo "Healthcheck Docker: $RESULT"
+          if [ "$RESULT" = "true" ]; then
+            echo "DOCKER_HEALTHY=true" >> $GITHUB_ENV
+          else
+            echo "DOCKER_HEALTHY=false" >> $GITHUB_ENV
+          fi
+
+      - name: Check version Docker install
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") dpkg-query -W ${{ matrix.package_name }}' \
+            | awk '{print $2}')
+          echo "Version Docker: ${VERSION:-not detected}"
+          echo "DOCKER_VERSION=${VERSION:-not detected}" >> $GITHUB_ENV
+
+      - name: Start ds-example Docker install
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") supervisorctl start ds:example'
+
+      - name: Wait for ds-example to start
+        run: sleep 10
+
+      - name: Clear puppeteer output before Docker tests
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: Puppeteer API tests Docker install
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
+          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/smoke/smoke_test_presentation.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/check_draw_after_delete_page.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/smoke/checkbox_with_one_key.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: Puppeteer WOPI tests Docker install
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/smoke/smoke_test_presentation.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/check_draw_after_delete_page.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/smoke/checkbox_with_one_key.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Parse puppeteer results Docker
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition DOCKER
+
+      - name: Remove Docker containers
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
+          sudo docker rm -f $(sudo docker ps -aq) 2>/dev/null || true
+          sudo docker system prune -af 2>/dev/null || true
+          EOF
+
+      # ==================== Native install (printf "n") ====================
+      - name: Install ONLYOFFICE Docs natively
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
+          cd OneClickInstall-Docs
+          printf "n\n" | sudo bash docs-install.sh -ls true --wopienabled true --installationtype ${{ matrix.installationtype }}
+          EOF
+
+      - name: Wait for native install to start
+        run: sleep 30
+
+      - name: Info Native install
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
+          echo "-------------healthcheck-------------"
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo systemctl list-unit-files --type=service 2>/dev/null | grep ds- || true
+          echo "---------Installed packages----------"
+          if command -v dpkg-query &>/dev/null; then
+            dpkg-query -l | grep onlyoffice || true
+          else
+            rpm -qa | grep onlyoffice || true
+          fi
+          echo "--------packageType--------"
+          curl -s http://127.0.0.1:8000/info/info.json 2>/dev/null | grep -i -e buildVersion -e buildNumber -e packageType || true
+          echo "-------------WOPI--------------"
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: Check healthcheck Native install
+        continue-on-error: true
+        run: |
+          RESULT=$(curl -s http://${{ env.EC2_IP }}/healthcheck)
+          echo "Healthcheck Native: $RESULT"
+          if [ "$RESULT" = "true" ]; then
+            echo "NATIVE_HEALTHY=true" >> $GITHUB_ENV
+          else
+            echo "NATIVE_HEALTHY=false" >> $GITHUB_ENV
+          fi
+
+      - name: Check version Native install
+        continue-on-error: true
+        run: |
+          if [ "${{ matrix.os_type }}" = "deb" ]; then
+            VERSION=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+              'dpkg-query -W ${{ matrix.package_name }}' | awk '{print $2}')
+          else
+            VERSION=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+              'rpm -q --qf "%{VERSION}-%{RELEASE}" ${{ matrix.package_name }}' | sed 's/\.el[0-9]*//')
+          fi
+          echo "Version Native: ${VERSION:-not detected}"
+          echo "NATIVE_VERSION=${VERSION:-not detected}" >> $GITHUB_ENV
+
+      - name: Start ds-example Native install
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo systemctl start ds-example || true'
+
+      - name: Wait for ds-example to start
+        run: sleep 10
+
+      - name: Clear puppeteer output before Native tests
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: Puppeteer API tests Native install
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/smoke/smoke_test_presentation.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/check_draw_after_delete_page.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/smoke/checkbox_with_one_key.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: Puppeteer WOPI tests Native install
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          cat ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/smoke/smoke_test_presentation.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/check_draw_after_delete_page.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/smoke/checkbox_with_one_key.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: Parse puppeteer results Native
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition NATIVE
+
+      # ==================== Final check + Cleanup ====================
+      - name: Final check
+        if: always()
+        run: |
+          FAILED=0
+
+          echo "=== Docker healthcheck ==="
+          echo "Docker healthy: ${DOCKER_HEALTHY:-not set}"
+          if [ "${DOCKER_HEALTHY}" != "true" ]; then
+            echo "Docker healthcheck FAILED"
+            FAILED=1
+          else
+            echo "Docker healthcheck passed"
+          fi
+
+          echo "=== Docker version ==="
+          echo "Docker version: ${DOCKER_VERSION:-not detected}"
+
+          echo "=== Native healthcheck ==="
+          echo "Native healthy: ${NATIVE_HEALTHY:-not set}"
+          if [ "${NATIVE_HEALTHY}" != "true" ]; then
+            echo "Native healthcheck FAILED"
+            FAILED=1
+          else
+            echo "Native healthcheck passed"
+          fi
+
+          echo "=== Native version ==="
+          echo "Native version: ${NATIVE_VERSION:-not detected}"
+
+          echo "=== Puppeteer results ==="
+          echo "Puppeteer Docker  failed: ${PUPPETEER_DOCKER_FAILED:-0}"
+          echo "Puppeteer Native  failed: ${PUPPETEER_NATIVE_FAILED:-0}"
+          echo "Puppeteer total   failed: ${PUPPETEER_TOTAL_FAILED:-0}"
+          if [ "${PUPPETEER_TOTAL_FAILED:-0}" -gt 5 ]; then
+            echo "Too many puppeteer failures: ${PUPPETEER_TOTAL_FAILED} (threshold: 5)"
+            FAILED=1
+          else
+            echo "Puppeteer tests OK: ${PUPPETEER_TOTAL_FAILED:-0} failures (threshold: 5)"
+          fi
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::Instance: ${{ env.INSTANCE_ID }}, IP: ${{ env.EC2_IP }}, Tag: ${{ matrix.tag }}"
+            exit 1
+          fi
+
+      - name: Delete EC2 Instance
+        if: always()
+        run: |
+          aws ec2 terminate-instances --instance-ids ${{ env.INSTANCE_ID }}
+          aws ec2 wait instance-terminated --instance-ids ${{ env.INSTANCE_ID }}
