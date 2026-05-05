@@ -29,8 +29,8 @@ jobs:
             ami: ami-0a7a4e87939439934
             instance_type: t4g.medium
             tag: test-ubuntu2404-arm64
-            installationtype: community
-            package_name: onlyoffice-documentserver
+            installationtype: enterprise
+            package_name: onlyoffice-documentserver-ee
 
           - os_name: CentOS 9
             arch: x64
@@ -49,8 +49,8 @@ jobs:
             ami: ami-058dc7e5ef5f28287
             instance_type: t4g.medium
             tag: test-centos9-arm64
-            installationtype: developer
-            package_name: onlyoffice-documentserver-de
+            installationtype: enterprise
+            package_name: onlyoffice-documentserver-ee
 
     steps:
       - name: Checkout Repository
