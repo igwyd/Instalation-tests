@@ -6,13 +6,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-24.04
-    name: ${{ matrix.os_name }}
+    name: ${{ matrix.os_name }} ${{ matrix.arch }}
     timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os_name: Ubuntu 24.04 x64
+          - os_name: Ubuntu 24.04
+            arch: x64
             os_type: deb
             ssh_user: ubuntu
             ami: ami-0b6c6ebed2801a5cb
@@ -21,7 +22,8 @@ jobs:
             installationtype: community
             package_name: onlyoffice-documentserver
 
-          - os_name: Ubuntu 24.04 arm64
+          - os_name: Ubuntu 24.04
+            arch: arm64
             os_type: deb
             ssh_user: ubuntu
             ami: ami-0a7a4e87939439934
@@ -30,7 +32,8 @@ jobs:
             installationtype: community
             package_name: onlyoffice-documentserver
 
-          - os_name: CentOS 9 x64
+          - os_name: CentOS 9
+            arch: x64
             os_type: rpm
             ssh_user: ec2-user
             ami: ami-04331ec57720ee626
@@ -39,7 +42,8 @@ jobs:
             installationtype: developer
             package_name: onlyoffice-documentserver-de
 
-          - os_name: CentOS 9 arm64
+          - os_name: CentOS 9
+            arch: arm64
             os_type: rpm
             ssh_user: ec2-user
             ami: ami-058dc7e5ef5f28287
