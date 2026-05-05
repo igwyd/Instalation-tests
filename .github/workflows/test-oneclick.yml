@@ -143,7 +143,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
           cd OneClickInstall-Docs
-          printf "y\n" | sudo bash docs-install.sh -ls true --wopienabled true --installationtype ${{ matrix.installationtype }}
+          printf "y\n" | sudo bash docs-install.sh -ls true --skiphardwarecheck true --wopienabled true --installationtype ${{ matrix.installationtype }}
           EOF
 
       - name: Wait for DS Docker startup
@@ -241,7 +241,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
           cd OneClickInstall-Docs
-          printf "n\n" | sudo bash docs-install.sh -ls true --wopienabled true --installationtype ${{ matrix.installationtype }}
+          printf "n\n" | sudo bash docs-install.sh -ls true --skiphardwarecheck true --wopienabled true --installationtype ${{ matrix.installationtype }}
           EOF
 
       - name: Wait for native install to start
@@ -311,10 +311,10 @@ jobs:
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py ../tests/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
-          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
           python3 run.py ../tests/desktop/presentation/smoke/smoke_test_presentation.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
           python3 run.py ../tests/desktop/pdf/smoke/check_draw_after_delete_page.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
           python3 run.py ../tests/desktop/pdf-form/smoke/checkbox_with_one_key.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
 
       - name: Puppeteer WOPI tests Native install
         continue-on-error: true
@@ -324,10 +324,10 @@ jobs:
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
           python3 run.py ../tests/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
-          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
           python3 run.py ../tests/desktop/presentation/smoke/smoke_test_presentation.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
           python3 run.py ../tests/desktop/pdf/smoke/check_draw_after_delete_page.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
           python3 run.py ../tests/desktop/pdf-form/smoke/checkbox_with_one_key.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/smoke/smoke_test_spreadsheet_2.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
 
       - name: Parse puppeteer results Native
         if: always()
@@ -378,9 +378,3 @@ jobs:
             echo "::error::Instance: ${{ env.INSTANCE_ID }}, IP: ${{ env.EC2_IP }}, Tag: ${{ matrix.tag }}"
             exit 1
           fi
-
-      - name: Delete EC2 Instance
-        if: always()
-        run: |
-          aws ec2 terminate-instances --instance-ids ${{ env.INSTANCE_ID }}
-          aws ec2 wait instance-terminated --instance-ids ${{ env.INSTANCE_ID }}
