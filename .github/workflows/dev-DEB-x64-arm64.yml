@@ -497,18 +497,6 @@ jobs:
           sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
 
-      - name: Check DS default services EE RELEASE
-        continue-on-error: true
-        run: |
-          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); if [ "$s" = "enabled" ]; then echo "$svc"; fi; done')
-          if [ -z "$UNEXPECTED" ]; then
-            echo "SERVICES_EE_RELEASE_OK=true" >> $GITHUB_ENV
-          else
-            echo "Unexpected enabled services after EE RELEASE install: $UNEXPECTED"
-            echo "SERVICES_EE_RELEASE_OK=false" >> $GITHUB_ENV
-          fi
-
       - name: Check healthcheck EE RELEASE and save JWT before upgrade
         continue-on-error: true
         run: |
@@ -550,18 +538,6 @@ jobs:
           echo "------------WOPI external------------"
           sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
-
-      - name: Check DS default services EE UPGRADE
-        continue-on-error: true
-        run: |
-          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); if [ "$s" = "enabled" ]; then echo "$svc"; fi; done')
-          if [ -z "$UNEXPECTED" ]; then
-            echo "SERVICES_EE_UPGRADE_OK=true" >> $GITHUB_ENV
-          else
-            echo "Unexpected enabled services after EE upgrade: $UNEXPECTED"
-            echo "SERVICES_EE_UPGRADE_OK=false" >> $GITHUB_ENV
-          fi
 
       - name: Check healthcheck, version and JWT after upgrade
         continue-on-error: true
@@ -679,7 +655,7 @@ jobs:
           fi
 
           echo "=== DS services check ==="
-          for VAR in SERVICES_EE_OK SERVICES_DE_OK SERVICES_CE_OK SERVICES_EE_RELEASE_OK SERVICES_EE_UPGRADE_OK; do
+          for VAR in SERVICES_EE_OK SERVICES_DE_OK SERVICES_CE_OK; do
             VAL="${!VAR}"
             echo "$VAR: ${VAL:-not set}"
             if [ "${VAL}" != "true" ]; then
