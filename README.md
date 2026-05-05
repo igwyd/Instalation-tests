@@ -9,10 +9,19 @@ Pre-release builds from S3 dev repo.
 ### Package installation (18 runners at the same time)
 - Install from **helpcenter guide** and run all tests (Scheduled every Wednesday at 14:00 UTC+3)
 
-| Test | x64/arm64 |
-|------|-----|
-| dev-DEB (Ubuntu 24.04) | ![dev-DEB-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml/badge.svg?branch=main) | ![dev-DEB-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml/badge.svg?branch=main) |
-| dev-RPM (CentOS 9) | ![dev-RPM-x64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml/badge.svg?branch=main) |
+<!-- deb-status-start -->
+| [![dev-DEB-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml) | EE | DE | CE | EE Upgrade |
+|---|---|---|---|---|
+| x64   | — | — | — | — |
+| arm64 | — | — | — | — |
+<!-- deb-status-end -->
+
+<!-- rpm-status-start -->
+| [![dev-RPM-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml) | EE | DE | CE | EE Upgrade |
+|---|---|---|---|---|
+| x64   | — | — | — | — |
+| arm64 | — | — | — | — |
+<!-- rpm-status-end -->
 
 - Check installation **OneClickInstall** on supported OS **Package** and **Docker** (Scheduled every Wednesday at 14:00 UTC+3)
 
