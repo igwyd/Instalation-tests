@@ -100,6 +100,16 @@ jobs:
       - name: Wait for instance to reboot after upgrade
         run: sleep 180
 
+      - name: Install git
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
+          if command -v apt-get &>/dev/null; then
+            sudo apt-get install git -y
+          else
+            sudo dnf install git -y
+          fi
+          EOF
+
       - name: Clone OneClickInstall-Docs
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
