@@ -6,6 +6,6 @@
   "puppeteer_api_failed": 0,
   "puppeteer_wopi_failed": 2,
   "puppeteer_total_failed": 2,
-  "ds_log_errors": 4,
+  "ds_log_errors": 2,
   "conclusion": "failure"
 }
