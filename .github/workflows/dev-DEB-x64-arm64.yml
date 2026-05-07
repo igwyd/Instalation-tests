@@ -543,7 +543,7 @@ jobs:
           echo "VERSION_EE_RELEASE_ACTUAL=$VERSION_RELEASE" >> $GITHUB_ENV
 
           JWT_ENABLE=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            "sudo jq -r '.services.CoAuthoring.token.enable // false' /etc/onlyoffice/documentserver/local.json 2>/dev/null || echo 'false'")
+            "sudo jq -r '.services.CoAuthoring.token.enable.browser // false' /etc/onlyoffice/documentserver/local.json 2>/dev/null || echo 'false'")
           echo "JWT enable: $JWT_ENABLE"
           if [ "$JWT_ENABLE" = "true" ]; then
             echo "JWT_EE_RELEASE_EXISTS=true" >> $GITHUB_ENV
