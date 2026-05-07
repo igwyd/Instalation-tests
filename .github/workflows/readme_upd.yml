@@ -39,6 +39,12 @@ jobs:
             echo "Version is up to date, skipping change."
           fi
 
+      - name: Update dev-DEB-x64-arm64.yml status in README
+        run: python3 .github/scripts/update-readme-deb.py
+
+      - name: Update dev-RPM-x64-arm64.yml status in README
+        run: python3 .github/scripts/update-readme-rpm.py
+
       - name: Update dev-ActiveMQ.yml status in README
         run: python3 .github/scripts/update-readme-activemq.py
 
