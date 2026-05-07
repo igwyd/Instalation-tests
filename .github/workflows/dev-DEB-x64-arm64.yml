@@ -765,7 +765,7 @@ jobs:
             RH_HC_ICON="❌"; RH_HC_LABEL="FAILED"; FAILED=1
           fi
           if [ "${JWT_EE_RELEASE_EXISTS}" = "true" ]; then
-            RH_JWT_ICON="✅"; RH_JWT_LABEL="OK"
+            RH_JWT_ICON="✅"; RH_JWT_LABEL="YES"
           else
             RH_JWT_ICON="❌"; RH_JWT_LABEL="FAIL"
           fi
@@ -782,9 +782,9 @@ jobs:
             UG_VER_ICON="❌"; UG_VER_LABEL="FAILED"; FAILED=1
           fi
           if [ "${JWT_MATCH}" = "true" ]; then
-            JWT_ICON="✅"; JWT_LABEL="OK"
+            JWT_ICON="✅"; JWT_LABEL="MATCH"
           else
-            JWT_ICON="❌"; JWT_LABEL="FAILED"; FAILED=1
+            JWT_ICON="❌"; JWT_LABEL="FAIL"; FAILED=1
           fi
           UG_P="${PUPPETEER_EE_UPGRADE_FAILED:-0}"
           if [ "${UG_P}" -gt 5 ]; then
