@@ -12,15 +12,15 @@ Pre-release builds from S3 dev repo.
 <!-- deb-status-start -->
 | [![dev-DEB-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml) | EE | DE | CE | EE Upgrade |
 |---|---|---|---|---|
-| x64   | — | — | — | — |
-| arm64 | — | — | — | — |
+| x64   | ✅ OK | ❌ FAILED | ❌ FAILED | ❌ FAILED |
+| arm64 | ❌ FAILED | ❌ FAILED | ❌ FAILED | ❌ FAILED |
 <!-- deb-status-end -->
 
 <!-- rpm-status-start -->
 | [![dev-RPM-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml) | EE | DE | CE | EE Upgrade |
 |---|---|---|---|---|
-| x64   | — | — | — | — |
-| arm64 | — | — | — | — |
+| x64   | ❌ FAILED | ❌ FAILED | ❌ FAILED | ❌ FAILED |
+| arm64 | ❌ FAILED | ❌ FAILED | ❌ FAILED | ❌ FAILED |
 <!-- rpm-status-end -->
 
 - Check installation **OneClickInstall** on supported OS **Package** and **Docker** (Scheduled every Wednesday at 14:00 UTC+3)
