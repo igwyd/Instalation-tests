@@ -30,6 +30,8 @@
   "ee_upgrade": {
     "healthy_release": true,
     "healthy_upgrade": true,
+    "version_release_actual": "not set",
+    "jwt_ee_release_exists": false,
     "version_ok": true,
     "version_actual": "9.4.0-76.el7",
     "jwt_match": true,
