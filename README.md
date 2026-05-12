@@ -12,45 +12,45 @@ Pre-release builds from S3 dev repo.
 <!-- deb-status-start -->
 [![dev-DEB-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml)
 
-**x64** · 2026-05-07 15:21 UTC
-| Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
-|---------|-------------|---------|---------|----------------|---------------|
-| EE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (2) |
-| DE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (1) |
-| CE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (1) |
-| EE Release | ✅ OK | ? | JWT: ❌ FAIL | — | — |
-| EE Upgrade | ✅ OK | ✅ 9.4.0-76 | JWT: ✅ MATCH | ✅ OK (2) | ❌ FAILED (2) |
-
-**arm64** · 2026-05-07 15:22 UTC
+**x64** · 2026-05-08 12:56 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
 | EE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (1) |
 | DE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (3) |
+| CE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (2) |
+| EE Release | ✅ OK | 9.3.1-10 | JWT: ✅ YES | — | — |
+| EE Upgrade | ✅ OK | ✅ 9.4.0-76 | JWT: ✅ MATCH | ✅ OK (2) | ❌ FAILED (2) |
+
+**arm64** · 2026-05-08 13:01 UTC
+| Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
+|---------|-------------|---------|---------|----------------|---------------|
+| EE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (4) | ❌ FAILED (2) |
+| DE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (4) | ❌ FAILED (6) |
 | CE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (4) |
-| EE Release | ✅ OK | ? | JWT: ❌ FAIL | — | — |
-| EE Upgrade | ✅ OK | ✅ 9.4.0-76 | JWT: ✅ MATCH | ✅ OK (2) | ❌ FAILED (21) |
+| EE Release | ✅ OK | 9.3.1-10 | JWT: ✅ YES | — | — |
+| EE Upgrade | ✅ OK | ✅ 9.4.0-76 | JWT: ✅ MATCH | ✅ OK (2) | ❌ FAILED (8) |
 <!-- deb-status-end -->
 
 <!-- rpm-status-start -->
 [![dev-RPM-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml)
 
-**x64** · 2026-05-07 15:50 UTC
+**x64** · 2026-05-08 13:24 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
-| EE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (5) | ❌ FAILED (4) |
-| DE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (5) | ❌ FAILED (4) |
-| CE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (3) | ✅ OK (0) |
-| EE Release | ✅ OK | ? | JWT: ❌ FAIL | — | — |
-| EE Upgrade | ✅ OK | ✅ 9.4.0-76.el7 | JWT: ✅ MATCH | ❌ FAILED (6) | ❌ FAILED (2) |
+| EE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (5) | ❌ FAILED (13) |
+| DE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (2) |
+| CE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (3) | ❌ FAILED (2) |
+| EE Release | ✅ OK | 9.3.1-10.el7 | JWT: ✅ YES | — | — |
+| EE Upgrade | ✅ OK | ✅ 9.4.0-76.el7 | JWT: ✅ MATCH | ✅ OK (3) | ❌ FAILED (1) |
 
-**arm64** · 2026-05-07 15:38 UTC
+**arm64** · 2026-05-08 13:11 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
-| EE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (3) |
-| DE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (4) |
-| CE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (3) | ❌ FAILED (1) |
-| EE Release | ✅ OK | ? | JWT: ❌ FAIL | — | — |
-| EE Upgrade | ✅ OK | ✅ 9.4.0-76.el7 | JWT: ✅ MATCH | ✅ OK (4) | ❌ FAILED (119) |
+| EE | ❌ FAILED | ❌ ? | SVC: ✅ OK | ✅ OK (3) | ❌ FAILED (12) |
+| DE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (5) |
+| CE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (3) | ❌ FAILED (3) |
+| EE Release | ✅ OK | 9.3.1-10.el7 | JWT: ✅ YES | — | — |
+| EE Upgrade | ✅ OK | ✅ 9.4.0-76.el7 | JWT: ✅ MATCH | ✅ OK (2) | ❌ FAILED (4) |
 <!-- rpm-status-end -->
 
 - Check installation **OneClickInstall** on supported OS **Package** and **Docker** (Scheduled every Wednesday at 14:00 UTC+3)
