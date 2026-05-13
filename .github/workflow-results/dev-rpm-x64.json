@@ -1,30 +1,30 @@
 {
-  "run_date": "2026-05-08 13:24 UTC",
+  "run_date": "2026-05-13 15:46 UTC",
   "ee": {
     "healthy": true,
     "version_ok": true,
-    "version_actual": "9.4.0-76.el7",
+    "version_actual": "9.4.0-115.el7",
     "services_ok": true,
-    "puppeteer_failed": 5,
-    "ds_log_errors": 13,
+    "puppeteer_failed": 0,
+    "ds_log_errors": 6,
     "conclusion": "failure"
   },
   "de": {
     "healthy": true,
     "version_ok": true,
-    "version_actual": "9.4.0-76.el7",
+    "version_actual": "9.4.0-115.el7",
     "services_ok": true,
-    "puppeteer_failed": 2,
-    "ds_log_errors": 2,
+    "puppeteer_failed": 1,
+    "ds_log_errors": 7,
     "conclusion": "failure"
   },
   "ce": {
     "healthy": true,
     "version_ok": true,
-    "version_actual": "9.4.0-76.el7",
+    "version_actual": "9.4.0-115.el7",
     "services_ok": true,
-    "puppeteer_failed": 3,
-    "ds_log_errors": 2,
+    "puppeteer_failed": 4,
+    "ds_log_errors": 8,
     "conclusion": "failure"
   },
   "ee_upgrade": {
@@ -33,10 +33,10 @@
     "version_release_actual": "9.3.1-10.el7",
     "jwt_ee_release_exists": true,
     "version_ok": true,
-    "version_actual": "9.4.0-76.el7",
+    "version_actual": "9.4.0-115.el7",
     "jwt_match": true,
-    "puppeteer_failed": 3,
-    "ds_log_errors": 1,
+    "puppeteer_failed": 0,
+    "ds_log_errors": 6,
     "conclusion": "failure"
   },
   "conclusion": "failure"
