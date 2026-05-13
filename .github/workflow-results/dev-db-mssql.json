@@ -1,11 +1,11 @@
 {
   "healthy": true,
-  "version_expected": "9.4.0-76",
-  "version_actual": "9.4.0-76",
+  "version_expected": "9.4.0-115",
+  "version_actual": "9.4.0-115",
   "version_ok": true,
   "puppeteer_api_failed": 0,
-  "puppeteer_wopi_failed": 2,
-  "puppeteer_total_failed": 2,
-  "ds_log_errors": 0,
-  "conclusion": "success"
+  "puppeteer_wopi_failed": 0,
+  "puppeteer_total_failed": 0,
+  "ds_log_errors": 1,
+  "conclusion": "failure"
 }
