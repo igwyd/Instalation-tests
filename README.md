@@ -2,7 +2,7 @@
 
 Automated installation testing of ONLYOFFICE Docs packages via GitHub Actions.
 
-## Develop **<!-- onlyoffice-version-start -->v9.4.0-76<!-- onlyoffice-version-end -->**
+## Develop **<!-- onlyoffice-version-start -->v9.4.0-115<!-- onlyoffice-version-end -->**
 
 Pre-release builds from S3 dev repo.
 
@@ -12,7 +12,7 @@ Pre-release builds from S3 dev repo.
 <!-- deb-status-start -->
 [![dev-DEB-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml)
 
-**DEB x64** · 2026-05-08 12:56 UTC
+**x64** · 2026-05-08 12:56 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
 | EE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (1) |
@@ -21,7 +21,7 @@ Pre-release builds from S3 dev repo.
 | EE Release | ✅ OK | 9.3.1-10 | JWT: ✅ YES | — | — |
 | EE Upgrade | ✅ OK | ✅ 9.4.0-76 | JWT: ✅ MATCH | ✅ OK (2) | ❌ FAILED (2) |
 
-**DEB arm64** · 2026-05-08 13:01 UTC
+**arm64** · 2026-05-08 13:01 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
 | EE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (4) | ❌ FAILED (2) |
@@ -34,7 +34,7 @@ Pre-release builds from S3 dev repo.
 <!-- rpm-status-start -->
 [![dev-RPM-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml)
 
-**RPM x64** · 2026-05-08 13:24 UTC
+**x64** · 2026-05-08 13:24 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
 | EE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (5) | ❌ FAILED (13) |
@@ -43,7 +43,7 @@ Pre-release builds from S3 dev repo.
 | EE Release | ✅ OK | 9.3.1-10.el7 | JWT: ✅ YES | — | — |
 | EE Upgrade | ✅ OK | ✅ 9.4.0-76.el7 | JWT: ✅ MATCH | ✅ OK (3) | ❌ FAILED (1) |
 
-**RPM arm64** · 2026-05-08 13:11 UTC
+**arm64** · 2026-05-08 13:11 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
 | EE | ❌ FAILED | ❌ ? | SVC: ✅ OK | ✅ OK (3) | ❌ FAILED (12) |
