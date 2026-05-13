@@ -12,45 +12,45 @@ Pre-release builds from S3 dev repo.
 <!-- deb-status-start -->
 [![dev-DEB-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml)
 
-**x64** · 2026-05-08 12:56 UTC
+**x64** · 2026-05-13 13:44 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
-| EE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (1) |
-| DE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (3) |
-| CE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (2) |
-| EE Release | ✅ OK | 9.3.1-10 | JWT: ✅ YES | — | — |
-| EE Upgrade | ✅ OK | ✅ 9.4.0-76 | JWT: ✅ MATCH | ✅ OK (2) | ❌ FAILED (2) |
+| EE | ✅ OK | ✅ 9.4.0-115 | SVC: ✅ OK | ✅ OK (0) | ❌ FAILED (3) |
+| DE | ❌ FAILED | ❌ ? | SVC: ❌ FAILED | ✅ OK (0) | ✅ OK (0) |
+| CE | ❌ FAILED | ❌ ? | SVC: ❌ FAILED | ✅ OK (0) | ✅ OK (0) |
+| EE Release | ❌ FAILED | ? | JWT: ❌ FAIL | — | — |
+| EE Upgrade | ❌ FAILED | ❌ ? | JWT: ❌ FAIL | ✅ OK (0) | ✅ OK (0) |
 
-**arm64** · 2026-05-08 13:01 UTC
+**arm64** · 2026-05-13 13:45 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
-| EE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (4) | ❌ FAILED (2) |
-| DE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (4) | ❌ FAILED (6) |
-| CE | ✅ OK | ✅ 9.4.0-76 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (4) |
-| EE Release | ✅ OK | 9.3.1-10 | JWT: ✅ YES | — | — |
-| EE Upgrade | ✅ OK | ✅ 9.4.0-76 | JWT: ✅ MATCH | ✅ OK (2) | ❌ FAILED (8) |
+| EE | ✅ OK | ✅ 9.4.0-115 | SVC: ✅ OK | ✅ OK (0) | ❌ FAILED (1) |
+| DE | ❌ FAILED | ❌ ? | SVC: ❌ FAILED | ✅ OK (0) | ✅ OK (0) |
+| CE | ❌ FAILED | ❌ ? | SVC: ❌ FAILED | ✅ OK (0) | ✅ OK (0) |
+| EE Release | ❌ FAILED | ? | JWT: ❌ FAIL | — | — |
+| EE Upgrade | ❌ FAILED | ❌ ? | JWT: ❌ FAIL | ✅ OK (0) | ✅ OK (0) |
 <!-- deb-status-end -->
 
 <!-- rpm-status-start -->
 [![dev-RPM-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml)
 
-**x64** · 2026-05-08 13:24 UTC
+**x64** · 2026-05-13 15:46 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
-| EE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (5) | ❌ FAILED (13) |
-| DE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (2) |
-| CE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (3) | ❌ FAILED (2) |
+| EE | ✅ OK | ✅ 9.4.0-115.el7 | SVC: ✅ OK | ✅ OK (0) | ❌ FAILED (6) |
+| DE | ✅ OK | ✅ 9.4.0-115.el7 | SVC: ✅ OK | ✅ OK (1) | ❌ FAILED (7) |
+| CE | ✅ OK | ✅ 9.4.0-115.el7 | SVC: ✅ OK | ✅ OK (4) | ❌ FAILED (8) |
 | EE Release | ✅ OK | 9.3.1-10.el7 | JWT: ✅ YES | — | — |
-| EE Upgrade | ✅ OK | ✅ 9.4.0-76.el7 | JWT: ✅ MATCH | ✅ OK (3) | ❌ FAILED (1) |
+| EE Upgrade | ✅ OK | ✅ 9.4.0-115.el7 | JWT: ✅ MATCH | ✅ OK (0) | ❌ FAILED (6) |
 
-**arm64** · 2026-05-08 13:11 UTC
+**arm64** · 2026-05-13 15:37 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
-| EE | ❌ FAILED | ❌ ? | SVC: ✅ OK | ✅ OK (3) | ❌ FAILED (12) |
-| DE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (5) |
-| CE | ✅ OK | ✅ 9.4.0-76.el7 | SVC: ✅ OK | ✅ OK (3) | ❌ FAILED (3) |
+| EE | ✅ OK | ✅ 9.4.0-115.el7 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (5) |
+| DE | ✅ OK | ✅ 9.4.0-115.el7 | SVC: ✅ OK | ✅ OK (0) | ❌ FAILED (5) |
+| CE | ✅ OK | ✅ 9.4.0-115.el7 | SVC: ✅ OK | ✅ OK (3) | ❌ FAILED (11) |
 | EE Release | ✅ OK | 9.3.1-10.el7 | JWT: ✅ YES | — | — |
-| EE Upgrade | ✅ OK | ✅ 9.4.0-76.el7 | JWT: ✅ MATCH | ✅ OK (2) | ❌ FAILED (4) |
+| EE Upgrade | ✅ OK | ✅ 9.4.0-115.el7 | JWT: ✅ MATCH | ✅ OK (4) | ❌ FAILED (127) |
 <!-- rpm-status-end -->
 
 - Check installation **OneClickInstall** on supported OS **Package** and **Docker** (Scheduled every Wednesday at 14:00 UTC+3)
@@ -90,16 +90,16 @@ Pre-release builds from S3 dev repo.
 <!-- db-status-start -->
 | [![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml) | Healthcheck | Version | Puppeteer | DS Log Errors |
 |-------|-------------|---------|-----------|---------------|
-| MySQL | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 1 |
-| PostgreSQL | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 3 |
-| PostgreSQL 14 | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 1 |
-| PostgreSQL 15 | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ✅ 0 |
-| PostgreSQL 16 | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 3 |
-| PostgreSQL 17 | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ✅ 0 |
-| MSSQL | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ✅ 0 |
-| Oracle | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 2 |
-| Dameng | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 4 |
-| MariaDB | ✅ OK | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 3 |
+| MySQL | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
+| PostgreSQL | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
+| PostgreSQL 14 | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
+| PostgreSQL 15 | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
+| PostgreSQL 16 | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
+| PostgreSQL 17 | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 2 |
+| MSSQL | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
+| Oracle | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 3 |
+| Dameng | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ✅ 0 |
+| MariaDB | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 3 |
 <!-- db-status-end -->
 
 * Tests with ActiveMQ-Classic and ActiveMQ-Artemis (Scheduled every Wednesday at 17:00 UTC+3)
@@ -107,8 +107,8 @@ Pre-release builds from S3 dev repo.
 <!-- activemq-status-start -->
 | [![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml) | Healthcheck | Version | Puppeteer | DS Log Errors |
 |-------|-------------|---------|-----------|---------------|
-| Artemis | ❌ FAILED | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 2 errors |
-| Classic | ❌ FAILED | ✅ 9.4.0-76 | ✅ 2 (API: 0, WOPI: 2) | ❌ 2 errors |
+| Artemis | ❌ FAILED | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 4 errors |
+| Classic | ❌ FAILED | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 2 errors |
 <!-- activemq-status-end -->
 
 
