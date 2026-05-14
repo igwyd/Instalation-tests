@@ -6,17 +6,28 @@ Usage:
   python3 parse-puppeteer-results.py --edition EE     # multi-edition (EE/DE/CE)
 """
 import os
+import re
 import sys
 
 
 def count_results(path):
     if not os.path.exists(path):
         print(f"Report not found: {path}")
-        return 0, 0
+        return 0, 999
     with open(path) as f:
         content = f.read()
-    ok  = content.count("<td>OK</td>")
-    err = content.count("<td>Error in script terminal.</td>")
+    ok = 0
+    err = 0
+    # Report table columns: Test Name | Start Time | Execution Time | Status | ...
+    # Status is always the 4th <td> (index 3) in each data row.
+    for row in re.findall(r'<tr[^>]*>(.*?)</tr>', content, re.DOTALL):
+        cells = re.findall(r'<td>(.*?)</td>', row, re.DOTALL)
+        if len(cells) >= 4:
+            status = cells[3].strip()
+            if status == "OK":
+                ok += 1
+            elif status:
+                err += 1
     return ok, err
 
 
