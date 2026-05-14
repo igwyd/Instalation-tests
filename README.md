@@ -65,8 +65,8 @@ Pre-release builds from S3 dev repo.
 
 | Test | x64/arm64 |
 |------|-----------|
-| dev-Docker-DEB (Ubuntu 24.04) | ![dev-Docker-DEB](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-DEB-x64-arm64.yml/badge.svg?branch=main) |
-| dev-Docker-RPM (CentOS 9) | ![dev-Docker-RPM](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-RPM-x64-arm64.yml/badge.svg?branch=main) |
+| dev-Docker-DEB (Ubuntu 24.04) | [![dev-Docker-DEB](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-DEB-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-DEB-x64-arm64.yml) |
+| dev-Docker-RPM (CentOS 9) | [![dev-Docker-RPM](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-RPM-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-RPM-x64-arm64.yml) |
 
 
 ### Server checks (1 runner at the same time)
