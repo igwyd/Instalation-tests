@@ -2,7 +2,7 @@
 
 Automated installation testing of ONLYOFFICE Docs packages via GitHub Actions.
 
-## Develop **<!-- onlyoffice-version-start -->v9.4.0-115<!-- onlyoffice-version-end -->**
+## Develop **<!-- onlyoffice-version-start -->v9.4.0-124<!-- onlyoffice-version-end -->**
 
 Pre-release builds from S3 dev repo.
 
@@ -12,45 +12,45 @@ Pre-release builds from S3 dev repo.
 <!-- deb-status-start -->
 [![dev-DEB-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml)
 
-**x64** · 2026-05-13 13:44 UTC
+**x64** · 2026-05-18 14:11 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
-| EE | ✅ OK | ✅ 9.4.0-115 | SVC: ✅ OK | ✅ OK (0) | ❌ FAILED (3) |
-| DE | ❌ FAILED | ❌ ? | SVC: ❌ FAILED | ✅ OK (0) | ✅ OK (0) |
-| CE | ❌ FAILED | ❌ ? | SVC: ❌ FAILED | ✅ OK (0) | ✅ OK (0) |
-| EE Release | ❌ FAILED | ? | JWT: ❌ FAIL | — | — |
-| EE Upgrade | ❌ FAILED | ❌ ? | JWT: ❌ FAIL | ✅ OK (0) | ✅ OK (0) |
+| EE | ✅ OK | ✅ 9.4.0-124 | SVC: ✅ OK | ✅ OK (0) | ❌ FAILED (2) |
+| DE | ✅ OK | ✅ 9.4.0-124 | SVC: ✅ OK | ✅ OK (0) | ❌ FAILED (1) |
+| CE | ✅ OK | ✅ 9.4.0-124 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (6) |
+| EE Release | ✅ OK | 9.3.1-10 | JWT: ✅ YES | — | — |
+| EE Upgrade | ✅ OK | ✅ 9.4.0-124 | JWT: ✅ MATCH | ✅ OK (0) | ❌ FAILED (2) |
 
-**arm64** · 2026-05-13 13:45 UTC
+**arm64** · 2026-05-18 14:14 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
-| EE | ✅ OK | ✅ 9.4.0-115 | SVC: ✅ OK | ✅ OK (0) | ❌ FAILED (1) |
-| DE | ❌ FAILED | ❌ ? | SVC: ❌ FAILED | ✅ OK (0) | ✅ OK (0) |
-| CE | ❌ FAILED | ❌ ? | SVC: ❌ FAILED | ✅ OK (0) | ✅ OK (0) |
-| EE Release | ❌ FAILED | ? | JWT: ❌ FAIL | — | — |
-| EE Upgrade | ❌ FAILED | ❌ ? | JWT: ❌ FAIL | ✅ OK (0) | ✅ OK (0) |
+| EE | ✅ OK | ✅ 9.4.0-124 | SVC: ✅ OK | ✅ OK (1) | ❌ FAILED (2) |
+| DE | ✅ OK | ✅ 9.4.0-124 | SVC: ✅ OK | ✅ OK (0) | ❌ FAILED (2) |
+| CE | ✅ OK | ✅ 9.4.0-124 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (3) |
+| EE Release | ✅ OK | 9.3.1-10 | JWT: ✅ YES | — | — |
+| EE Upgrade | ✅ OK | ✅ 9.4.0-124 | JWT: ✅ MATCH | ✅ OK (1) | ❌ FAILED (6) |
 <!-- deb-status-end -->
 
 <!-- rpm-status-start -->
 [![dev-RPM-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml)
 
-**x64** · 2026-05-13 15:46 UTC
+**x64** · 2026-05-18 14:43 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
-| EE | ✅ OK | ✅ 9.4.0-115.el7 | SVC: ✅ OK | ✅ OK (0) | ❌ FAILED (6) |
-| DE | ✅ OK | ✅ 9.4.0-115.el7 | SVC: ✅ OK | ✅ OK (1) | ❌ FAILED (7) |
-| CE | ✅ OK | ✅ 9.4.0-115.el7 | SVC: ✅ OK | ✅ OK (4) | ❌ FAILED (8) |
+| EE | ✅ OK | ✅ 9.4.0-124.el7 | SVC: ✅ OK | ✅ OK (4) | ❌ FAILED (12) |
+| DE | ✅ OK | ✅ 9.4.0-124.el7 | SVC: ✅ OK | ✅ OK (4) | ❌ FAILED (7) |
+| CE | ✅ OK | ✅ 9.4.0-124.el7 | SVC: ✅ OK | ✅ OK (3) | ❌ FAILED (5) |
 | EE Release | ✅ OK | 9.3.1-10.el7 | JWT: ✅ YES | — | — |
-| EE Upgrade | ✅ OK | ✅ 9.4.0-115.el7 | JWT: ✅ MATCH | ✅ OK (0) | ❌ FAILED (6) |
+| EE Upgrade | ✅ OK | ✅ 9.4.0-124.el7 | JWT: ✅ MATCH | ✅ OK (4) | ❌ FAILED (5) |
 
-**arm64** · 2026-05-13 15:37 UTC
+**arm64** · 2026-05-18 14:28 UTC
 | Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |
 |---------|-------------|---------|---------|----------------|---------------|
-| EE | ✅ OK | ✅ 9.4.0-115.el7 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (5) |
-| DE | ✅ OK | ✅ 9.4.0-115.el7 | SVC: ✅ OK | ✅ OK (0) | ❌ FAILED (5) |
-| CE | ✅ OK | ✅ 9.4.0-115.el7 | SVC: ✅ OK | ✅ OK (3) | ❌ FAILED (11) |
+| EE | ✅ OK | ✅ 9.4.0-124.el7 | SVC: ✅ OK | ✅ OK (4) | ❌ FAILED (3) |
+| DE | ✅ OK | ✅ 9.4.0-124.el7 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (92) |
+| CE | ✅ OK | ✅ 9.4.0-124.el7 | SVC: ✅ OK | ✅ OK (2) | ❌ FAILED (4) |
 | EE Release | ✅ OK | 9.3.1-10.el7 | JWT: ✅ YES | — | — |
-| EE Upgrade | ✅ OK | ✅ 9.4.0-115.el7 | JWT: ✅ MATCH | ✅ OK (4) | ❌ FAILED (127) |
+| EE Upgrade | ✅ OK | ✅ 9.4.0-124.el7 | JWT: ✅ MATCH | ✅ OK (2) | ❌ FAILED (12) |
 <!-- rpm-status-end -->
 
 - Check installation **OneClickInstall** on supported OS **Package** and **Docker** (Scheduled every Wednesday at 14:00 UTC+3)
@@ -90,16 +90,16 @@ Pre-release builds from S3 dev repo.
 <!-- db-status-start -->
 | [![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml) | Healthcheck | Version | Puppeteer | DS Log Errors |
 |-------|-------------|---------|-----------|---------------|
-| MySQL | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
-| PostgreSQL | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
-| PostgreSQL 14 | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
-| PostgreSQL 15 | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
-| PostgreSQL 16 | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
-| PostgreSQL 17 | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 2 |
-| MSSQL | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
-| Oracle | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 3 |
-| Dameng | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ✅ 0 |
-| MariaDB | ✅ OK | ✅ 9.4.0-115 | ✅ 0 (API: 0, WOPI: 0) | ❌ 3 |
+| MySQL | ✅ OK | ✅ 9.4.0-117 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
+| PostgreSQL | ✅ OK | ✅ 9.4.0-117 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
+| PostgreSQL 14 | ✅ OK | ✅ 9.4.0-117 | ✅ 1 (API: 1, WOPI: 0) | ❌ 4 |
+| PostgreSQL 15 | ✅ OK | ✅ 9.4.0-117 | ✅ 0 (API: 0, WOPI: 0) | ✅ 0 |
+| PostgreSQL 16 | ✅ OK | ✅ 9.4.0-117 | ✅ 1 (API: 0, WOPI: 1) | ❌ 2 |
+| PostgreSQL 17 | ✅ OK | ✅ 9.4.0-117 | ✅ 0 (API: 0, WOPI: 0) | ✅ 0 |
+| MSSQL | ✅ OK | ✅ 9.4.0-117 | ✅ 0 (API: 0, WOPI: 0) | ✅ 0 |
+| Oracle | ✅ OK | ✅ 9.4.0-117 | ✅ 1 (API: 0, WOPI: 1) | ❌ 2 |
+| Dameng | ✅ OK | ✅ 9.4.0-117 | ✅ 2 (API: 1, WOPI: 1) | ❌ 7 |
+| MariaDB | ✅ OK | ✅ 9.4.0-117 | ✅ 0 (API: 0, WOPI: 0) | ✅ 0 |
 <!-- db-status-end -->
 
 * Tests with ActiveMQ-Classic and ActiveMQ-Artemis (Scheduled every Wednesday at 17:00 UTC+3)
