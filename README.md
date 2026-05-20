@@ -90,16 +90,16 @@ Pre-release builds from S3 dev repo.
 <!-- db-status-start -->
 | [![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml) | Healthcheck | Version | Puppeteer | DS Log Errors |
 |-------|-------------|---------|-----------|---------------|
-| MySQL | ✅ OK | ✅ 9.4.0-117 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
-| PostgreSQL | ✅ OK | ✅ 9.4.0-117 | ✅ 0 (API: 0, WOPI: 0) | ❌ 1 |
-| PostgreSQL 14 | ✅ OK | ✅ 9.4.0-117 | ✅ 1 (API: 1, WOPI: 0) | ❌ 4 |
-| PostgreSQL 15 | ✅ OK | ✅ 9.4.0-117 | ✅ 0 (API: 0, WOPI: 0) | ✅ 0 |
-| PostgreSQL 16 | ✅ OK | ✅ 9.4.0-117 | ✅ 1 (API: 0, WOPI: 1) | ❌ 2 |
-| PostgreSQL 17 | ✅ OK | ✅ 9.4.0-117 | ✅ 0 (API: 0, WOPI: 0) | ✅ 0 |
-| MSSQL | ✅ OK | ✅ 9.4.0-117 | ✅ 0 (API: 0, WOPI: 0) | ✅ 0 |
-| Oracle | ✅ OK | ✅ 9.4.0-117 | ✅ 1 (API: 0, WOPI: 1) | ❌ 2 |
-| Dameng | ✅ OK | ✅ 9.4.0-117 | ✅ 2 (API: 1, WOPI: 1) | ❌ 7 |
-| MariaDB | ✅ OK | ✅ 9.4.0-117 | ✅ 0 (API: 0, WOPI: 0) | ✅ 0 |
+| MySQL | ✅ OK | ✅ 9.4.0-129 | ✅ 2 (API: 0, WOPI: 2) | ❌ 2 |
+| PostgreSQL | ✅ OK | ✅ 9.4.0-129 | ✅ 1 (API: 0, WOPI: 1) | ❌ 2 |
+| PostgreSQL 14 | ✅ OK | ✅ 9.4.0-129 | ✅ 1 (API: 0, WOPI: 1) | ❌ 3 |
+| PostgreSQL 15 | ✅ OK | ✅ 9.4.0-129 | ✅ 1 (API: 0, WOPI: 1) | ❌ 2 |
+| PostgreSQL 16 | ✅ OK | ✅ 9.4.0-129 | ✅ 1 (API: 0, WOPI: 1) | ❌ 1 |
+| PostgreSQL 17 | ✅ OK | ✅ 9.4.0-129 | ✅ 1 (API: 0, WOPI: 1) | ❌ 1 |
+| MSSQL | ✅ OK | ✅ 9.4.0-129 | ✅ 1 (API: 0, WOPI: 1) | ❌ 1 |
+| Oracle | ✅ OK | ✅ 9.4.0-129 | ✅ 1 (API: 0, WOPI: 1) | ✅ 0 |
+| Dameng | ✅ OK | ✅ 9.4.0-129 | ✅ 1 (API: 0, WOPI: 1) | ❌ 2 |
+| MariaDB | ✅ OK | ✅ 9.4.0-129 | ✅ 1 (API: 0, WOPI: 1) | ✅ 0 |
 <!-- db-status-end -->
 
 * Tests with ActiveMQ-Classic and ActiveMQ-Artemis (Scheduled every Wednesday at 17:00 UTC+3)
