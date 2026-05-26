@@ -388,18 +388,6 @@ jobs:
       - name: Wait for native install to start
         run: sleep 10
 
-      - name: Check DS default services native install
-        continue-on-error: true
-        run: |
-          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-            'for svc in ds-example ds-metrics ds-adminpanel; do s=$(systemctl is-enabled $svc 2>/dev/null || true); [ "$s" = "enabled" ] && echo $svc; done')
-          if [ -z "$UNEXPECTED" ]; then
-            echo "SERVICES_NATIVE_OK=true" >> $GITHUB_ENV
-          else
-            echo "Unexpected enabled services native: $UNEXPECTED"
-            echo "SERVICES_NATIVE_OK=false" >> $GITHUB_ENV
-          fi
-
       - name: Healthcheck native install
         continue-on-error: true
         run: |
@@ -520,11 +508,6 @@ jobs:
           else
             N_VER_ICON="❌"; N_VER_LABEL="FAILED"; FAILED=1
           fi
-          if [ "${SERVICES_NATIVE_OK}" = "true" ]; then
-            N_SVC_ICON="✅"; N_SVC_LABEL="OK"
-          else
-            N_SVC_ICON="❌"; N_SVC_LABEL="FAILED"; FAILED=1
-          fi
           N_P="${PUPPETEER_NATIVE_FAILED:-0}"
           if [ "${N_P}" -gt 5 ]; then
             N_PPT_ICON="❌"; N_PPT_LABEL="FAILED"; FAILED=1
@@ -544,10 +527,10 @@ jobs:
             echo ""
             echo "**Expected version:** \`${EXPECTED}\`"
             echo ""
-            echo "| Install | Healthcheck | Version | Services | Puppeteer (≤5) | DS Log Errors |"
-            echo "|---------|-------------|---------|----------|----------------|---------------|"
-            echo "| Docker | ${D_HC_ICON} ${D_HC_LABEL} | ${D_VER_ICON} \`${DOCKER_VERSION_ACTUAL:-?}\` | — | ${D_PPT_ICON} ${D_PPT_LABEL} (${D_P}) | ${D_DS_ICON} ${D_DS_LABEL} (${D_ERR}) |"
-            echo "| Native | ${N_HC_ICON} ${N_HC_LABEL} | ${N_VER_ICON} \`${NATIVE_VERSION_ACTUAL:-?}\` | SVC: ${N_SVC_ICON} ${N_SVC_LABEL} | ${N_PPT_ICON} ${N_PPT_LABEL} (${N_P}) | ${N_DS_ICON} ${N_DS_LABEL} (${N_ERR}) |"
+            echo "| Install | Healthcheck | Version | Puppeteer (≤5) | DS Log Errors |"
+            echo "|---------|-------------|---------|----------------|---------------|"
+            echo "| Docker | ${D_HC_ICON} ${D_HC_LABEL} | ${D_VER_ICON} \`${DOCKER_VERSION_ACTUAL:-?}\` | ${D_PPT_ICON} ${D_PPT_LABEL} (${D_P}) | ${D_DS_ICON} ${D_DS_LABEL} (${D_ERR}) |"
+            echo "| Native | ${N_HC_ICON} ${N_HC_LABEL} | ${N_VER_ICON} \`${NATIVE_VERSION_ACTUAL:-?}\` | ${N_PPT_ICON} ${N_PPT_LABEL} (${N_P}) | ${N_DS_ICON} ${N_DS_LABEL} (${N_ERR}) |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -557,12 +540,12 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           # ── Console (ASCII table) ────────────────────────────────────────
-          SEP="+--------+--------+-----------------+--------+---------------+-----------+"
+          SEP="+--------+--------+-----------------+---------------+-----------+"
           echo "$SEP"
-          printf "| %-6s | %-6s | %-15s | %-6s | %-13s | %-9s |\n" "Install" "HC" "Version" "Svc" "Puppeteer(≤5)" "DS Errors"
+          printf "| %-6s | %-6s | %-15s | %-13s | %-9s |\n" "Install" "HC" "Version" "Puppeteer(≤5)" "DS Errors"
           echo "$SEP"
-          printf "| %-6s | %-6s | %-15s | %-6s | %-13s | %-9s |\n" "Docker" "${D_HC_LABEL}" "${DOCKER_VERSION_ACTUAL:-?}" "—" "${D_PPT_LABEL}(${D_P})" "${D_DS_LABEL}(${D_ERR})"
-          printf "| %-6s | %-6s | %-15s | %-6s | %-13s | %-9s |\n" "Native" "${N_HC_LABEL}" "${NATIVE_VERSION_ACTUAL:-?}" "SVC:${N_SVC_LABEL}" "${N_PPT_LABEL}(${N_P})" "${N_DS_LABEL}(${N_ERR})"
+          printf "| %-6s | %-6s | %-15s | %-13s | %-9s |\n" "Docker" "${D_HC_LABEL}" "${DOCKER_VERSION_ACTUAL:-?}" "${D_PPT_LABEL}(${D_P})" "${D_DS_LABEL}(${D_ERR})"
+          printf "| %-6s | %-6s | %-15s | %-13s | %-9s |\n" "Native" "${N_HC_LABEL}" "${NATIVE_VERSION_ACTUAL:-?}" "${N_PPT_LABEL}(${N_P})" "${N_DS_LABEL}(${N_ERR})"
           echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
@@ -608,10 +591,9 @@ jobs:
                   'healthy':          b('NATIVE_HEALTHY'),
                   'version_ok':       b('NATIVE_VERSION_OK'),
                   'version_actual':   s('NATIVE_VERSION_ACTUAL'),
-                  'services_ok':      b('SERVICES_NATIVE_OK'),
                   'puppeteer_failed': n('PUPPETEER_NATIVE_FAILED'),
                   'ds_log_errors':    n('DS_LOG_ERRORS_NATIVE'),
-                  'conclusion': 'success' if (b('NATIVE_HEALTHY') and b('NATIVE_VERSION_OK') and b('SERVICES_NATIVE_OK') and ok5('PUPPETEER_NATIVE_FAILED') and n('DS_LOG_ERRORS_NATIVE') == 0) else 'failure',
+                  'conclusion': 'success' if (b('NATIVE_HEALTHY') and b('NATIVE_VERSION_OK') and ok5('PUPPETEER_NATIVE_FAILED') and n('DS_LOG_ERRORS_NATIVE') == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
           }

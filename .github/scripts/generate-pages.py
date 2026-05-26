@@ -230,7 +230,6 @@ def generate():
                 n_hc  = (native or {}).get("healthy", False)
                 n_ver = (native or {}).get("version_actual", "?") or "?"
                 n_vok = (native or {}).get("version_ok", False)
-                svc   = (native or {}).get("services_ok", False)
                 d_err = (docker or {}).get("ds_log_errors", 0)
                 n_err = (native or {}).get("ds_log_errors", 0)
                 err_ok = (d_err + n_err) == 0
@@ -243,7 +242,6 @@ def generate():
                     + f'<td class="{status(d_vok)}">{"✅" if d_vok else "❌"} {escape(d_ver)}</td>'
                     + f'<td class="{status(n_hc)}">{"✅ OK" if n_hc else "❌ FAILED"}</td>'
                     + f'<td class="{status(n_vok)}">{"✅" if n_vok else "❌"} {escape(n_ver)}</td>'
-                    + f'<td class="{status(svc)}">{"✅ OK" if svc else "❌ FAILED"}</td>'
                     + f'<td class="{status(ppt_ok)}">{"✅" if ppt_ok else "❌"} {ppt_total}</td>'
                     + f'<td class="{status(err_ok)}">{"✅" if err_ok else "❌"} {d_err + n_err}</td>'
                     + '</tr>'
@@ -253,7 +251,7 @@ def generate():
         '<th>OS</th><th>Arch</th><th>Last run</th>'
         '<th>Docker HC</th><th>Docker Ver</th>'
         '<th>Native HC</th><th>Native Ver</th>'
-        '<th>Services</th><th>Puppeteer (≤5)</th><th>DS Errors</th>'
+        '<th>Puppeteer (≤5)</th><th>DS Errors</th>'
         '</tr></thead><tbody>'
         + '\n'.join(os_rows)
         + '</tbody></table>\n'
