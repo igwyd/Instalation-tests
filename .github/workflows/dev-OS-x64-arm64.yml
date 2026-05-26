@@ -243,7 +243,10 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
-          printf "y\n" | sudo bash docs-enterprise-install.sh --documentimage onlyoffice/4testing-documentserver-ee --documentversion ${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }} --skiphardwarecheck true --wopienabled true
+          printf "y\n" | sudo bash docs-enterprise-install.sh --documentimage onlyoffice/4testing-documentserver-ee \
+            --documentversion ${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }} \
+            --skiphardwarecheck true \
+            --wopienabled true
           EOF
 
       - name: TEMP Workaround for Docker install issues
@@ -296,26 +299,6 @@ jobs:
             'sudo docker ps -q --filter "name=onlyoffice"')
           echo "id=$CONTAINER_ID" >> $GITHUB_OUTPUT
 
-      - name: Documentserver logs Docker install
-        continue-on-error: true
-        uses: ./.github/actions/ds-logs
-        with:
-          mode: ssh-docker
-          ssh_host: ${{ env.EC2_IP }}
-          ssh_user: ${{ matrix.ssh_user }}
-          container: ${{ steps.ds-container.outputs.id }}
-
-      - name: Check DS logs for errors Docker install
-        continue-on-error: true
-        uses: ./.github/actions/check-ds-logs
-        with:
-          mode: ssh-docker
-          ssh_host: ${{ env.EC2_IP }}
-          ssh_user: ${{ matrix.ssh_user }}
-          container: ${{ steps.ds-container.outputs.id }}
-          env_var: DS_LOG_ERRORS_DOCKER
-          label: Docker
-
       - name: Start ds:example Docker install
         continue-on-error: true
         run: |
@@ -355,12 +338,32 @@ jobs:
           sudo docker system prune -af 2>/dev/null || true
           EOF
 
+      - name: Documentserver logs Docker install
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ${{ matrix.ssh_user }}
+          container: ${{ steps.ds-container.outputs.id }}
+
+      - name: Check DS logs for errors Docker install
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ${{ matrix.ssh_user }}
+          container: ${{ steps.ds-container.outputs.id }}
+          env_var: DS_LOG_ERRORS_DOCKER
+          label: Docker
+
       # ==================== Native install (printf "n") ====================
       - name: Install ONLYOFFICE Docs natively
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
-          printf "n\n" | sudo bash docs-enterprise-install.sh --skiphardwarecheck true
+          printf "n\n" | sudo bash docs-enterprise-install.sh --skiphardwarecheck true --wopienabled true
           EOF
 
       - name: Add dev repo
@@ -417,24 +420,6 @@ jobs:
             echo "NATIVE_VERSION_OK=false" >> $GITHUB_ENV
           fi
 
-      - name: Documentserver logs native install
-        continue-on-error: true
-        uses: ./.github/actions/ds-logs
-        with:
-          mode: ssh-native
-          ssh_host: ${{ env.EC2_IP }}
-          ssh_user: ${{ matrix.ssh_user }}
-
-      - name: Check DS logs for errors native install
-        continue-on-error: true
-        uses: ./.github/actions/check-ds-logs
-        with:
-          mode: ssh-native
-          ssh_host: ${{ env.EC2_IP }}
-          ssh_user: ${{ matrix.ssh_user }}
-          env_var: DS_LOG_ERRORS_NATIVE
-          label: native
-
       - name: Start ds:example native install
         continue-on-error: true
         run: |
@@ -465,6 +450,24 @@ jobs:
       - name: Parse puppeteer results Native
         if: always()
         run: python3 .github/scripts/parse-puppeteer-results.py --edition NATIVE
+
+      - name: Documentserver logs native install
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ${{ matrix.ssh_user }}
+
+      - name: Check DS logs for errors native install
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ${{ matrix.ssh_user }}
+          env_var: DS_LOG_ERRORS_NATIVE
+          label: native
 
       # ==================== Final check + Cleanup ====================
       - name: Final check
