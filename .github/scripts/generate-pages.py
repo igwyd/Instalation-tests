@@ -180,6 +180,39 @@ def pkg_table(data, arch_label):
             f'<table>{thead}<tbody>' + '\n'.join(rows) + '</tbody></table>\n')
 
 
+def docker_table(data, arch_label):
+    run_date = (data or {}).get("run_date", "")
+    date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
+
+    rows = []
+    if data is None:
+        for label in ["EE", "DE", "CE"]:
+            rows.append(f'<tr><td>{label}</td>'
+                        + '<td class="na">—</td>' * 5 + '</tr>')
+    else:
+        for key, label in [("ee", "EE"), ("de", "DE"), ("ce", "CE")]:
+            ed = data.get(key, {})
+            svc_ok = ed.get("services_ok", False)
+            svc_cell = (f'<td class="{status(svc_ok)}">'
+                        f'SVC: {"✅ OK" if svc_ok else "❌ FAILED"}</td>')
+            rows.append(
+                f'<tr><td>{label}</td>'
+                + td_bool(ed.get("healthy", False))
+                + td_version(ed)
+                + svc_cell
+                + td_ppt_simple(ed.get("puppeteer_failed", 0))
+                + td_ds_errors(ed)
+                + '</tr>'
+            )
+
+    thead = ('<thead><tr>'
+             '<th>Edition</th><th>Healthcheck</th><th>Version</th>'
+             '<th>SVC</th><th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
+             '</tr></thead>')
+    return (f'<h3>{arch_label}{date_part}</h3>\n'
+            f'<table>{thead}<tbody>' + '\n'.join(rows) + '</tbody></table>\n')
+
+
 def td_svc(data):
     if data is None:
         return '<td class="na">—</td>'
@@ -261,6 +294,10 @@ def generate():
     deb_arm64  = load("dev-deb-arm64.json")
     rpm_x64   = load("dev-rpm-x64.json")
     rpm_arm64  = load("dev-rpm-arm64.json")
+    docker_deb_x64   = load("dev-docker-deb-x64.json")
+    docker_deb_arm64 = load("dev-docker-deb-arm64.json")
+    docker_rpm_x64   = load("dev-docker-rpm-x64.json")
+    docker_rpm_arm64 = load("dev-docker-rpm-arm64.json")
     db_data   = {key: load(f"dev-db-{key}.json") for _, key in DBS}
     amq_artemis = load("dev-activemq-artemis.json")
     amq_classic = load("dev-activemq-classic.json")
@@ -270,6 +307,12 @@ def generate():
 
     # RPM section body
     rpm_body = pkg_table(rpm_x64, "x64") + pkg_table(rpm_arm64, "arm64")
+
+    # Docker DEB section body
+    docker_deb_body = docker_table(docker_deb_x64, "x64") + docker_table(docker_deb_arm64, "arm64")
+
+    # Docker RPM section body
+    docker_rpm_body = docker_table(docker_rpm_x64, "x64") + docker_table(docker_rpm_arm64, "arm64")
 
     # DB section body
     db_rows = []
@@ -332,6 +375,8 @@ def generate():
 <main>
 {section("DEB Packages (Ubuntu 24.04)", "dev-DEB-x64-arm64.yml", "dev-DEB-x64-arm64", deb_body)}
 {section("RPM Packages (CentOS 9)", "dev-RPM-x64-arm64.yml", "dev-RPM-x64-arm64", rpm_body)}
+{section("Docker DEB (Ubuntu 24.04)", "dev-Docker-DEB-x64-arm64.yml", "dev-Docker-DEB-x64-arm64", docker_deb_body)}
+{section("Docker RPM (CentOS 9)", "dev-Docker-RPM-x64-arm64.yml", "dev-Docker-RPM-x64-arm64", docker_rpm_body)}
 {section("OS Tests (OneClickInstall)", "dev-OS-x64-arm64.yml", "dev-OS-x64-arm64", os_body)}
 {section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body)}
 {section("ActiveMQ Tests", "dev-ActiveMQ.yml", "dev-ActiveMQ", amq_body)}
