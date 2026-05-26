@@ -282,6 +282,7 @@ jobs:
           ACTUAL=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} 'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") dpkg-query -W onlyoffice-documentserver-ee' | awk '{print $2}')
           echo "Expected version: $EXPECTED"
           echo "Actual version: $ACTUAL"
+          echo "DOCKER_VERSION_ACTUAL=$ACTUAL" >> $GITHUB_ENV
           if [ "$ACTUAL" = "$EXPECTED" ]; then
             echo "DOCKER_VERSION_OK=true" >> $GITHUB_ENV
           else
@@ -421,6 +422,7 @@ jobs:
           fi
           echo "Expected version: $EXPECTED"
           echo "Actual version: $ACTUAL"
+          echo "NATIVE_VERSION_ACTUAL=$ACTUAL" >> $GITHUB_ENV
           if [ "$ACTUAL" = "$EXPECTED" ]; then
             echo "NATIVE_VERSION_OK=true" >> $GITHUB_ENV
           else
@@ -481,68 +483,157 @@ jobs:
         if: always()
         run: |
           FAILED=0
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
 
-          echo "=== Docker healthcheck ==="
-          echo "Docker healthy: ${DOCKER_HEALTHY:-not set}"
-          if [ "${DOCKER_HEALTHY}" != "true" ]; then
-            echo "Docker healthcheck FAILED"
-            FAILED=1
+          # ── Docker ───────────────────────────────────────────────────────
+          if [ "${DOCKER_HEALTHY}" = "true" ]; then
+            D_HC_ICON="✅"; D_HC_LABEL="OK"
           else
-            echo "Docker healthcheck passed"
+            D_HC_ICON="❌"; D_HC_LABEL="FAILED"; FAILED=1
           fi
-
-          echo "=== Docker version ==="
-          echo "Docker version OK: ${DOCKER_VERSION_OK:-not set}"
-          if [ "${DOCKER_VERSION_OK}" != "true" ]; then
-            echo "Docker version check FAILED"
-            FAILED=1
+          if [ "${DOCKER_VERSION_OK}" = "true" ]; then
+            D_VER_ICON="✅"; D_VER_LABEL="OK"
           else
-            echo "Docker version check passed"
+            D_VER_ICON="❌"; D_VER_LABEL="FAILED"; FAILED=1
           fi
-
-          echo "=== Native healthcheck ==="
-          echo "Native healthy: ${NATIVE_HEALTHY:-not set}"
-          if [ "${NATIVE_HEALTHY}" != "true" ]; then
-            echo "Native healthcheck FAILED"
-            FAILED=1
+          D_P="${PUPPETEER_DOCKER_FAILED:-0}"
+          if [ "${D_P}" -gt 5 ]; then
+            D_PPT_ICON="❌"; D_PPT_LABEL="FAILED"; FAILED=1
           else
-            echo "Native healthcheck passed"
+            D_PPT_ICON="✅"; D_PPT_LABEL="OK"
           fi
-
-          echo "=== Native version ==="
-          echo "Native version OK: ${NATIVE_VERSION_OK:-not set}"
-          if [ "${NATIVE_VERSION_OK}" != "true" ]; then
-            echo "Native version check FAILED"
-            FAILED=1
+          D_ERR="${DS_LOG_ERRORS_DOCKER:-0}"
+          if [ "${D_ERR}" -gt 0 ]; then
+            D_DS_ICON="❌"; D_DS_LABEL="FAILED"; FAILED=1
           else
-            echo "Native version check passed"
+            D_DS_ICON="✅"; D_DS_LABEL="OK"
           fi
 
-          echo "=== DS services check ==="
-          echo "Services Native OK: ${SERVICES_NATIVE_OK:-not set}"
-          if [ "${SERVICES_NATIVE_OK}" != "true" ]; then
-            echo "Native services check FAILED — unexpected services enabled after install"
-            FAILED=1
-          fi
-
-          echo "=== Puppeteer results ==="
-          echo "Puppeteer Docker  failed: ${PUPPETEER_DOCKER_FAILED:-0}"
-          echo "Puppeteer Native  failed: ${PUPPETEER_NATIVE_FAILED:-0}"
-          echo "Puppeteer total   failed: ${PUPPETEER_TOTAL_FAILED:-0}"
-          if [ "${PUPPETEER_TOTAL_FAILED:-0}" -gt 5 ]; then
-            echo "Too many puppeteer failures: ${PUPPETEER_TOTAL_FAILED} (threshold: 5)"
-            FAILED=1
+          # ── Native ───────────────────────────────────────────────────────
+          if [ "${NATIVE_HEALTHY}" = "true" ]; then
+            N_HC_ICON="✅"; N_HC_LABEL="OK"
           else
-            echo "Puppeteer tests OK: ${PUPPETEER_TOTAL_FAILED:-0} failures (threshold: 5)"
+            N_HC_ICON="❌"; N_HC_LABEL="FAILED"; FAILED=1
+          fi
+          if [ "${NATIVE_VERSION_OK}" = "true" ]; then
+            N_VER_ICON="✅"; N_VER_LABEL="OK"
+          else
+            N_VER_ICON="❌"; N_VER_LABEL="FAILED"; FAILED=1
+          fi
+          if [ "${SERVICES_NATIVE_OK}" = "true" ]; then
+            N_SVC_ICON="✅"; N_SVC_LABEL="OK"
+          else
+            N_SVC_ICON="❌"; N_SVC_LABEL="FAILED"; FAILED=1
+          fi
+          N_P="${PUPPETEER_NATIVE_FAILED:-0}"
+          if [ "${N_P}" -gt 5 ]; then
+            N_PPT_ICON="❌"; N_PPT_LABEL="FAILED"; FAILED=1
+          else
+            N_PPT_ICON="✅"; N_PPT_LABEL="OK"
+          fi
+          N_ERR="${DS_LOG_ERRORS_NATIVE:-0}"
+          if [ "${N_ERR}" -gt 0 ]; then
+            N_DS_ICON="❌"; N_DS_LABEL="FAILED"; FAILED=1
+          else
+            N_DS_ICON="✅"; N_DS_LABEL="OK"
           fi
 
-          echo "=== DS log errors ==="
-          echo "DS log errors Docker: ${DS_LOG_ERRORS_DOCKER:-0}"
-          echo "DS log errors Native: ${DS_LOG_ERRORS_NATIVE:-0}"
+          # ── GITHUB_STEP_SUMMARY ──────────────────────────────────────────
+          {
+            echo "## Final Check — ${{ matrix.os_name }} ${{ matrix.arch }}"
+            echo ""
+            echo "**Expected version:** \`${EXPECTED}\`"
+            echo ""
+            echo "| Install | Healthcheck | Version | Services | Puppeteer (≤5) | DS Log Errors |"
+            echo "|---------|-------------|---------|----------|----------------|---------------|"
+            echo "| Docker | ${D_HC_ICON} ${D_HC_LABEL} | ${D_VER_ICON} \`${DOCKER_VERSION_ACTUAL:-?}\` | — | ${D_PPT_ICON} ${D_PPT_LABEL} (${D_P}) | ${D_DS_ICON} ${D_DS_LABEL} (${D_ERR}) |"
+            echo "| Native | ${N_HC_ICON} ${N_HC_LABEL} | ${N_VER_ICON} \`${NATIVE_VERSION_ACTUAL:-?}\` | SVC: ${N_SVC_ICON} ${N_SVC_LABEL} | ${N_PPT_ICON} ${N_PPT_LABEL} (${N_P}) | ${N_DS_ICON} ${N_DS_LABEL} (${N_ERR}) |"
+            echo ""
+            if [ "$FAILED" -eq 1 ]; then
+              echo "> ❌ **Final check FAILED**"
+            else
+              echo "> ✅ **All checks passed**"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # ── Console (ASCII table) ────────────────────────────────────────
+          SEP="+--------+--------+-----------------+--------+---------------+-----------+"
+          echo "$SEP"
+          printf "| %-6s | %-6s | %-15s | %-6s | %-13s | %-9s |\n" "Install" "HC" "Version" "Svc" "Puppeteer(≤5)" "DS Errors"
+          echo "$SEP"
+          printf "| %-6s | %-6s | %-15s | %-6s | %-13s | %-9s |\n" "Docker" "${D_HC_LABEL}" "${DOCKER_VERSION_ACTUAL:-?}" "—" "${D_PPT_LABEL}(${D_P})" "${D_DS_LABEL}(${D_ERR})"
+          printf "| %-6s | %-6s | %-15s | %-6s | %-13s | %-9s |\n" "Native" "${N_HC_LABEL}" "${NATIVE_VERSION_ACTUAL:-?}" "SVC:${N_SVC_LABEL}" "${N_PPT_LABEL}(${N_P})" "${N_DS_LABEL}(${N_ERR})"
+          echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
+            echo "FINAL_CONCLUSION=failure" >> "$GITHUB_ENV"
             echo "::error::Instance: ${{ env.INSTANCE_ID }}, IP: ${{ env.EC2_IP }}, Tag: ${{ matrix.tag }}"
             exit 1
+          else
+            echo "FINAL_CONCLUSION=success" >> "$GITHUB_ENV"
+          fi
+
+      - name: Save results
+        if: always()
+        continue-on-error: true
+        env:
+          OS_NAME: ${{ matrix.os_name }}
+          ARCH: ${{ matrix.arch }}
+          TAG: ${{ matrix.tag }}
+          EXPECTED_VERSION: ${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}
+        run: |
+          mkdir -p .github/workflow-results
+          python3 - << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+
+          def b(v):   return os.environ.get(v, 'false') == 'true'
+          def n(v):   return int(os.environ.get(v, '0') or '0')
+          def s(v):   return os.environ.get(v, 'not set')
+          def ok5(v): return n(v) <= 5
+
+          data = {
+              'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              'os_name':  s('OS_NAME'),
+              'arch':     s('ARCH'),
+              'docker': {
+                  'healthy':          b('DOCKER_HEALTHY'),
+                  'version_ok':       b('DOCKER_VERSION_OK'),
+                  'version_actual':   s('DOCKER_VERSION_ACTUAL'),
+                  'puppeteer_failed': n('PUPPETEER_DOCKER_FAILED'),
+                  'ds_log_errors':    n('DS_LOG_ERRORS_DOCKER'),
+                  'conclusion': 'success' if (b('DOCKER_HEALTHY') and b('DOCKER_VERSION_OK') and ok5('PUPPETEER_DOCKER_FAILED') and n('DS_LOG_ERRORS_DOCKER') == 0) else 'failure',
+              },
+              'native': {
+                  'healthy':          b('NATIVE_HEALTHY'),
+                  'version_ok':       b('NATIVE_VERSION_OK'),
+                  'version_actual':   s('NATIVE_VERSION_ACTUAL'),
+                  'services_ok':      b('SERVICES_NATIVE_OK'),
+                  'puppeteer_failed': n('PUPPETEER_NATIVE_FAILED'),
+                  'ds_log_errors':    n('DS_LOG_ERRORS_NATIVE'),
+                  'conclusion': 'success' if (b('NATIVE_HEALTHY') and b('NATIVE_VERSION_OK') and b('SERVICES_NATIVE_OK') and ok5('PUPPETEER_NATIVE_FAILED') and n('DS_LOG_ERRORS_NATIVE') == 0) else 'failure',
+              },
+              'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
+          }
+          tag  = s('TAG')
+          path = f'.github/workflow-results/{tag}.json'
+          with open(path, 'w') as f:
+              json.dump(data, f, indent=2)
+          print(f'Saved: {path}')
+          PYEOF
+
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add .github/workflow-results/${{ matrix.tag }}.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "[dev OS x64-arm64] Save ${{ matrix.os_name }} ${{ matrix.arch }} results"
+            for i in 1 2 3; do
+              git pull --rebase origin ${{ github.ref_name }} && git push origin HEAD && break
+              echo "Attempt $i failed, retrying..."
+              sleep $((5 + RANDOM % 10))
+            done
           fi
 
       - name: Delete EC2 Instance

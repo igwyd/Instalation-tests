@@ -24,6 +24,16 @@ DBS = [
     ("MariaDB",       "mariadb"),
 ]
 
+OS_ENTRIES = [
+    ("Ubuntu 26.04", "ubuntu2604"),
+    ("Debian 12",    "debian12"),
+    ("Debian 13",    "debian13"),
+    ("CentOS 10",    "centos10"),
+    ("RHEL 8",       "rhel8"),
+    ("RHEL 9",       "rhel9"),
+    ("RHEL 10",      "rhel10"),
+]
+
 CSS = """
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; color: #24292f; background: #f6f8fa; }
@@ -170,6 +180,13 @@ def pkg_table(data, arch_label):
             f'<table>{thead}<tbody>' + '\n'.join(rows) + '</tbody></table>\n')
 
 
+def td_svc(data):
+    if data is None:
+        return '<td class="na">—</td>'
+    v = data.get("services_ok", False)
+    return f'<td class="{status(v)}">SVC: {"✅ OK" if v else "❌ FAILED"}</td>'
+
+
 def badge_link(workflow_file, label):
     url = f"{WORKFLOW_BASE}/{workflow_file}"
     return (f'<a href="{url}">'
@@ -188,6 +205,59 @@ def section(title, workflow_file, badge_label, body_html):
 
 def generate():
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    # OS section body
+    os_rows = []
+    for os_label, os_key in OS_ENTRIES:
+        for arch in ("x64", "arm64"):
+            tag = f"dev-{os_key}-{arch}"
+            d = load(f"{tag}.json")
+            run_date = (d or {}).get("run_date", "")
+            docker = (d or {}).get("docker")
+            native = (d or {}).get("native")
+            ppt_total = ((docker or {}).get("puppeteer_failed", 0)
+                         + (native or {}).get("puppeteer_failed", 0)) if d else 0
+            ppt_ok = ppt_total <= 5
+            if d is None:
+                os_rows.append(
+                    f'<tr><td>{escape(os_label)}</td><td>{arch}</td>'
+                    + '<td class="na">—</td>' * 8 + '</tr>'
+                )
+            else:
+                d_hc  = (docker or {}).get("healthy", False)
+                d_ver = (docker or {}).get("version_actual", "?") or "?"
+                d_vok = (docker or {}).get("version_ok", False)
+                n_hc  = (native or {}).get("healthy", False)
+                n_ver = (native or {}).get("version_actual", "?") or "?"
+                n_vok = (native or {}).get("version_ok", False)
+                svc   = (native or {}).get("services_ok", False)
+                d_err = (docker or {}).get("ds_log_errors", 0)
+                n_err = (native or {}).get("ds_log_errors", 0)
+                err_ok = (d_err + n_err) == 0
+                os_rows.append(
+                    f'<tr>'
+                    f'<td>{escape(os_label)}</td>'
+                    f'<td>{arch}</td>'
+                    f'<td class="na" style="font-size:11px;color:#8c959f">{escape(run_date)}</td>'
+                    + f'<td class="{status(d_hc)}">{"✅ OK" if d_hc else "❌ FAILED"}</td>'
+                    + f'<td class="{status(d_vok)}">{"✅" if d_vok else "❌"} {escape(d_ver)}</td>'
+                    + f'<td class="{status(n_hc)}">{"✅ OK" if n_hc else "❌ FAILED"}</td>'
+                    + f'<td class="{status(n_vok)}">{"✅" if n_vok else "❌"} {escape(n_ver)}</td>'
+                    + f'<td class="{status(svc)}">{"✅ OK" if svc else "❌ FAILED"}</td>'
+                    + f'<td class="{status(ppt_ok)}">{"✅" if ppt_ok else "❌"} {ppt_total}</td>'
+                    + f'<td class="{status(err_ok)}">{"✅" if err_ok else "❌"} {d_err + n_err}</td>'
+                    + '</tr>'
+                )
+    os_body = (
+        '<table><thead><tr>'
+        '<th>OS</th><th>Arch</th><th>Last run</th>'
+        '<th>Docker HC</th><th>Docker Ver</th>'
+        '<th>Native HC</th><th>Native Ver</th>'
+        '<th>Services</th><th>Puppeteer (≤5)</th><th>DS Errors</th>'
+        '</tr></thead><tbody>'
+        + '\n'.join(os_rows)
+        + '</tbody></table>\n'
+    )
 
     deb_x64   = load("dev-deb-x64.json")
     deb_arm64  = load("dev-deb-arm64.json")
@@ -264,6 +334,7 @@ def generate():
 <main>
 {section("DEB Packages (Ubuntu 24.04)", "dev-DEB-x64-arm64.yml", "dev-DEB-x64-arm64", deb_body)}
 {section("RPM Packages (CentOS 9)", "dev-RPM-x64-arm64.yml", "dev-RPM-x64-arm64", rpm_body)}
+{section("OS Tests (OneClickInstall)", "dev-OS-x64-arm64.yml", "dev-OS-x64-arm64", os_body)}
 {section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body)}
 {section("ActiveMQ Tests", "dev-ActiveMQ.yml", "dev-ActiveMQ", amq_body)}
 </main>
