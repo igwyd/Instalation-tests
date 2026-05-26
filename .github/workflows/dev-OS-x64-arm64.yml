@@ -14,24 +14,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Ubuntu 22.04
-          - os_name: Ubuntu 22.04
+          # Ubuntu 26.04
+          - os_name: Ubuntu 26.04
             os_type: deb
             ssh_user: ubuntu
             device_name: /dev/sda1
             arch: x64
-            ami: ami-0030e4319cbf4dbf2
+            ami: ami-091138d0f0d41ff90
             instance_type: t2.medium
-            tag: dev-ubuntu2204-x64
+            tag: dev-ubuntu2604-x64
 
-          - os_name: Ubuntu 22.04
+          - os_name: Ubuntu 26.04
             os_type: deb
             ssh_user: ubuntu
             device_name: /dev/sda1
             arch: arm64
-            ami: ami-03dc355fadfbaaf26
+            ami: ami-07ad186bc37b8dac4
             instance_type: t4g.medium
-            tag: dev-ubuntu2204-arm64
+            tag: dev-ubuntu2604-arm64
 
           # Debian 12
           - os_name: Debian 12
