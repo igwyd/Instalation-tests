@@ -1,65 +1,39 @@
-name: Update data in README
+name: Update version in README
 
 on:
   schedule:
     - cron: '0 11 * * 3'  # Wednesday 14:00 Moscow time (UTC+3)
-    - cron: '0 22 * * 3'  # Wednesday 01:00 Moscow time (UTC+3, next day)
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  update-data:
+  update-version:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Set up version variable
-        run: echo "VERSION=v${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" >> $GITHUB_ENV
-
-      - name: Update version in README.md if changed
+      - name: Update version badge in README.md
         run: |
+          VERSION="v${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           FILE="README.md"
           START="<!-- onlyoffice-version-start -->"
           END="<!-- onlyoffice-version-end -->"
 
-          #Current version in README
           CURRENT=$(grep -oP "$START\K.*?(?=$END)" "$FILE")
-
-          echo "Current version in README: $CURRENT"
-          echo "Target version from variable: $VERSION"
+          echo "Current: $CURRENT | Target: $VERSION"
 
           if [ "$CURRENT" != "$VERSION" ]; then
             echo "Updating version..."
             sed -i "s|\($START\).*\($END\)|\1$VERSION\2|" "$FILE"
-          else
-            echo "Version is up to date, skipping change."
-          fi
-
-      - name: Update dev-DEB-x64-arm64.yml status in README
-        run: python3 .github/scripts/update-readme-deb.py
-
-      - name: Update dev-RPM-x64-arm64.yml status in README
-        run: python3 .github/scripts/update-readme-rpm.py
-
-      - name: Update dev-ActiveMQ.yml status in README
-        run: python3 .github/scripts/update-readme-activemq.py
-
-      - name: Update dev-DB-check.yml status in README
-        run: python3 .github/scripts/update-readme-db.py
-
-      - name: Commit and push if changed
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-
-          if git diff --quiet; then
-            echo "No changes to commit"
-          else
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
             git add README.md
-            git commit -m "Update data in README.md, ONLYOFFICE version to $VERSION"
+            git commit -m "[Update version in README] $VERSION"
             git push
+          else
+            echo "Version is up to date, skipping."
           fi
