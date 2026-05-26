@@ -210,7 +210,16 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
           if command -v apt-get &>/dev/null; then
-            sudo apt-get update && sudo apt-get upgrade -y
+            for i in 1 2 3; do
+              sudo apt-get update && sudo apt-get upgrade -y && break
+              if [ $i -lt 3 ]; then
+                echo "Attempt $i failed, retrying in 30s..."
+                sleep 30
+              else
+                echo "All attempts failed"
+                exit 1
+              fi
+            done
           else
             sudo dnf -y clean all && sudo dnf -y update
           fi
