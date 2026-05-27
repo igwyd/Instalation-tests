@@ -1,0 +1,31 @@
+{
+  "run_date": "2026-05-27 16:47 UTC",
+  "ee": {
+    "healthy": false,
+    "version_ok": false,
+    "version_actual": "not set",
+    "services_ok": false,
+    "puppeteer_failed": 1998,
+    "ds_log_errors": 0,
+    "conclusion": "failure"
+  },
+  "de": {
+    "healthy": false,
+    "version_ok": false,
+    "version_actual": "not set",
+    "services_ok": false,
+    "puppeteer_failed": 1998,
+    "ds_log_errors": 0,
+    "conclusion": "failure"
+  },
+  "ce": {
+    "healthy": false,
+    "version_ok": false,
+    "version_actual": "not set",
+    "services_ok": false,
+    "puppeteer_failed": 1998,
+    "ds_log_errors": 0,
+    "conclusion": "failure"
+  },
+  "conclusion": "failure"
+}
