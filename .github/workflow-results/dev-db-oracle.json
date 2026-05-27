@@ -3,9 +3,9 @@
   "version_expected": "9.4.0-129",
   "version_actual": "9.4.0-129",
   "version_ok": true,
-  "puppeteer_api_failed": 1,
+  "puppeteer_api_failed": 0,
   "puppeteer_wopi_failed": 0,
-  "puppeteer_total_failed": 1,
-  "ds_log_errors": 3,
+  "puppeteer_total_failed": 0,
+  "ds_log_errors": 1,
   "conclusion": "failure"
 }
