@@ -5,6 +5,9 @@ on:
     - cron: '0 14 * * 3'  # Wednesday 17:00 Mosсow time (UTC+3)
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   test-dev-Redis-unix-sock:
     runs-on: ubuntu-24.04
@@ -179,52 +182,134 @@ jobs:
         run: |
           FAILED=0
 
-          echo "=== Healthcheck ==="
-          echo "Healthcheck: ${HEALTHCHECK_RESULT:-not set}"
-          if [ "${HEALTHCHECK_RESULT}" != "true" ]; then
-            echo "Healthcheck FAILED"
-            FAILED=1
-          fi
-
-          echo "=== Redis socket ==="
-          echo "Redis socket ping: ${REDIS_SOCK_OK:-not set}"
-          if [ "${REDIS_SOCK_OK}" != "true" ]; then
-            echo "Redis socket check FAILED"
-            FAILED=1
-          fi
-
-          echo "=== Port 6379 ==="
-          echo "Port 6379 closed: ${PORT_6379_CLOSED:-not set}"
-          if [ "${PORT_6379_CLOSED}" != "true" ]; then
-            echo "Port 6379 is not closed!"
-            FAILED=1
-          fi
-
-          echo "=== DS services check ==="
-          echo "Services OK: ${SERVICES_OK:-not set}"
-          if [ "${SERVICES_OK}" != "true" ]; then
-            echo "DS services check FAILED — unexpected services running after install"
-            FAILED=1
-          fi
-
-          echo "=== Puppeteer results ==="
-          echo "Puppeteer API  failed: ${PUPPETEER_API_FAILED:-0}"
-          echo "Puppeteer WOPI failed: ${PUPPETEER_WOPI_FAILED:-0}"
-          echo "Puppeteer total failed: ${PUPPETEER_FAILED:-0}"
-          if [ "${PUPPETEER_FAILED:-0}" -gt 5 ]; then
-            echo "Too many puppeteer failures: ${PUPPETEER_FAILED} (threshold: 5)"
-            FAILED=1
+          if [ "${HEALTHCHECK_RESULT}" = "true" ]; then
+            HC_ICON="✅"; HC_LABEL="OK";     HC_DETAIL="${HEALTHCHECK_RESULT}"
           else
-            echo "Puppeteer tests OK: ${PUPPETEER_FAILED:-0} failures (threshold: 5)"
+            HC_ICON="❌"; HC_LABEL="FAILED"; HC_DETAIL="${HEALTHCHECK_RESULT:-not set}"; FAILED=1
           fi
 
-          echo "=== DS log errors ==="
-          echo "DS log errors: ${DS_LOG_ERRORS:-0}"
-          if [ "${DS_LOG_ERRORS:-0}" -gt 0 ]; then
-            echo "DS log errors FAILED"
-            FAILED=1
+          if [ "${REDIS_SOCK_OK}" = "true" ]; then
+            SOCK_ICON="✅"; SOCK_LABEL="OK"
+          else
+            SOCK_ICON="❌"; SOCK_LABEL="FAILED"; FAILED=1
           fi
+          SOCK_DETAIL="PONG: ${REDIS_SOCK_OK:-not set}"
+
+          if [ "${PORT_6379_CLOSED}" = "true" ]; then
+            PORT_ICON="✅"; PORT_LABEL="OK"
+          else
+            PORT_ICON="❌"; PORT_LABEL="FAILED"; FAILED=1
+          fi
+          PORT_DETAIL="closed: ${PORT_6379_CLOSED:-not set}"
+
+          if [ "${SERVICES_OK}" = "true" ]; then
+            SVC_ICON="✅"; SVC_LABEL="OK"
+          else
+            SVC_ICON="❌"; SVC_LABEL="FAILED"; FAILED=1
+          fi
+          SVC_DETAIL="services_ok: ${SERVICES_OK:-not set}"
+
+          PPTR_TOTAL="${PUPPETEER_FAILED:-0}"
+          PPT_DETAIL="API: ${PUPPETEER_API_FAILED:-0}, WOPI: ${PUPPETEER_WOPI_FAILED:-0}, Total: ${PPTR_TOTAL} (threshold: 5)"
+          if [ "$PPTR_TOTAL" -gt 5 ]; then
+            PPT_ICON="❌"; PPT_LABEL="FAILED"; FAILED=1
+          else
+            PPT_ICON="✅"; PPT_LABEL="OK"
+          fi
+
+          DS_ERRORS="${DS_LOG_ERRORS:-0}"
+          DS_DETAIL="${DS_ERRORS} errors"
+          if [ "$DS_ERRORS" -gt 0 ]; then
+            DS_ICON="❌"; DS_LABEL="FAILED"; FAILED=1
+          else
+            DS_ICON="✅"; DS_LABEL="OK"
+          fi
+
+          # --- GITHUB_STEP_SUMMARY (markdown table) ---
+          {
+            echo "## Final Check — ${{ matrix.driver }}"
+            echo ""
+            echo "| Check | Result | Details |"
+            echo "|-------|--------|---------|"
+            echo "| Healthcheck     | ${HC_ICON} ${HC_LABEL}   | ${HC_DETAIL} |"
+            echo "| Redis sock ping | ${SOCK_ICON} ${SOCK_LABEL} | ${SOCK_DETAIL} |"
+            echo "| Port 6379       | ${PORT_ICON} ${PORT_LABEL} | ${PORT_DETAIL} |"
+            echo "| DS Services     | ${SVC_ICON} ${SVC_LABEL}  | ${SVC_DETAIL} |"
+            echo "| Puppeteer       | ${PPT_ICON} ${PPT_LABEL}  | ${PPT_DETAIL} |"
+            echo "| DS Log Errors   | ${DS_ICON} ${DS_LABEL}   | ${DS_DETAIL} |"
+            echo ""
+            if [ "$FAILED" -eq 1 ]; then
+              echo "> ❌ **Final check FAILED**"
+            else
+              echo "> ✅ **All checks passed**"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # --- Console log (ASCII table) ---
+          SEP="+------------------+--------+--------------------------------------------+"
+          echo "$SEP"
+          printf "| %-16s | %-6s | %-42s |\n" "Check" "Result" "Details"
+          echo "$SEP"
+          printf "| %-16s | %-6s | %-42s |\n" "Healthcheck"     "${HC_LABEL}"   "${HC_DETAIL}"
+          printf "| %-16s | %-6s | %-42s |\n" "Redis sock ping" "${SOCK_LABEL}" "${SOCK_DETAIL}"
+          printf "| %-16s | %-6s | %-42s |\n" "Port 6379"       "${PORT_LABEL}" "${PORT_DETAIL}"
+          printf "| %-16s | %-6s | %-42s |\n" "DS Services"     "${SVC_LABEL}"  "${SVC_DETAIL}"
+          printf "| %-16s | %-6s | %-42s |\n" "Puppeteer"       "${PPT_LABEL}"  "${PPT_DETAIL}"
+          printf "| %-16s | %-6s | %-42s |\n" "DS Log Errors"   "${DS_LABEL}"   "${DS_DETAIL}"
+          echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
+            echo "FINAL_CONCLUSION=failure" >> "$GITHUB_ENV"
             exit 1
+          else
+            echo "FINAL_CONCLUSION=success" >> "$GITHUB_ENV"
+          fi
+
+      - name: Save results
+        if: always()
+        continue-on-error: true
+        env:
+          DRIVER: ${{ matrix.driver }}
+        run: |
+          mkdir -p .github/workflow-results
+          python3 - << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+
+          def b(v): return os.environ.get(v, 'false') == 'true'
+          def n(v): return int(os.environ.get(v, '0') or '0')
+          def s(v): return os.environ.get(v, 'not set')
+
+          driver = s('DRIVER')
+          data = {
+              'run_date':              datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              'driver':                driver,
+              'healthy':               b('HEALTHCHECK_RESULT'),
+              'redis_sock_ok':         b('REDIS_SOCK_OK'),
+              'port_6379_closed':      b('PORT_6379_CLOSED'),
+              'services_ok':           b('SERVICES_OK'),
+              'puppeteer_api_failed':  n('PUPPETEER_API_FAILED'),
+              'puppeteer_wopi_failed': n('PUPPETEER_WOPI_FAILED'),
+              'puppeteer_total_failed': n('PUPPETEER_FAILED'),
+              'ds_log_errors':         n('DS_LOG_ERRORS'),
+              'conclusion':            os.environ.get('FINAL_CONCLUSION', 'failure'),
+          }
+          path = f'.github/workflow-results/dev-redis-sock-{driver}.json'
+          with open(path, 'w') as f:
+              json.dump(data, f, indent=2)
+          print(f'Saved: {path}')
+          PYEOF
+
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add .github/workflow-results/dev-redis-sock-${{ matrix.driver }}.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "[dev Redis unix.sock x64] Save ${{ matrix.driver }} results"
+            for i in 1 2 3; do
+              git pull --rebase origin ${{ github.ref_name }} && git push origin HEAD && break
+              echo "Attempt $i failed, retrying..."
+              sleep $((5 + RANDOM % 10))
+            done
           fi

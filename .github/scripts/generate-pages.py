@@ -301,6 +301,8 @@ def generate():
     db_data   = {key: load(f"dev-db-{key}.json") for _, key in DBS}
     amq_artemis = load("dev-activemq-artemis.json")
     amq_classic = load("dev-activemq-classic.json")
+    redis_redis  = load("dev-redis-sock-redis.json")
+    redis_ioredis = load("dev-redis-sock-ioredis.json")
 
     # DEB section body
     deb_body = pkg_table(deb_x64, "x64") + pkg_table(deb_arm64, "arm64")
@@ -359,6 +361,43 @@ def generate():
                 + '\n'.join(amq_rows)
                 + '</tbody></table>\n')
 
+    # Redis section body
+    redis_rows = []
+    for label, d in [("redis", redis_redis), ("ioredis", redis_ioredis)]:
+        run_date = (d or {}).get("run_date", "")
+        date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
+        if d is None:
+            redis_rows.append(f'<tr><td>{label}</td>'
+                              + '<td class="na">—</td>' * 5 + '</tr>')
+        else:
+            hc   = d.get("healthy", False)
+            sock = d.get("redis_sock_ok", False)
+            port = d.get("port_6379_closed", False)
+            svc  = d.get("services_ok", False)
+            ppt  = d.get("puppeteer_total_failed", 0)
+            ppt_api  = d.get("puppeteer_api_failed", 0)
+            ppt_wopi = d.get("puppeteer_wopi_failed", 0)
+            ppt_ok   = ppt <= 5
+            ds_err   = d.get("ds_log_errors", 0)
+            redis_rows.append(
+                f'<tr>'
+                f'<td>{label}{date_part}</td>'
+                + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
+                + f'<td class="{status(sock)}">{"✅ OK" if sock else "❌ FAILED"}</td>'
+                + f'<td class="{status(port)}">{"✅ OK" if port else "❌ FAILED"}</td>'
+                + f'<td class="{status(svc)}">{"✅ OK" if svc else "❌ FAILED"}</td>'
+                + f'<td class="{status(ppt_ok)}">{"✅" if ppt_ok else "❌"} {ppt} (API: {ppt_api}, WOPI: {ppt_wopi})</td>'
+                + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
+                + '</tr>'
+            )
+    redis_body = ('<table><thead><tr>'
+                  '<th>Driver</th><th>Healthcheck</th><th>Redis Sock</th>'
+                  '<th>Port 6379</th><th>DS Services</th>'
+                  '<th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
+                  '</tr></thead><tbody>'
+                  + '\n'.join(redis_rows)
+                  + '</tbody></table>\n')
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -380,6 +419,7 @@ def generate():
 {section("OS Tests (OneClickInstall)", "dev-OS-x64-arm64.yml", "dev-OS-x64-arm64", os_body)}
 {section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body)}
 {section("ActiveMQ Tests", "dev-ActiveMQ.yml", "dev-ActiveMQ", amq_body)}
+{section("Redis unix.sock Tests", "dev-Redis-unix.sock.yml", "dev-Redis-unix.sock x64", redis_body)}
 </main>
 <footer>Generated automatically · <a href="{REPO}/actions">GitHub Actions</a></footer>
 </body>
