@@ -370,6 +370,7 @@ jobs:
           EOF
 
       - name: Add dev repo
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
           if [ "${{ matrix.os_type }}" = "deb" ]; then
