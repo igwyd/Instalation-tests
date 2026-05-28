@@ -71,6 +71,27 @@ jobs:
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
 
+      - name: Upgrade packages
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          for i in 1 2 3; do
+            sudo apt-get update && sudo apt-get upgrade -y && break
+            if [ $i -lt 3 ]; then
+              echo "Attempt $i failed, retrying in 30s..."
+              sleep 30
+            else
+              echo "All attempts failed"
+              exit 1
+            fi
+          done
+          EOF
+
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Wait for instance to reboot after upgrade
+        run: sleep 180
+
       - name: Install Docker on EC2
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
