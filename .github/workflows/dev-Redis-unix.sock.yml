@@ -112,6 +112,19 @@ jobs:
             echo "PORT_6379_CLOSED=false" >> $GITHUB_ENV
           fi
 
+      - name: Check version ${{ matrix.driver }}
+        continue-on-error: true
+        run: |
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          ACTUAL=$(docker exec ${{ matrix.container }} dpkg-query -W onlyoffice-documentserver-ee 2>/dev/null | awk '{print $2}')
+          echo "Expected: $EXPECTED, Actual: $ACTUAL"
+          echo "VERSION_ACTUAL=$ACTUAL" >> $GITHUB_ENV
+          if [ "$ACTUAL" = "$EXPECTED" ]; then
+            echo "VERSION_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_OK=false" >> $GITHUB_ENV
+          fi
+
       - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
@@ -188,6 +201,14 @@ jobs:
             HC_ICON="❌"; HC_LABEL="FAILED"; HC_DETAIL="${HEALTHCHECK_RESULT:-not set}"; FAILED=1
           fi
 
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          if [ "${VERSION_OK}" = "true" ]; then
+            VER_ICON="✅"; VER_LABEL="OK"
+          else
+            VER_ICON="❌"; VER_LABEL="FAILED"; FAILED=1
+          fi
+          VER_DETAIL="exp: ${EXPECTED}, act: ${VERSION_ACTUAL:-not set}"
+
           if [ "${REDIS_SOCK_OK}" = "true" ]; then
             SOCK_ICON="✅"; SOCK_LABEL="OK"
           else
@@ -201,13 +222,6 @@ jobs:
             PORT_ICON="❌"; PORT_LABEL="FAILED"; FAILED=1
           fi
           PORT_DETAIL="closed: ${PORT_6379_CLOSED:-not set}"
-
-          if [ "${SERVICES_OK}" = "true" ]; then
-            SVC_ICON="✅"; SVC_LABEL="OK"
-          else
-            SVC_ICON="❌"; SVC_LABEL="FAILED"; FAILED=1
-          fi
-          SVC_DETAIL="services_ok: ${SERVICES_OK:-not set}"
 
           PPTR_TOTAL="${PUPPETEER_FAILED:-0}"
           PPT_DETAIL="API: ${PUPPETEER_API_FAILED:-0}, WOPI: ${PUPPETEER_WOPI_FAILED:-0}, Total: ${PPTR_TOTAL} (threshold: 5)"
@@ -232,9 +246,9 @@ jobs:
             echo "| Check | Result | Details |"
             echo "|-------|--------|---------|"
             echo "| Healthcheck     | ${HC_ICON} ${HC_LABEL}   | ${HC_DETAIL} |"
+            echo "| Version         | ${VER_ICON} ${VER_LABEL}  | \`${VERSION_ACTUAL:-not set}\` |"
             echo "| Redis sock ping | ${SOCK_ICON} ${SOCK_LABEL} | ${SOCK_DETAIL} |"
             echo "| Port 6379       | ${PORT_ICON} ${PORT_LABEL} | ${PORT_DETAIL} |"
-            echo "| DS Services     | ${SVC_ICON} ${SVC_LABEL}  | ${SVC_DETAIL} |"
             echo "| Puppeteer       | ${PPT_ICON} ${PPT_LABEL}  | ${PPT_DETAIL} |"
             echo "| DS Log Errors   | ${DS_ICON} ${DS_LABEL}   | ${DS_DETAIL} |"
             echo ""
@@ -251,9 +265,9 @@ jobs:
           printf "| %-16s | %-6s | %-42s |\n" "Check" "Result" "Details"
           echo "$SEP"
           printf "| %-16s | %-6s | %-42s |\n" "Healthcheck"     "${HC_LABEL}"   "${HC_DETAIL}"
+          printf "| %-16s | %-6s | %-42s |\n" "Version"         "${VER_LABEL}"  "${VER_DETAIL}"
           printf "| %-16s | %-6s | %-42s |\n" "Redis sock ping" "${SOCK_LABEL}" "${SOCK_DETAIL}"
           printf "| %-16s | %-6s | %-42s |\n" "Port 6379"       "${PORT_LABEL}" "${PORT_DETAIL}"
-          printf "| %-16s | %-6s | %-42s |\n" "DS Services"     "${SVC_LABEL}"  "${SVC_DETAIL}"
           printf "| %-16s | %-6s | %-42s |\n" "Puppeteer"       "${PPT_LABEL}"  "${PPT_DETAIL}"
           printf "| %-16s | %-6s | %-42s |\n" "DS Log Errors"   "${DS_LABEL}"   "${DS_DETAIL}"
           echo "$SEP"
@@ -282,17 +296,18 @@ jobs:
 
           driver = s('DRIVER')
           data = {
-              'run_date':              datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
-              'driver':                driver,
-              'healthy':               b('HEALTHCHECK_RESULT'),
-              'redis_sock_ok':         b('REDIS_SOCK_OK'),
-              'port_6379_closed':      b('PORT_6379_CLOSED'),
-              'services_ok':           b('SERVICES_OK'),
-              'puppeteer_api_failed':  n('PUPPETEER_API_FAILED'),
-              'puppeteer_wopi_failed': n('PUPPETEER_WOPI_FAILED'),
+              'run_date':               datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              'driver':                 driver,
+              'healthy':                b('HEALTHCHECK_RESULT'),
+              'version_ok':             b('VERSION_OK'),
+              'version_actual':         s('VERSION_ACTUAL'),
+              'redis_sock_ok':          b('REDIS_SOCK_OK'),
+              'port_6379_closed':       b('PORT_6379_CLOSED'),
+              'puppeteer_api_failed':   n('PUPPETEER_API_FAILED'),
+              'puppeteer_wopi_failed':  n('PUPPETEER_WOPI_FAILED'),
               'puppeteer_total_failed': n('PUPPETEER_FAILED'),
-              'ds_log_errors':         n('DS_LOG_ERRORS'),
-              'conclusion':            os.environ.get('FINAL_CONCLUSION', 'failure'),
+              'ds_log_errors':          n('DS_LOG_ERRORS'),
+              'conclusion':             os.environ.get('FINAL_CONCLUSION', 'failure'),
           }
           path = f'.github/workflow-results/dev-redis-sock-{driver}.json'
           with open(path, 'w') as f:

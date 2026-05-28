@@ -363,41 +363,42 @@ def generate():
                 + '</tbody></table>\n')
 
     # Redis section body
-    redis_rows = []
-    for label, d in [("redis", redis_redis), ("ioredis", redis_ioredis)]:
+    def redis_driver_table(label, d):
         run_date = (d or {}).get("run_date", "")
         date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
+        thead = ('<thead><tr>'
+                 '<th>Healthcheck</th><th>Version</th>'
+                 '<th>Redis sock ping</th><th>Port 6379 closed</th>'
+                 '<th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
+                 '</tr></thead>')
         if d is None:
-            redis_rows.append(f'<tr><td>{label}</td>'
-                              + '<td class="na">—</td>' * 5 + '</tr>')
+            row = '<tr>' + '<td class="na">—</td>' * 6 + '</tr>'
         else:
-            hc   = d.get("healthy", False)
-            sock = d.get("redis_sock_ok", False)
-            port = d.get("port_6379_closed", False)
-            svc  = d.get("services_ok", False)
-            ppt  = d.get("puppeteer_total_failed", 0)
-            ppt_api  = d.get("puppeteer_api_failed", 0)
-            ppt_wopi = d.get("puppeteer_wopi_failed", 0)
-            ppt_ok   = ppt <= 5
-            ds_err   = d.get("ds_log_errors", 0)
-            redis_rows.append(
-                f'<tr>'
-                f'<td>{label}{date_part}</td>'
+            hc      = d.get("healthy", False)
+            ver_ok  = d.get("version_ok", False)
+            ver_act = d.get("version_actual", "?") or "?"
+            sock    = d.get("redis_sock_ok", False)
+            port    = d.get("port_6379_closed", False)
+            ppt     = d.get("puppeteer_total_failed", 0)
+            ppt_api = d.get("puppeteer_api_failed", 0)
+            ppt_wopi= d.get("puppeteer_wopi_failed", 0)
+            ppt_ok  = ppt <= 5
+            ds_err  = d.get("ds_log_errors", 0)
+            row = (
+                '<tr>'
                 + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
+                + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver_act)}</td>'
                 + f'<td class="{status(sock)}">{"✅ OK" if sock else "❌ FAILED"}</td>'
                 + f'<td class="{status(port)}">{"✅ OK" if port else "❌ FAILED"}</td>'
-                + f'<td class="{status(svc)}">{"✅ OK" if svc else "❌ FAILED"}</td>'
                 + f'<td class="{status(ppt_ok)}">{"✅" if ppt_ok else "❌"} {ppt} (API: {ppt_api}, WOPI: {ppt_wopi})</td>'
                 + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
                 + '</tr>'
             )
-    redis_body = ('<table><thead><tr>'
-                  '<th>Driver</th><th>Healthcheck</th><th>Redis Sock</th>'
-                  '<th>Port 6379</th><th>DS Services</th>'
-                  '<th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
-                  '</tr></thead><tbody>'
-                  + '\n'.join(redis_rows)
-                  + '</tbody></table>\n')
+        return (f'<h3>{escape(label)}{date_part}</h3>\n'
+                f'<table>{thead}<tbody>{row}</tbody></table>\n')
+
+    redis_body = (redis_driver_table("redis", redis_redis)
+                  + redis_driver_table("ioredis", redis_ioredis))
 
     # SERVER checks section body
     run_date = (server_checks or {}).get("run_date", "")
