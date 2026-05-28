@@ -301,8 +301,9 @@ def generate():
     db_data   = {key: load(f"dev-db-{key}.json") for _, key in DBS}
     amq_artemis = load("dev-activemq-artemis.json")
     amq_classic = load("dev-activemq-classic.json")
-    redis_redis  = load("dev-redis-sock-redis.json")
+    redis_redis   = load("dev-redis-sock-redis.json")
     redis_ioredis = load("dev-redis-sock-ioredis.json")
+    server_checks = load("dev-server-checks.json")
 
     # DEB section body
     deb_body = pkg_table(deb_x64, "x64") + pkg_table(deb_arm64, "arm64")
@@ -398,6 +399,41 @@ def generate():
                   + '\n'.join(redis_rows)
                   + '</tbody></table>\n')
 
+    # SERVER checks section body
+    run_date = (server_checks or {}).get("run_date", "")
+    date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
+    server_rows = []
+    for label, key in [("S3 false", "s3_false"), ("S3 true", "s3_true")]:
+        d = (server_checks or {}).get(key)
+        if d is None:
+            server_rows.append(f'<tr><td>{label}</td>'
+                               + '<td class="na">—</td>' * 4 + '</tr>')
+        else:
+            hc     = d.get("healthy", False)
+            ver_ok = d.get("version_ok", False)
+            ver    = d.get("version_actual", "?") or "?"
+            ppt    = d.get("puppeteer_failed", 0)
+            ppt_ok = ppt <= 5
+            ds_err = d.get("ds_log_errors", 0)
+            server_rows.append(
+                f'<tr>'
+                f'<td>{label}</td>'
+                + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
+                + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
+                + f'<td class="{status(ppt_ok)}">{"✅" if ppt_ok else "❌"} {ppt}</td>'
+                + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
+                + '</tr>'
+            )
+    server_body = (
+        f'<h3>EE{date_part}</h3>\n'
+        '<table><thead><tr>'
+        '<th>Cycle</th><th>Healthcheck</th><th>Version</th>'
+        '<th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
+        '</tr></thead><tbody>'
+        + '\n'.join(server_rows)
+        + '</tbody></table>\n'
+    )
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -420,6 +456,7 @@ def generate():
 {section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body)}
 {section("ActiveMQ Tests", "dev-ActiveMQ.yml", "dev-ActiveMQ", amq_body)}
 {section("Redis unix.sock Tests", "dev-Redis-unix.sock.yml", "dev-Redis-unix.sock x64", redis_body)}
+{section("SERVER Checks (AWS S3)", "dev-SERVER-checks.yml", "dev SERVER checks", server_body)}
 </main>
 <footer>Generated automatically · <a href="{REPO}/actions">GitHub Actions</a></footer>
 </body>

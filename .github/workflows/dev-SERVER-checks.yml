@@ -5,6 +5,9 @@ on:
     - cron: '0 13 * * 3'  # Wednesday 16:00 Moscow time (UTC+3)
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   check-server:
     runs-on: ubuntu-24.04
@@ -339,70 +342,182 @@ jobs:
           FAILED=0
           EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
 
-          echo "=== Version results AWS_S3_FALSE ==="
-          echo "Expected version: $EXPECTED"
-          echo "VERSION_AWS_S3_FALSE_OK: ${VERSION_AWS_S3_FALSE_OK:-not set} (actual: ${VERSION_AWS_S3_FALSE_ACTUAL:-not set})"
-          if [ "${VERSION_AWS_S3_FALSE_OK}" != "true" ]; then
-            echo "VERSION_AWS_S3_FALSE_OK FAILED"
-            FAILED=1
-          fi
-
-          echo "=== Healthcheck results AWS_S3_FALSE ==="
-          echo "HEALTHCHECK_AWS_S3_FALSE: ${HEALTHCHECK_AWS_S3_FALSE:-not set}"
-          if [ "${HEALTHCHECK_AWS_S3_FALSE}" != "true" ]; then
-            echo "HEALTHCHECK_AWS_S3_FALSE FAILED"
-            FAILED=1
-          fi
-
-          echo "=== Puppeteer results AWS_S3_FALSE ==="
-          echo "PUPPETEER_AWS_S3_FALSE_FAILED: ${PUPPETEER_AWS_S3_FALSE_FAILED:-0}"
-          if [ "${PUPPETEER_AWS_S3_FALSE_FAILED:-0}" -gt 5 ]; then
-            echo "PUPPETEER_AWS_S3_FALSE_FAILED FAILED (threshold: 5)"
-            FAILED=1
+          # --- AWS_S3_FALSE ---
+          if [ "${HEALTHCHECK_AWS_S3_FALSE}" = "true" ]; then
+            HC1_ICON="✅"; HC1_LABEL="OK";     HC1_DETAIL="${HEALTHCHECK_AWS_S3_FALSE}"
           else
-            echo "PUPPETEER_AWS_S3_FALSE_FAILED OK (${PUPPETEER_AWS_S3_FALSE_FAILED:-0} failures, threshold: 5)"
+            HC1_ICON="❌"; HC1_LABEL="FAILED"; HC1_DETAIL="${HEALTHCHECK_AWS_S3_FALSE:-not set}"; FAILED=1
           fi
 
-          echo "=== DS log errors AWS_S3_FALSE ==="
-          echo "DS_LOG_ERRORS_AWS_S3_FALSE: ${DS_LOG_ERRORS_AWS_S3_FALSE:-0}"
-          if [ "${DS_LOG_ERRORS_AWS_S3_FALSE:-0}" -gt 0 ]; then
-            echo "DS_LOG_ERRORS_AWS_S3_FALSE FAILED"
-            FAILED=1
-          fi
-
-          echo "=== Version results AWS_S3_TRUE ==="
-          echo "Expected version: $EXPECTED"
-          echo "VERSION_AWS_S3_TRUE_OK: ${VERSION_AWS_S3_TRUE_OK:-not set} (actual: ${VERSION_AWS_S3_TRUE_ACTUAL:-not set})"
-          if [ "${VERSION_AWS_S3_TRUE_OK}" != "true" ]; then
-            echo "VERSION_AWS_S3_TRUE_OK FAILED"
-            FAILED=1
-          fi
-
-          echo "=== Healthcheck results AWS_S3_TRUE ==="
-          echo "HEALTHCHECK_AWS_S3_TRUE: ${HEALTHCHECK_AWS_S3_TRUE:-not set}"
-          if [ "${HEALTHCHECK_AWS_S3_TRUE}" != "true" ]; then
-            echo "HEALTHCHECK_AWS_S3_TRUE FAILED"
-            FAILED=1
-          fi
-
-          echo "=== Puppeteer results AWS_S3_TRUE ==="
-          echo "PUPPETEER_AWS_S3_TRUE_FAILED: ${PUPPETEER_AWS_S3_TRUE_FAILED:-0}"
-          if [ "${PUPPETEER_AWS_S3_TRUE_FAILED:-0}" -gt 5 ]; then
-            echo "PUPPETEER_AWS_S3_TRUE_FAILED FAILED (threshold: 5)"
-            FAILED=1
+          if [ "${VERSION_AWS_S3_FALSE_OK}" = "true" ]; then
+            VER1_ICON="✅"; VER1_LABEL="OK"
           else
-            echo "PUPPETEER_AWS_S3_TRUE_FAILED OK (${PUPPETEER_AWS_S3_TRUE_FAILED:-0} failures, threshold: 5)"
+            VER1_ICON="❌"; VER1_LABEL="FAILED"; FAILED=1
+          fi
+          VER1_DETAIL="exp: ${EXPECTED}, act: ${VERSION_AWS_S3_FALSE_ACTUAL:-not set}"
+
+          PPT1="${PUPPETEER_AWS_S3_FALSE_FAILED:-0}"
+          PPT1_DETAIL="${PPT1} failures (threshold: 5)"
+          if [ "$PPT1" -gt 5 ]; then
+            PPT1_ICON="❌"; PPT1_LABEL="FAILED"; FAILED=1
+          else
+            PPT1_ICON="✅"; PPT1_LABEL="OK"
           fi
 
-          echo "=== DS log errors AWS_S3_TRUE ==="
-          echo "DS_LOG_ERRORS_AWS_S3_TRUE: ${DS_LOG_ERRORS_AWS_S3_TRUE:-0}"
-          if [ "${DS_LOG_ERRORS_AWS_S3_TRUE:-0}" -gt 0 ]; then
-            echo "DS_LOG_ERRORS_AWS_S3_TRUE FAILED"
-            FAILED=1
+          DS1="${DS_LOG_ERRORS_AWS_S3_FALSE:-0}"
+          DS1_DETAIL="${DS1} errors"
+          if [ "$DS1" -gt 0 ]; then
+            DS1_ICON="❌"; DS1_LABEL="FAILED"; FAILED=1
+          else
+            DS1_ICON="✅"; DS1_LABEL="OK"
           fi
+
+          # --- AWS_S3_TRUE ---
+          if [ "${HEALTHCHECK_AWS_S3_TRUE}" = "true" ]; then
+            HC2_ICON="✅"; HC2_LABEL="OK";     HC2_DETAIL="${HEALTHCHECK_AWS_S3_TRUE}"
+          else
+            HC2_ICON="❌"; HC2_LABEL="FAILED"; HC2_DETAIL="${HEALTHCHECK_AWS_S3_TRUE:-not set}"; FAILED=1
+          fi
+
+          if [ "${VERSION_AWS_S3_TRUE_OK}" = "true" ]; then
+            VER2_ICON="✅"; VER2_LABEL="OK"
+          else
+            VER2_ICON="❌"; VER2_LABEL="FAILED"; FAILED=1
+          fi
+          VER2_DETAIL="exp: ${EXPECTED}, act: ${VERSION_AWS_S3_TRUE_ACTUAL:-not set}"
+
+          PPT2="${PUPPETEER_AWS_S3_TRUE_FAILED:-0}"
+          PPT2_DETAIL="${PPT2} failures (threshold: 5)"
+          if [ "$PPT2" -gt 5 ]; then
+            PPT2_ICON="❌"; PPT2_LABEL="FAILED"; FAILED=1
+          else
+            PPT2_ICON="✅"; PPT2_LABEL="OK"
+          fi
+
+          DS2="${DS_LOG_ERRORS_AWS_S3_TRUE:-0}"
+          DS2_DETAIL="${DS2} errors"
+          if [ "$DS2" -gt 0 ]; then
+            DS2_ICON="❌"; DS2_LABEL="FAILED"; FAILED=1
+          else
+            DS2_ICON="✅"; DS2_LABEL="OK"
+          fi
+
+          # --- GITHUB_STEP_SUMMARY (markdown table) ---
+          {
+            echo "## Final Check"
+            echo ""
+            echo "### S3 useDirectStorageUrls=false"
+            echo ""
+            echo "| Check | Result | Details |"
+            echo "|-------|--------|---------|"
+            echo "| Healthcheck   | ${HC1_ICON} ${HC1_LABEL}  | ${HC1_DETAIL} |"
+            echo "| Version       | ${VER1_ICON} ${VER1_LABEL} | \`${VERSION_AWS_S3_FALSE_ACTUAL:-not set}\` |"
+            echo "| Puppeteer     | ${PPT1_ICON} ${PPT1_LABEL} | ${PPT1_DETAIL} |"
+            echo "| DS Log Errors | ${DS1_ICON} ${DS1_LABEL}  | ${DS1_DETAIL} |"
+            echo ""
+            echo "### S3 useDirectStorageUrls=true"
+            echo ""
+            echo "| Check | Result | Details |"
+            echo "|-------|--------|---------|"
+            echo "| Healthcheck   | ${HC2_ICON} ${HC2_LABEL}  | ${HC2_DETAIL} |"
+            echo "| Version       | ${VER2_ICON} ${VER2_LABEL} | \`${VERSION_AWS_S3_TRUE_ACTUAL:-not set}\` |"
+            echo "| Puppeteer     | ${PPT2_ICON} ${PPT2_LABEL} | ${PPT2_DETAIL} |"
+            echo "| DS Log Errors | ${DS2_ICON} ${DS2_LABEL}  | ${DS2_DETAIL} |"
+            echo ""
+            if [ "$FAILED" -eq 1 ]; then
+              echo "> ❌ **Final check FAILED**"
+            else
+              echo "> ✅ **All checks passed**"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # --- Console log (ASCII table) ---
+          SEP="+----------------------+--------+--------------------------------------------+"
+          echo "=== S3 useDirectStorageUrls=false ==="
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC1_LABEL}"  "${HC1_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER1_LABEL}" "${VER1_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT1_LABEL}" "${PPT1_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" "${DS1_LABEL}"  "${DS1_DETAIL}"
+          echo "$SEP"
+          echo ""
+          echo "=== S3 useDirectStorageUrls=true ==="
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC2_LABEL}"  "${HC2_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER2_LABEL}" "${VER2_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT2_LABEL}" "${PPT2_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" "${DS2_LABEL}"  "${DS2_DETAIL}"
+          echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
+            echo "FINAL_CONCLUSION=failure" >> "$GITHUB_ENV"
             exit 1
+          else
+            echo "FINAL_CONCLUSION=success" >> "$GITHUB_ENV"
+          fi
+
+      - name: Save results
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p .github/workflow-results
+          python3 - << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+
+          def b(v): return os.environ.get(v, 'false') == 'true'
+          def n(v): return int(os.environ.get(v, '0') or '0')
+          def s(v): return os.environ.get(v, 'not set')
+
+          def ok5(ppt): return ppt <= 5
+
+          s3f_ppt = n('PUPPETEER_AWS_S3_FALSE_FAILED')
+          s3t_ppt = n('PUPPETEER_AWS_S3_TRUE_FAILED')
+          s3f_ds  = n('DS_LOG_ERRORS_AWS_S3_FALSE')
+          s3t_ds  = n('DS_LOG_ERRORS_AWS_S3_TRUE')
+
+          data = {
+              'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              's3_false': {
+                  'healthy':          b('HEALTHCHECK_AWS_S3_FALSE'),
+                  'version_ok':       b('VERSION_AWS_S3_FALSE_OK'),
+                  'version_actual':   s('VERSION_AWS_S3_FALSE_ACTUAL'),
+                  'puppeteer_failed': s3f_ppt,
+                  'ds_log_errors':    s3f_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_FALSE') and b('VERSION_AWS_S3_FALSE_OK') and ok5(s3f_ppt) and s3f_ds == 0) else 'failure',
+              },
+              's3_true': {
+                  'healthy':          b('HEALTHCHECK_AWS_S3_TRUE'),
+                  'version_ok':       b('VERSION_AWS_S3_TRUE_OK'),
+                  'version_actual':   s('VERSION_AWS_S3_TRUE_ACTUAL'),
+                  'puppeteer_failed': s3t_ppt,
+                  'ds_log_errors':    s3t_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_TRUE') and b('VERSION_AWS_S3_TRUE_OK') and ok5(s3t_ppt) and s3t_ds == 0) else 'failure',
+              },
+              'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
+          }
+          path = '.github/workflow-results/dev-server-checks.json'
+          with open(path, 'w') as f:
+              json.dump(data, f, indent=2)
+          print(f'Saved: {path}')
+          PYEOF
+
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add .github/workflow-results/dev-server-checks.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "[dev SERVER checks] Save results"
+            for i in 1 2 3; do
+              git pull --rebase origin ${{ github.ref_name }} && git push origin HEAD && break
+              echo "Attempt $i failed, retrying..."
+              sleep $((5 + RANDOM % 10))
+            done
           fi
 
       - name: Clear S3 bucket files folder
