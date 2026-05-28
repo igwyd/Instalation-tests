@@ -334,14 +334,7 @@ jobs:
         if: always()
         run: python3 .github/scripts/parse-puppeteer-results.py --edition DOCKER
 
-      - name: Remove Docker containers
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
-          sudo docker rm -f $(sudo docker ps -aq) 2>/dev/null || true
-          sudo docker system prune -af 2>/dev/null || true
-          EOF
-
-      - name: Documentserver logs Docker install
+      - name: LOGS Documentserver Docker install
         continue-on-error: true
         uses: ./.github/actions/ds-logs
         with:
@@ -360,6 +353,13 @@ jobs:
           container: ${{ steps.ds-container.outputs.id }}
           env_var: DS_LOG_ERRORS_DOCKER
           label: Docker
+
+      - name: Remove Docker containers
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
+          sudo docker rm -f $(sudo docker ps -aq) 2>/dev/null || true
+          sudo docker system prune -af 2>/dev/null || true
+          EOF
 
       # ==================== Native install (printf "n") ====================
       - name: Install ONLYOFFICE Docs natively
@@ -394,15 +394,25 @@ jobs:
       - name: Wait for native install to start
         run: sleep 10
 
-      - name: Healthcheck native install
+      - name: INFO native install
         continue-on-error: true
         run: |
+          echo "----------Healthcheck----------"
           RESULT=$(curl -s http://${{ env.EC2_IP }}/healthcheck)
           echo "Healthcheck result: $RESULT"
           if [ "$RESULT" = "true" ]; then
             echo "NATIVE_HEALTHY=true" >> $GITHUB_ENV
           else
             echo "NATIVE_HEALTHY=false" >> $GITHUB_ENV
+          fi
+
+          echo "---------Installed packages----------"
+          if [ "${{ matrix.os_type }}" = "deb" ]; then
+            ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+              'dpkg-query -l | grep onlyoffice-documentserver'
+          else
+            ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+              'rpm -qa | grep onlyoffice-documentserver'
           fi
 
       - name: Check version native install
@@ -454,7 +464,7 @@ jobs:
         if: always()
         run: python3 .github/scripts/parse-puppeteer-results.py --edition NATIVE
 
-      - name: Documentserver logs native install
+      - name: LOGS Documentserver native install
         continue-on-error: true
         uses: ./.github/actions/ds-logs
         with:
