@@ -1,0 +1,20 @@
+{
+  "run_date": "2026-05-28 07:28 UTC",
+  "s3_false": {
+    "healthy": true,
+    "version_ok": true,
+    "version_actual": "9.4.0-129",
+    "puppeteer_failed": 0,
+    "ds_log_errors": 0,
+    "conclusion": "success"
+  },
+  "s3_true": {
+    "healthy": true,
+    "version_ok": true,
+    "version_actual": "9.4.0-129",
+    "puppeteer_failed": 0,
+    "ds_log_errors": 0,
+    "conclusion": "success"
+  },
+  "conclusion": "success"
+}
