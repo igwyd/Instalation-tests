@@ -1,20 +1,20 @@
 {
-  "run_date": "2026-06-03 17:57 UTC",
+  "run_date": "2026-06-04 12:52 UTC",
   "s3_false": {
-    "healthy": false,
-    "version_ok": false,
-    "version_actual": "not set",
-    "puppeteer_failed": 1998,
+    "healthy": true,
+    "version_ok": true,
+    "version_actual": "9.4.1-15",
+    "puppeteer_failed": 0,
     "ds_log_errors": 0,
-    "conclusion": "failure"
+    "conclusion": "success"
   },
   "s3_true": {
-    "healthy": false,
-    "version_ok": false,
-    "version_actual": "not set",
-    "puppeteer_failed": 1998,
+    "healthy": true,
+    "version_ok": true,
+    "version_actual": "9.4.1-15",
+    "puppeteer_failed": 0,
     "ds_log_errors": 0,
-    "conclusion": "failure"
+    "conclusion": "success"
   },
-  "conclusion": "failure"
+  "conclusion": "success"
 }
