@@ -1,0 +1,22 @@
+{
+  "run_date": "2026-06-04 09:21 UTC",
+  "os_name": "Ubuntu 26.04",
+  "arch": "arm64",
+  "docker": {
+    "healthy": true,
+    "version_ok": true,
+    "version_actual": "9.4.1-15",
+    "puppeteer_failed": 0,
+    "ds_log_errors": 3,
+    "conclusion": "failure"
+  },
+  "native": {
+    "healthy": true,
+    "version_ok": true,
+    "version_actual": "9.4.1-15",
+    "puppeteer_failed": 1,
+    "ds_log_errors": 3,
+    "conclusion": "failure"
+  },
+  "conclusion": "failure"
+}
