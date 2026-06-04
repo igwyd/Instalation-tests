@@ -1,14 +1,14 @@
 {
-  "run_date": "2026-06-03 18:24 UTC",
+  "run_date": "2026-06-04 12:52 UTC",
   "driver": "redis",
-  "healthy": false,
-  "version_ok": false,
-  "version_actual": "not set",
-  "redis_sock_ok": false,
-  "port_6379_closed": false,
-  "puppeteer_api_failed": 999,
-  "puppeteer_wopi_failed": 999,
-  "puppeteer_total_failed": 1998,
+  "healthy": true,
+  "version_ok": true,
+  "version_actual": "9.4.1-15",
+  "redis_sock_ok": true,
+  "port_6379_closed": true,
+  "puppeteer_api_failed": 0,
+  "puppeteer_wopi_failed": 0,
+  "puppeteer_total_failed": 0,
   "ds_log_errors": 0,
-  "conclusion": "failure"
+  "conclusion": "success"
 }
