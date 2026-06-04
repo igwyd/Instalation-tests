@@ -1,21 +1,21 @@
 {
-  "run_date": "2026-06-03 17:23 UTC",
+  "run_date": "2026-06-04 09:38 UTC",
   "os_name": "RHEL 9",
   "arch": "x64",
   "docker": {
-    "healthy": false,
-    "version_ok": false,
-    "version_actual": "",
-    "puppeteer_failed": 1998,
-    "ds_log_errors": 0,
+    "healthy": true,
+    "version_ok": true,
+    "version_actual": "9.4.1-15",
+    "puppeteer_failed": 1,
+    "ds_log_errors": 1,
     "conclusion": "failure"
   },
   "native": {
-    "healthy": false,
-    "version_ok": false,
-    "version_actual": "not set",
-    "puppeteer_failed": 1998,
-    "ds_log_errors": 0,
+    "healthy": true,
+    "version_ok": true,
+    "version_actual": "9.4.1-15",
+    "puppeteer_failed": 0,
+    "ds_log_errors": 2,
     "conclusion": "failure"
   },
   "conclusion": "failure"
