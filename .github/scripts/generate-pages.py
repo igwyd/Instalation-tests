@@ -226,11 +226,14 @@ def badge_link(workflow_file, label):
             f'<img src="{url}/badge.svg?branch=main" alt="{escape(label)}"></a>')
 
 
-def section(title, workflow_file, badge_label, body_html):
+def section(title, workflow_file, badge_label, body_html, run_date=""):
+    date_part = (f' <span class="date" style="font-size:12px;color:#8c959f">'
+                 f'· {escape(run_date)}</span>') if run_date else ""
     return (f'<section>\n'
             f'<div class="section-header">'
             f'<h2>{escape(title)}</h2>'
             f'{badge_link(workflow_file, badge_label)}'
+            f'{date_part}'
             f'</div>\n'
             f'<div class="section-body">\n{body_html}</div>\n'
             f'</section>\n')
@@ -240,18 +243,20 @@ def generate():
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     # OS section body
+    os_run_date = ""
     os_rows = []
     for os_label, os_key in OS_ENTRIES:
         for arch in ("x64", "arm64"):
             tag = f"dev-{os_key}-{arch}"
             d = load(f"{tag}.json")
-            run_date = (d or {}).get("run_date", "")
+            if not os_run_date and d:
+                os_run_date = d.get("run_date", "")
             docker = (d or {}).get("docker")
             native = (d or {}).get("native")
             if d is None:
                 os_rows.append(
                     f'<tr><td>{escape(os_label)}</td><td>{arch}</td>'
-                    + '<td class="na">—</td>' * 9 + '</tr>'
+                    + '<td class="na">—</td>' * 8 + '</tr>'
                 )
             else:
                 d_hc   = (docker or {}).get("healthy", False)
@@ -275,7 +280,6 @@ def generate():
                     f'<tr>'
                     f'<td>{escape(os_label)}</td>'
                     f'<td>{arch}</td>'
-                    f'<td class="na" style="font-size:11px;color:#8c959f">{escape(run_date)}</td>'
                     + f'<td class="{status(d_hc)}">{"✅ OK" if d_hc else "❌ FAILED"}</td>'
                     + f'<td class="{status(d_vok)}">{"✅" if d_vok else "❌"} {escape(d_ver)}</td>'
                     + f'<td class="{status(n_hc)}">{"✅ OK" if n_hc else "❌ FAILED"}</td>'
@@ -287,7 +291,7 @@ def generate():
                 )
     os_body = (
         '<table><thead><tr>'
-        '<th>OS</th><th>Arch</th><th>Last run</th>'
+        '<th>OS</th><th>Arch</th>'
         '<th>Docker HC</th><th>Docker Ver</th>'
         '<th>Native HC</th><th>Native Ver</th>'
         '<th>Docker Puppeteer (≤5)</th><th>Native Puppeteer (≤5)</th><th>DS Errors</th>'
@@ -457,7 +461,7 @@ def generate():
 {section("RPM Packages (CentOS 9)", "dev-RPM-x64-arm64.yml", "dev-RPM-x64-arm64", rpm_body)}
 {section("Docker DEB (Ubuntu 24.04)", "dev-Docker-DEB-x64-arm64.yml", "dev-Docker-DEB-x64-arm64", docker_deb_body)}
 {section("Docker RPM (CentOS 9)", "dev-Docker-RPM-x64-arm64.yml", "dev-Docker-RPM-x64-arm64", docker_rpm_body)}
-{section("OS Tests (OneClickInstall)", "dev-OS-x64-arm64.yml", "dev-OS-x64-arm64", os_body)}
+{section("OS Tests (OneClickInstall)", "dev-OS-x64-arm64.yml", "dev-OS-x64-arm64", os_body, os_run_date)}
 {section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body)}
 {section("ActiveMQ Tests", "dev-ActiveMQ.yml", "dev-ActiveMQ", amq_body)}
 {section("Redis unix.sock Tests", "dev-Redis-unix.sock.yml", "dev-Redis-unix.sock x64", redis_body)}
