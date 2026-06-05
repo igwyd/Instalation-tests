@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -235,6 +235,9 @@ jobs:
         env:
           MQ_NAME: ${{ matrix.mq }}
           EXPECTED_VERSION: ${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.DASHBOARD_BUCKET_REGION }}
         run: |
           mkdir -p .github/workflow-results
           python3 - << 'PYEOF'
@@ -258,16 +261,6 @@ jobs:
           print(f"Saved: {path}")
           PYEOF
 
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add .github/workflow-results/dev-activemq-${{ matrix.mq }}.json
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "[dev ActiveMQ x64] Save ${{ matrix.mq }} results"
-            for i in 1 2 3; do
-              git pull --rebase origin ${{ github.ref_name }} && git push origin HEAD && break
-              echo "Attempt $i failed, retrying..."
-              sleep $((5 + RANDOM % 10))
-            done
-          fi
+          aws s3 cp .github/workflow-results/dev-activemq-${{ matrix.mq }}.json \
+            s3://${{ vars.DASHBOARD_BUCKET_NAME }}/results/dev-activemq-${{ matrix.mq }}.json \
+            --region ${{ vars.DASHBOARD_BUCKET_REGION }}

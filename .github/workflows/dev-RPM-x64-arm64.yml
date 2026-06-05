@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test-install-RPM:
@@ -929,19 +929,9 @@ jobs:
           print(f'Saved: {path}')
           PYEOF
 
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add .github/workflow-results/dev-rpm-${{ matrix.arch }}.json
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "[dev RPM x64-arm64] Save ${{ matrix.arch }} results"
-            for i in 1 2 3; do
-              git pull --rebase origin ${{ github.ref_name }} && git push origin HEAD && break
-              echo "Attempt $i failed, retrying..."
-              sleep $((5 + RANDOM % 10))
-            done
-          fi
+          aws s3 cp .github/workflow-results/dev-rpm-${{ matrix.arch }}.json \
+            s3://${{ vars.DASHBOARD_BUCKET_NAME }}/results/dev-rpm-${{ matrix.arch }}.json \
+            --region ${{ vars.DASHBOARD_BUCKET_REGION }}
 
       - name: Delete EC2 Instance
         if: always()

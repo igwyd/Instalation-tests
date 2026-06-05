@@ -1,41 +1,37 @@
-name: Deploy GitHub Pages
+name: Deploy Dashboard
 
 on:
   schedule:
     - cron: '0 20 * * 3'  # Wednesday 23:00 Moscow time (UTC+3)
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region ${{ vars.DASHBOARD_BUCKET_REGION }}
+
+      - name: Download results from S3
+        run: |
+          mkdir -p .github/workflow-results
+          aws s3 sync s3://${{ vars.DASHBOARD_BUCKET_NAME }}/results/ .github/workflow-results/ \
+            --region ${{ vars.DASHBOARD_BUCKET_REGION }}
+
       - name: Generate index.html
         run: python3 .github/scripts/generate-pages.py
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '_site'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Upload dashboard to S3
+        run: |
+          aws s3 cp _site/index.html s3://${{ vars.DASHBOARD_BUCKET_NAME }}/index.html \
+            --region ${{ vars.DASHBOARD_BUCKET_REGION }} \
+            --content-type text/html \
+            --cache-control "no-cache, no-store, must-revalidate"
+          echo "Dashboard: http://${{ vars.DASHBOARD_BUCKET_NAME }}.s3-website-${{ vars.DASHBOARD_BUCKET_REGION }}.amazonaws.com/" >> $GITHUB_STEP_SUMMARY
