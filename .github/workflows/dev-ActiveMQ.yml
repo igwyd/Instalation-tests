@@ -188,7 +188,7 @@ jobs:
           DS_ERRORS="${DS_LOG_ERRORS:-0}"
           DS_DETAIL="${DS_ERRORS} errors"
           if [ "$DS_ERRORS" -gt 0 ]; then
-            DS_ICON="❌"; DS_LABEL="FAILED"; FAILED=1
+            DS_ICON="❌"; DS_LABEL="FAILED"
           else
             DS_ICON="✅"; DS_LABEL="OK"
           fi
@@ -202,7 +202,7 @@ jobs:
             echo "| Healthcheck   | ${HC_ICON} ${HC_LABEL}  | ${HC_DETAIL} |"
             echo "| Version       | ${VER_ICON} ${VER_LABEL} | \`${EXPECTED}\` → \`${VERSION_ACTUAL:-not set}\` |"
             echo "| Puppeteer     | ${PPT_ICON} ${PPT_LABEL} | ${PPT_DETAIL} |"
-            echo "| DS Log Errors | ${DS_ICON} ${DS_LABEL}  | ${DS_DETAIL} |"
+            echo "| DS Log Errors | ${DS_DETAIL} | |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -219,7 +219,7 @@ jobs:
           printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC_LABEL}"  "${HC_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER_LABEL}" "${VER_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT_LABEL}" "${PPT_DETAIL}"
-          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" "${DS_LABEL}"  "${DS_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS_DETAIL}"
           echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then

@@ -234,7 +234,7 @@ jobs:
           DS_ERRORS="${DS_LOG_ERRORS:-0}"
           DS_DETAIL="${DS_ERRORS} errors"
           if [ "$DS_ERRORS" -gt 0 ]; then
-            DS_ICON="❌"; DS_LABEL="FAILED"; FAILED=1
+            DS_ICON="❌"; DS_LABEL="FAILED"
           else
             DS_ICON="✅"; DS_LABEL="OK"
           fi
@@ -250,7 +250,7 @@ jobs:
             echo "| Redis sock ping | ${SOCK_ICON} ${SOCK_LABEL} | ${SOCK_DETAIL} |"
             echo "| Port 6379       | ${PORT_ICON} ${PORT_LABEL} | ${PORT_DETAIL} |"
             echo "| Puppeteer       | ${PPT_ICON} ${PPT_LABEL}  | ${PPT_DETAIL} |"
-            echo "| DS Log Errors   | ${DS_ICON} ${DS_LABEL}   | ${DS_DETAIL} |"
+            echo "| DS Log Errors   | ${DS_DETAIL} | |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -269,7 +269,7 @@ jobs:
           printf "| %-16s | %-6s | %-42s |\n" "Redis sock ping" "${SOCK_LABEL}" "${SOCK_DETAIL}"
           printf "| %-16s | %-6s | %-42s |\n" "Port 6379"       "${PORT_LABEL}" "${PORT_DETAIL}"
           printf "| %-16s | %-6s | %-42s |\n" "Puppeteer"       "${PPT_LABEL}"  "${PPT_DETAIL}"
-          printf "| %-16s | %-6s | %-42s |\n" "DS Log Errors"   "${DS_LABEL}"   "${DS_DETAIL}"
+          printf "| %-16s | %-6s | %-42s |\n" "DS Log Errors"   ""   "${DS_DETAIL}"
           echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then

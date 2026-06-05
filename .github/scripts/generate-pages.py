@@ -113,7 +113,7 @@ def td_ds_errors(data):
     if data is None:
         return '<td class="na">—</td>'
     n = data.get("ds_log_errors", 0)
-    return f'<td class="{status(n == 0)}">{"✅" if n == 0 else "❌"} {n}</td>'
+    return f'<td>{n}</td>'
 
 
 def pkg_table(data, arch_label):
@@ -294,7 +294,7 @@ def generate():
         '<th>OS</th><th>Arch</th>'
         '<th>Docker HC</th><th>Docker Ver</th>'
         '<th>Native HC</th><th>Native Ver</th>'
-        '<th>Docker Puppeteer (≤5)</th><th>Native Puppeteer (≤5)</th><th>DS Errors</th>'
+        '<th>Docker Puppeteer (≤5)</th><th>Native Puppeteer (≤5)</th><th>DS Log Errors</th>'
         '</tr></thead><tbody>'
         + '\n'.join(os_rows)
         + '</tbody></table>\n'

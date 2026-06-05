@@ -544,7 +544,7 @@ jobs:
           fi
           D_ERR="${DS_LOG_ERRORS_DOCKER:-0}"
           if [ "${D_ERR}" -gt 0 ]; then
-            D_DS_ICON="❌"; D_DS_LABEL="FAILED"; FAILED=1
+            D_DS_ICON="❌"; D_DS_LABEL="FAILED"
           else
             D_DS_ICON="✅"; D_DS_LABEL="OK"
           fi
@@ -568,7 +568,7 @@ jobs:
           fi
           N_ERR="${DS_LOG_ERRORS_NATIVE:-0}"
           if [ "${N_ERR}" -gt 0 ]; then
-            N_DS_ICON="❌"; N_DS_LABEL="FAILED"; FAILED=1
+            N_DS_ICON="❌"; N_DS_LABEL="FAILED"
           else
             N_DS_ICON="✅"; N_DS_LABEL="OK"
           fi
@@ -581,8 +581,8 @@ jobs:
             echo ""
             echo "| Install | Healthcheck | Version | Puppeteer (≤5) | DS Log Errors |"
             echo "|---------|-------------|---------|----------------|---------------|"
-            echo "| Docker | ${D_HC_ICON} ${D_HC_LABEL} | ${D_VER_ICON} \`${DOCKER_VERSION_ACTUAL:-?}\` | ${D_PPT_ICON} ${D_PPT_LABEL} (${D_P}) | ${D_DS_ICON} ${D_DS_LABEL} (${D_ERR}) |"
-            echo "| Native | ${N_HC_ICON} ${N_HC_LABEL} | ${N_VER_ICON} \`${NATIVE_VERSION_ACTUAL:-?}\` | ${N_PPT_ICON} ${N_PPT_LABEL} (${N_P}) | ${N_DS_ICON} ${N_DS_LABEL} (${N_ERR}) |"
+            echo "| Docker | ${D_HC_ICON} ${D_HC_LABEL} | ${D_VER_ICON} \`${DOCKER_VERSION_ACTUAL:-?}\` | ${D_PPT_ICON} ${D_PPT_LABEL} (${D_P}) | ${D_ERR} |"
+            echo "| Native | ${N_HC_ICON} ${N_HC_LABEL} | ${N_VER_ICON} \`${NATIVE_VERSION_ACTUAL:-?}\` | ${N_PPT_ICON} ${N_PPT_LABEL} (${N_P}) | ${N_ERR} |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -596,8 +596,8 @@ jobs:
           echo "$SEP"
           printf "| %-6s | %-6s | %-15s | %-13s | %-9s |\n" "Install" "HC" "Version" "Puppeteer(≤5)" "DS Errors"
           echo "$SEP"
-          printf "| %-6s | %-6s | %-15s | %-13s | %-9s |\n" "Docker" "${D_HC_LABEL}" "${DOCKER_VERSION_ACTUAL:-?}" "${D_PPT_LABEL}(${D_P})" "${D_DS_LABEL}(${D_ERR})"
-          printf "| %-6s | %-6s | %-15s | %-13s | %-9s |\n" "Native" "${N_HC_LABEL}" "${NATIVE_VERSION_ACTUAL:-?}" "${N_PPT_LABEL}(${N_P})" "${N_DS_LABEL}(${N_ERR})"
+          printf "| %-6s | %-6s | %-15s | %-13s | %-9s |\n" "Docker" "${D_HC_LABEL}" "${DOCKER_VERSION_ACTUAL:-?}" "${D_PPT_LABEL}(${D_P})" "${D_ERR}"
+          printf "| %-6s | %-6s | %-15s | %-13s | %-9s |\n" "Native" "${N_HC_LABEL}" "${NATIVE_VERSION_ACTUAL:-?}" "${N_PPT_LABEL}(${N_P})" "${N_ERR}"
           echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then

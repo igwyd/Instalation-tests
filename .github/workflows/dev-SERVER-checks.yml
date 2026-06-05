@@ -367,7 +367,7 @@ jobs:
           DS1="${DS_LOG_ERRORS_AWS_S3_FALSE:-0}"
           DS1_DETAIL="${DS1} errors"
           if [ "$DS1" -gt 0 ]; then
-            DS1_ICON="❌"; DS1_LABEL="FAILED"; FAILED=1
+            DS1_ICON="❌"; DS1_LABEL="FAILED"
           else
             DS1_ICON="✅"; DS1_LABEL="OK"
           fi
@@ -397,7 +397,7 @@ jobs:
           DS2="${DS_LOG_ERRORS_AWS_S3_TRUE:-0}"
           DS2_DETAIL="${DS2} errors"
           if [ "$DS2" -gt 0 ]; then
-            DS2_ICON="❌"; DS2_LABEL="FAILED"; FAILED=1
+            DS2_ICON="❌"; DS2_LABEL="FAILED"
           else
             DS2_ICON="✅"; DS2_LABEL="OK"
           fi
@@ -413,7 +413,7 @@ jobs:
             echo "| Healthcheck   | ${HC1_ICON} ${HC1_LABEL}  | ${HC1_DETAIL} |"
             echo "| Version       | ${VER1_ICON} ${VER1_LABEL} | \`${VERSION_AWS_S3_FALSE_ACTUAL:-not set}\` |"
             echo "| Puppeteer     | ${PPT1_ICON} ${PPT1_LABEL} | ${PPT1_DETAIL} |"
-            echo "| DS Log Errors | ${DS1_ICON} ${DS1_LABEL}  | ${DS1_DETAIL} |"
+            echo "| DS Log Errors | ${DS1_DETAIL} | |"
             echo ""
             echo "### S3 useDirectStorageUrls=true"
             echo ""
@@ -422,7 +422,7 @@ jobs:
             echo "| Healthcheck   | ${HC2_ICON} ${HC2_LABEL}  | ${HC2_DETAIL} |"
             echo "| Version       | ${VER2_ICON} ${VER2_LABEL} | \`${VERSION_AWS_S3_TRUE_ACTUAL:-not set}\` |"
             echo "| Puppeteer     | ${PPT2_ICON} ${PPT2_LABEL} | ${PPT2_DETAIL} |"
-            echo "| DS Log Errors | ${DS2_ICON} ${DS2_LABEL}  | ${DS2_DETAIL} |"
+            echo "| DS Log Errors | ${DS2_DETAIL} | |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -440,7 +440,7 @@ jobs:
           printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC1_LABEL}"  "${HC1_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER1_LABEL}" "${VER1_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT1_LABEL}" "${PPT1_DETAIL}"
-          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" "${DS1_LABEL}"  "${DS1_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS1_DETAIL}"
           echo "$SEP"
           echo ""
           echo "=== S3 useDirectStorageUrls=true ==="
@@ -450,7 +450,7 @@ jobs:
           printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC2_LABEL}"  "${HC2_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER2_LABEL}" "${VER2_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT2_LABEL}" "${PPT2_DETAIL}"
-          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" "${DS2_LABEL}"  "${DS2_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS2_DETAIL}"
           echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then

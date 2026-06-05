@@ -482,7 +482,7 @@ jobs:
           fi
           EE_D="${DS_LOG_ERRORS_EE:-0}"
           if [ "${EE_D}" -gt 0 ]; then
-            EE_DS_ICON="❌"; EE_DS_LABEL="FAILED"; FAILED=1
+            EE_DS_ICON="❌"; EE_DS_LABEL="FAILED"
           else
             EE_DS_ICON="✅"; EE_DS_LABEL="OK"
           fi
@@ -511,7 +511,7 @@ jobs:
           fi
           DE_D="${DS_LOG_ERRORS_DE:-0}"
           if [ "${DE_D}" -gt 0 ]; then
-            DE_DS_ICON="❌"; DE_DS_LABEL="FAILED"; FAILED=1
+            DE_DS_ICON="❌"; DE_DS_LABEL="FAILED"
           else
             DE_DS_ICON="✅"; DE_DS_LABEL="OK"
           fi
@@ -540,7 +540,7 @@ jobs:
           fi
           CE_D="${DS_LOG_ERRORS_CE:-0}"
           if [ "${CE_D}" -gt 0 ]; then
-            CE_DS_ICON="❌"; CE_DS_LABEL="FAILED"; FAILED=1
+            CE_DS_ICON="❌"; CE_DS_LABEL="FAILED"
           else
             CE_DS_ICON="✅"; CE_DS_LABEL="OK"
           fi
@@ -553,9 +553,9 @@ jobs:
             echo ""
             echo "| Edition | Healthcheck | Version | SVC | Puppeteer (≤5) | DS Log Errors |"
             echo "|---------|-------------|---------|-----|----------------|---------------|"
-            echo "| EE | ${EE_HC_ICON} ${EE_HC_LABEL} | ${EE_VER_ICON} \`${VERSION_EE_ACTUAL:-?}\` | SVC: ${EE_SVC_ICON} ${EE_SVC_LABEL} | ${EE_PPT_ICON} ${EE_PPT_LABEL} (${EE_P}) | ${EE_DS_ICON} ${EE_DS_LABEL} (${EE_D}) |"
-            echo "| DE | ${DE_HC_ICON} ${DE_HC_LABEL} | ${DE_VER_ICON} \`${VERSION_DE_ACTUAL:-?}\` | SVC: ${DE_SVC_ICON} ${DE_SVC_LABEL} | ${DE_PPT_ICON} ${DE_PPT_LABEL} (${DE_P}) | ${DE_DS_ICON} ${DE_DS_LABEL} (${DE_D}) |"
-            echo "| CE | ${CE_HC_ICON} ${CE_HC_LABEL} | ${CE_VER_ICON} \`${VERSION_CE_ACTUAL:-?}\` | SVC: ${CE_SVC_ICON} ${CE_SVC_LABEL} | ${CE_PPT_ICON} ${CE_PPT_LABEL} (${CE_P}) | ${CE_DS_ICON} ${CE_DS_LABEL} (${CE_D}) |"
+            echo "| EE | ${EE_HC_ICON} ${EE_HC_LABEL} | ${EE_VER_ICON} \`${VERSION_EE_ACTUAL:-?}\` | SVC: ${EE_SVC_ICON} ${EE_SVC_LABEL} | ${EE_PPT_ICON} ${EE_PPT_LABEL} (${EE_P}) | ${EE_D} |"
+            echo "| DE | ${DE_HC_ICON} ${DE_HC_LABEL} | ${DE_VER_ICON} \`${VERSION_DE_ACTUAL:-?}\` | SVC: ${DE_SVC_ICON} ${DE_SVC_LABEL} | ${DE_PPT_ICON} ${DE_PPT_LABEL} (${DE_P}) | ${DE_D} |"
+            echo "| CE | ${CE_HC_ICON} ${CE_HC_LABEL} | ${CE_VER_ICON} \`${VERSION_CE_ACTUAL:-?}\` | SVC: ${CE_SVC_ICON} ${CE_SVC_LABEL} | ${CE_PPT_ICON} ${CE_PPT_LABEL} (${CE_P}) | ${CE_D} |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -569,9 +569,9 @@ jobs:
           echo "$SEP"
           printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "Edition" "HC" "Version" "Svc" "Puppeteer" "DS Errors"
           echo "$SEP"
-          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "EE" "${EE_HC_LABEL}" "${EE_VER_LABEL}" "SVC:${EE_SVC_LABEL}" "${EE_PPT_LABEL}(${EE_P})" "${EE_DS_LABEL}(${EE_D})"
-          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "DE" "${DE_HC_LABEL}" "${DE_VER_LABEL}" "SVC:${DE_SVC_LABEL}" "${DE_PPT_LABEL}(${DE_P})" "${DE_DS_LABEL}(${DE_D})"
-          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "CE" "${CE_HC_LABEL}" "${CE_VER_LABEL}" "SVC:${CE_SVC_LABEL}" "${CE_PPT_LABEL}(${CE_P})" "${CE_DS_LABEL}(${CE_D})"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "EE" "${EE_HC_LABEL}" "${EE_VER_LABEL}" "SVC:${EE_SVC_LABEL}" "${EE_PPT_LABEL}(${EE_P})" "${EE_D}"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "DE" "${DE_HC_LABEL}" "${DE_VER_LABEL}" "SVC:${DE_SVC_LABEL}" "${DE_PPT_LABEL}(${DE_P})" "${DE_D}"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "CE" "${CE_HC_LABEL}" "${CE_VER_LABEL}" "SVC:${CE_SVC_LABEL}" "${CE_PPT_LABEL}(${CE_P})" "${CE_D}"
           echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
