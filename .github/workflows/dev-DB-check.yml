@@ -441,8 +441,10 @@ jobs:
           mkdir -p .github/workflow-results
           python3 - << 'PYEOF'
           import json, os
+          from datetime import datetime, timezone
 
           data = {
+              "run_date": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
               "healthy": os.environ.get('HEALTHCHECK_RESULT', '') == 'true',
               "version_expected": os.environ.get('EXPECTED_VERSION', ''),
               "version_actual": os.environ.get('VERSION_ACTUAL', 'not set'),
