@@ -92,10 +92,18 @@ jobs:
           echo "VERSION_EE_RELEASE_ACTUAL=not set" >> $GITHUB_ENV
           echo "JWT_EE_RELEASE_EXISTS=false"   >> $GITHUB_ENV
           echo "JWT_MATCH=false"               >> $GITHUB_ENV
-          echo "PUPPETEER_EE_FAILED=0"         >> $GITHUB_ENV
-          echo "PUPPETEER_DE_FAILED=0"         >> $GITHUB_ENV
-          echo "PUPPETEER_CE_FAILED=0"         >> $GITHUB_ENV
-          echo "PUPPETEER_EE_UPGRADE_FAILED=0" >> $GITHUB_ENV
+          echo "PUPPETEER_EE_FAILED=0"              >> $GITHUB_ENV
+          echo "PUPPETEER_EE_API_FAILED=0"          >> $GITHUB_ENV
+          echo "PUPPETEER_EE_WOPI_FAILED=0"         >> $GITHUB_ENV
+          echo "PUPPETEER_DE_FAILED=0"              >> $GITHUB_ENV
+          echo "PUPPETEER_DE_API_FAILED=0"          >> $GITHUB_ENV
+          echo "PUPPETEER_DE_WOPI_FAILED=0"         >> $GITHUB_ENV
+          echo "PUPPETEER_CE_FAILED=0"              >> $GITHUB_ENV
+          echo "PUPPETEER_CE_API_FAILED=0"          >> $GITHUB_ENV
+          echo "PUPPETEER_CE_WOPI_FAILED=0"         >> $GITHUB_ENV
+          echo "PUPPETEER_EE_UPGRADE_FAILED=0"      >> $GITHUB_ENV
+          echo "PUPPETEER_EE_UPGRADE_API_FAILED=0"  >> $GITHUB_ENV
+          echo "PUPPETEER_EE_UPGRADE_WOPI_FAILED=0" >> $GITHUB_ENV
           echo "DS_LOG_ERRORS_EE=0"            >> $GITHUB_ENV
           echo "DS_LOG_ERRORS_DE=0"            >> $GITHUB_ENV
           echo "DS_LOG_ERRORS_CE=0"            >> $GITHUB_ENV
@@ -864,8 +872,10 @@ jobs:
                   'version_ok':       b('VERSION_EE_OK'),
                   'version_actual':   s('VERSION_EE_ACTUAL'),
                   'services_ok':      b('SERVICES_EE_OK'),
-                  'puppeteer_failed': n('PUPPETEER_EE_FAILED'),
-                  'ds_log_errors':    n('DS_LOG_ERRORS_EE'),
+                  'puppeteer_failed':      n('PUPPETEER_EE_FAILED'),
+                  'puppeteer_api_failed':  n('PUPPETEER_EE_API_FAILED'),
+                  'puppeteer_wopi_failed': n('PUPPETEER_EE_WOPI_FAILED'),
+                  'ds_log_errors':         n('DS_LOG_ERRORS_EE'),
                   'conclusion': 'success' if (b('HEALTHCHECK_EE') and b('VERSION_EE_OK') and b('SERVICES_EE_OK') and ok5('PUPPETEER_EE_FAILED') and n('DS_LOG_ERRORS_EE') == 0) else 'failure',
               },
               'de': {
@@ -873,8 +883,10 @@ jobs:
                   'version_ok':       b('VERSION_DE_OK'),
                   'version_actual':   s('VERSION_DE_ACTUAL'),
                   'services_ok':      b('SERVICES_DE_OK'),
-                  'puppeteer_failed': n('PUPPETEER_DE_FAILED'),
-                  'ds_log_errors':    n('DS_LOG_ERRORS_DE'),
+                  'puppeteer_failed':      n('PUPPETEER_DE_FAILED'),
+                  'puppeteer_api_failed':  n('PUPPETEER_DE_API_FAILED'),
+                  'puppeteer_wopi_failed': n('PUPPETEER_DE_WOPI_FAILED'),
+                  'ds_log_errors':         n('DS_LOG_ERRORS_DE'),
                   'conclusion': 'success' if (b('HEALTHCHECK_DE') and b('VERSION_DE_OK') and b('SERVICES_DE_OK') and ok5('PUPPETEER_DE_FAILED') and n('DS_LOG_ERRORS_DE') == 0) else 'failure',
               },
               'ce': {
@@ -882,8 +894,10 @@ jobs:
                   'version_ok':       b('VERSION_CE_OK'),
                   'version_actual':   s('VERSION_CE_ACTUAL'),
                   'services_ok':      b('SERVICES_CE_OK'),
-                  'puppeteer_failed': n('PUPPETEER_CE_FAILED'),
-                  'ds_log_errors':    n('DS_LOG_ERRORS_CE'),
+                  'puppeteer_failed':      n('PUPPETEER_CE_FAILED'),
+                  'puppeteer_api_failed':  n('PUPPETEER_CE_API_FAILED'),
+                  'puppeteer_wopi_failed': n('PUPPETEER_CE_WOPI_FAILED'),
+                  'ds_log_errors':         n('DS_LOG_ERRORS_CE'),
                   'conclusion': 'success' if (b('HEALTHCHECK_CE') and b('VERSION_CE_OK') and b('SERVICES_CE_OK') and ok5('PUPPETEER_CE_FAILED') and n('DS_LOG_ERRORS_CE') == 0) else 'failure',
               },
               'ee_upgrade': {
@@ -895,6 +909,8 @@ jobs:
                   'version_actual':          s('VERSION_EE_UPGRADE_ACTUAL'),
                   'jwt_match':               b('JWT_MATCH'),
                   'puppeteer_failed':        n('PUPPETEER_EE_UPGRADE_FAILED'),
+                  'puppeteer_api_failed':    n('PUPPETEER_EE_UPGRADE_API_FAILED'),
+                  'puppeteer_wopi_failed':   n('PUPPETEER_EE_UPGRADE_WOPI_FAILED'),
                   'ds_log_errors':           n('DS_LOG_ERRORS_EE_UPGRADE'),
                   'conclusion': 'success' if (b('HEALTHCHECK_EE_RELEASE') and b('HEALTHCHECK_EE_UPGRADE') and b('VERSION_EE_UPGRADE_OK') and b('JWT_MATCH') and ok5('PUPPETEER_EE_UPGRADE_FAILED') and n('DS_LOG_ERRORS_EE_UPGRADE') == 0) else 'failure',
               },

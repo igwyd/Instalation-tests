@@ -56,6 +56,8 @@ if edition:
     if github_env:
         with open(github_env, "a") as f:
             f.write(f"PUPPETEER_{edition}_FAILED={total_err}\n")
+            f.write(f"PUPPETEER_{edition}_API_FAILED={api_err}\n")
+            f.write(f"PUPPETEER_{edition}_WOPI_FAILED={wopi_err}\n")
             f.write(f"PUPPETEER_TOTAL_FAILED={new_total}\n")
 else:
     print(f"API tests:  OK={api_ok},  Failed={api_err}")

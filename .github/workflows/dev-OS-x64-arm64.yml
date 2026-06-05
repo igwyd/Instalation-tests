@@ -165,9 +165,13 @@ jobs:
           echo "DOCKER_VERSION_OK=false" >> $GITHUB_ENV
           echo "NATIVE_HEALTHY=false" >> $GITHUB_ENV
           echo "NATIVE_VERSION_OK=false" >> $GITHUB_ENV
-          echo "PUPPETEER_TOTAL_FAILED=0" >> $GITHUB_ENV
-          echo "DS_LOG_ERRORS_DOCKER=0" >> $GITHUB_ENV
-          echo "DS_LOG_ERRORS_NATIVE=0" >> $GITHUB_ENV
+          echo "PUPPETEER_TOTAL_FAILED=0"       >> $GITHUB_ENV
+          echo "PUPPETEER_DOCKER_API_FAILED=0"  >> $GITHUB_ENV
+          echo "PUPPETEER_DOCKER_WOPI_FAILED=0" >> $GITHUB_ENV
+          echo "PUPPETEER_NATIVE_API_FAILED=0"  >> $GITHUB_ENV
+          echo "PUPPETEER_NATIVE_WOPI_FAILED=0" >> $GITHUB_ENV
+          echo "DS_LOG_ERRORS_DOCKER=0"         >> $GITHUB_ENV
+          echo "DS_LOG_ERRORS_NATIVE=0"         >> $GITHUB_ENV
 
       - name: Configure AWS CLI
         run: |
@@ -628,19 +632,23 @@ jobs:
               'os_name':  s('OS_NAME'),
               'arch':     s('ARCH'),
               'docker': {
-                  'healthy':          b('DOCKER_HEALTHY'),
-                  'version_ok':       b('DOCKER_VERSION_OK'),
-                  'version_actual':   s('DOCKER_VERSION_ACTUAL'),
-                  'puppeteer_failed': n('PUPPETEER_DOCKER_FAILED'),
-                  'ds_log_errors':    n('DS_LOG_ERRORS_DOCKER'),
+                  'healthy':               b('DOCKER_HEALTHY'),
+                  'version_ok':            b('DOCKER_VERSION_OK'),
+                  'version_actual':        s('DOCKER_VERSION_ACTUAL'),
+                  'puppeteer_failed':      n('PUPPETEER_DOCKER_FAILED'),
+                  'puppeteer_api_failed':  n('PUPPETEER_DOCKER_API_FAILED'),
+                  'puppeteer_wopi_failed': n('PUPPETEER_DOCKER_WOPI_FAILED'),
+                  'ds_log_errors':         n('DS_LOG_ERRORS_DOCKER'),
                   'conclusion': 'success' if (b('DOCKER_HEALTHY') and b('DOCKER_VERSION_OK') and ok5('PUPPETEER_DOCKER_FAILED') and n('DS_LOG_ERRORS_DOCKER') == 0) else 'failure',
               },
               'native': {
-                  'healthy':          b('NATIVE_HEALTHY'),
-                  'version_ok':       b('NATIVE_VERSION_OK'),
-                  'version_actual':   s('NATIVE_VERSION_ACTUAL'),
-                  'puppeteer_failed': n('PUPPETEER_NATIVE_FAILED'),
-                  'ds_log_errors':    n('DS_LOG_ERRORS_NATIVE'),
+                  'healthy':               b('NATIVE_HEALTHY'),
+                  'version_ok':            b('NATIVE_VERSION_OK'),
+                  'version_actual':        s('NATIVE_VERSION_ACTUAL'),
+                  'puppeteer_failed':      n('PUPPETEER_NATIVE_FAILED'),
+                  'puppeteer_api_failed':  n('PUPPETEER_NATIVE_API_FAILED'),
+                  'puppeteer_wopi_failed': n('PUPPETEER_NATIVE_WOPI_FAILED'),
+                  'ds_log_errors':         n('DS_LOG_ERRORS_NATIVE'),
                   'conclusion': 'success' if (b('NATIVE_HEALTHY') and b('NATIVE_VERSION_OK') and ok5('PUPPETEER_NATIVE_FAILED') and n('DS_LOG_ERRORS_NATIVE') == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),

@@ -475,27 +475,35 @@ jobs:
 
           def ok5(ppt): return ppt <= 5
 
-          s3f_ppt = n('PUPPETEER_AWS_S3_FALSE_FAILED')
-          s3t_ppt = n('PUPPETEER_AWS_S3_TRUE_FAILED')
+          s3f_ppt      = n('PUPPETEER_AWS_S3_FALSE_FAILED')
+          s3f_api_ppt  = n('PUPPETEER_AWS_S3_FALSE_API_FAILED')
+          s3f_wopi_ppt = n('PUPPETEER_AWS_S3_FALSE_WOPI_FAILED')
+          s3t_ppt      = n('PUPPETEER_AWS_S3_TRUE_FAILED')
+          s3t_api_ppt  = n('PUPPETEER_AWS_S3_TRUE_API_FAILED')
+          s3t_wopi_ppt = n('PUPPETEER_AWS_S3_TRUE_WOPI_FAILED')
           s3f_ds  = n('DS_LOG_ERRORS_AWS_S3_FALSE')
           s3t_ds  = n('DS_LOG_ERRORS_AWS_S3_TRUE')
 
           data = {
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
               's3_false': {
-                  'healthy':          b('HEALTHCHECK_AWS_S3_FALSE'),
-                  'version_ok':       b('VERSION_AWS_S3_FALSE_OK'),
-                  'version_actual':   s('VERSION_AWS_S3_FALSE_ACTUAL'),
-                  'puppeteer_failed': s3f_ppt,
-                  'ds_log_errors':    s3f_ds,
+                  'healthy':               b('HEALTHCHECK_AWS_S3_FALSE'),
+                  'version_ok':            b('VERSION_AWS_S3_FALSE_OK'),
+                  'version_actual':        s('VERSION_AWS_S3_FALSE_ACTUAL'),
+                  'puppeteer_failed':      s3f_ppt,
+                  'puppeteer_api_failed':  s3f_api_ppt,
+                  'puppeteer_wopi_failed': s3f_wopi_ppt,
+                  'ds_log_errors':         s3f_ds,
                   'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_FALSE') and b('VERSION_AWS_S3_FALSE_OK') and ok5(s3f_ppt) and s3f_ds == 0) else 'failure',
               },
               's3_true': {
-                  'healthy':          b('HEALTHCHECK_AWS_S3_TRUE'),
-                  'version_ok':       b('VERSION_AWS_S3_TRUE_OK'),
-                  'version_actual':   s('VERSION_AWS_S3_TRUE_ACTUAL'),
-                  'puppeteer_failed': s3t_ppt,
-                  'ds_log_errors':    s3t_ds,
+                  'healthy':               b('HEALTHCHECK_AWS_S3_TRUE'),
+                  'version_ok':            b('VERSION_AWS_S3_TRUE_OK'),
+                  'version_actual':        s('VERSION_AWS_S3_TRUE_ACTUAL'),
+                  'puppeteer_failed':      s3t_ppt,
+                  'puppeteer_api_failed':  s3t_api_ppt,
+                  'puppeteer_wopi_failed': s3t_wopi_ppt,
+                  'ds_log_errors':         s3t_ds,
                   'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_TRUE') and b('VERSION_AWS_S3_TRUE_OK') and ok5(s3t_ppt) and s3t_ds == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),

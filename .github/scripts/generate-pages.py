@@ -101,7 +101,7 @@ def td_ppt_simple(failed, threshold=5):
 def td_ppt_breakdown(data, threshold=5):
     if data is None:
         return '<td class="na">—</td>'
-    total = data.get("puppeteer_total_failed", 0)
+    total = data.get("puppeteer_total_failed", data.get("puppeteer_failed", 0))
     api   = data.get("puppeteer_api_failed", 0)
     wopi  = data.get("puppeteer_wopi_failed", 0)
     is_ok = total <= threshold
@@ -138,7 +138,7 @@ def pkg_table(data, arch_label):
                 + td_bool(ed.get("healthy", False))
                 + td_version(ed)
                 + svc_cell
-                + td_ppt_simple(ed.get("puppeteer_failed", 0))
+                + td_ppt_breakdown(ed)
                 + td_ds_errors(ed)
                 + '</tr>'
             )
@@ -167,7 +167,7 @@ def pkg_table(data, arch_label):
             + td_bool(hc_upg)
             + td_version(ug)
             + f'<td class="{status(jwt_match)}">JWT: {"✅ MATCH" if jwt_match else "❌ FAIL"}</td>'
-            + td_ppt_simple(ug.get("puppeteer_failed", 0))
+            + td_ppt_breakdown(ug)
             + td_ds_errors(ug)
             + '</tr>'
         )
@@ -200,7 +200,7 @@ def docker_table(data, arch_label):
                 + td_bool(ed.get("healthy", False))
                 + td_version(ed)
                 + svc_cell
-                + td_ppt_simple(ed.get("puppeteer_failed", 0))
+                + td_ppt_breakdown(ed)
                 + td_ds_errors(ed)
                 + '</tr>'
             )
@@ -248,23 +248,28 @@ def generate():
             run_date = (d or {}).get("run_date", "")
             docker = (d or {}).get("docker")
             native = (d or {}).get("native")
-            ppt_total = ((docker or {}).get("puppeteer_failed", 0)
-                         + (native or {}).get("puppeteer_failed", 0)) if d else 0
-            ppt_ok = ppt_total <= 5
             if d is None:
                 os_rows.append(
                     f'<tr><td>{escape(os_label)}</td><td>{arch}</td>'
-                    + '<td class="na">—</td>' * 8 + '</tr>'
+                    + '<td class="na">—</td>' * 9 + '</tr>'
                 )
             else:
-                d_hc  = (docker or {}).get("healthy", False)
-                d_ver = (docker or {}).get("version_actual", "?") or "?"
-                d_vok = (docker or {}).get("version_ok", False)
-                n_hc  = (native or {}).get("healthy", False)
-                n_ver = (native or {}).get("version_actual", "?") or "?"
-                n_vok = (native or {}).get("version_ok", False)
-                d_err = (docker or {}).get("ds_log_errors", 0)
-                n_err = (native or {}).get("ds_log_errors", 0)
+                d_hc   = (docker or {}).get("healthy", False)
+                d_ver  = (docker or {}).get("version_actual", "?") or "?"
+                d_vok  = (docker or {}).get("version_ok", False)
+                d_ppt  = (docker or {}).get("puppeteer_failed", 0)
+                d_api  = (docker or {}).get("puppeteer_api_failed", 0)
+                d_wopi = (docker or {}).get("puppeteer_wopi_failed", 0)
+                d_pok  = d_ppt <= 5
+                n_hc   = (native or {}).get("healthy", False)
+                n_ver  = (native or {}).get("version_actual", "?") or "?"
+                n_vok  = (native or {}).get("version_ok", False)
+                n_ppt  = (native or {}).get("puppeteer_failed", 0)
+                n_api  = (native or {}).get("puppeteer_api_failed", 0)
+                n_wopi = (native or {}).get("puppeteer_wopi_failed", 0)
+                n_pok  = n_ppt <= 5
+                d_err  = (docker or {}).get("ds_log_errors", 0)
+                n_err  = (native or {}).get("ds_log_errors", 0)
                 err_ok = (d_err + n_err) == 0
                 os_rows.append(
                     f'<tr>'
@@ -275,7 +280,8 @@ def generate():
                     + f'<td class="{status(d_vok)}">{"✅" if d_vok else "❌"} {escape(d_ver)}</td>'
                     + f'<td class="{status(n_hc)}">{"✅ OK" if n_hc else "❌ FAILED"}</td>'
                     + f'<td class="{status(n_vok)}">{"✅" if n_vok else "❌"} {escape(n_ver)}</td>'
-                    + f'<td class="{status(ppt_ok)}">{"✅" if ppt_ok else "❌"} {ppt_total}</td>'
+                    + f'<td class="{status(d_pok)}">{"✅" if d_pok else "❌"} {d_ppt} (API: {d_api}, WOPI: {d_wopi})</td>'
+                    + f'<td class="{status(n_pok)}">{"✅" if n_pok else "❌"} {n_ppt} (API: {n_api}, WOPI: {n_wopi})</td>'
                     + f'<td class="{status(err_ok)}">{"✅" if err_ok else "❌"} {d_err + n_err}</td>'
                     + '</tr>'
                 )
@@ -284,7 +290,7 @@ def generate():
         '<th>OS</th><th>Arch</th><th>Last run</th>'
         '<th>Docker HC</th><th>Docker Ver</th>'
         '<th>Native HC</th><th>Native Ver</th>'
-        '<th>Puppeteer (≤5)</th><th>DS Errors</th>'
+        '<th>Docker Puppeteer (≤5)</th><th>Native Puppeteer (≤5)</th><th>DS Errors</th>'
         '</tr></thead><tbody>'
         + '\n'.join(os_rows)
         + '</tbody></table>\n'
@@ -413,15 +419,13 @@ def generate():
             hc     = d.get("healthy", False)
             ver_ok = d.get("version_ok", False)
             ver    = d.get("version_actual", "?") or "?"
-            ppt    = d.get("puppeteer_failed", 0)
-            ppt_ok = ppt <= 5
             ds_err = d.get("ds_log_errors", 0)
             server_rows.append(
                 f'<tr>'
                 f'<td>{label}</td>'
                 + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
                 + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
-                + f'<td class="{status(ppt_ok)}">{"✅" if ppt_ok else "❌"} {ppt}</td>'
+                + td_ppt_breakdown(d)
                 + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
                 + '</tr>'
             )
