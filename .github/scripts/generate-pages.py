@@ -328,6 +328,7 @@ def generate():
     docker_rpm_body = docker_table(docker_rpm_x64, "x64") + docker_table(docker_rpm_arm64, "arm64")
 
     # DB section body
+    db_run_date = next((db_data[k].get("run_date", "") for _, k in DBS if db_data.get(k)), "")
     db_rows = []
     for label, key in DBS:
         d = db_data[key]
@@ -462,7 +463,7 @@ def generate():
 {section("Docker DEB (Ubuntu 24.04)", "dev-Docker-DEB-x64-arm64.yml", "dev-Docker-DEB-x64-arm64", docker_deb_body)}
 {section("Docker RPM (CentOS 9)", "dev-Docker-RPM-x64-arm64.yml", "dev-Docker-RPM-x64-arm64", docker_rpm_body)}
 {section("OS Tests (OneClickInstall)", "dev-OS-x64-arm64.yml", "dev-OS-x64-arm64", os_body, os_run_date)}
-{section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body)}
+{section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body, db_run_date)}
 {section("ActiveMQ Tests", "dev-ActiveMQ.yml", "dev-ActiveMQ", amq_body)}
 {section("Redis unix.sock Tests", "dev-Redis-unix.sock.yml", "dev-Redis-unix.sock x64", redis_body)}
 {section("SERVER Checks (AWS S3)", "dev-SERVER-checks.yml", "dev SERVER checks", server_body)}
