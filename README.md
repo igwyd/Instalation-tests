@@ -2,7 +2,7 @@
 
 Automated installation testing of ONLYOFFICE Docs packages via GitHub Actions.
 
-📊 **[Test Results Dashboard](https://igwyd.github.io/Instalation-tests/)** — detailed results for all dev builds
+📊 **[Test Results Dashboard](http://onlyoffice-tests-dashboard.s3-website-us-east-1.amazonaws.com/)** — detailed results for all dev builds
 
 ## Develop **<!-- onlyoffice-version-start -->v9.4.1-15<!-- onlyoffice-version-end -->**
 
