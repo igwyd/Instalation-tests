@@ -352,6 +352,7 @@ def generate():
                + '</tbody></table>\n')
 
     # ActiveMQ section body
+    amq_run_date = next((d.get("run_date", "") for d in [amq_artemis, amq_classic] if d), "")
     amq_rows = []
     for label, d in [("Artemis", amq_artemis), ("Classic", amq_classic)]:
         if d is None:
@@ -464,7 +465,7 @@ def generate():
 {section("Docker RPM (CentOS 9)", "dev-Docker-RPM-x64-arm64.yml", "dev-Docker-RPM-x64-arm64", docker_rpm_body)}
 {section("OS Tests (OneClickInstall)", "dev-OS-x64-arm64.yml", "dev-OS-x64-arm64", os_body, os_run_date)}
 {section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body, db_run_date)}
-{section("ActiveMQ Tests", "dev-ActiveMQ.yml", "dev-ActiveMQ", amq_body)}
+{section("ActiveMQ Tests", "dev-ActiveMQ.yml", "dev-ActiveMQ", amq_body, amq_run_date)}
 {section("Redis unix.sock Tests", "dev-Redis-unix.sock.yml", "dev-Redis-unix.sock x64", redis_body)}
 {section("SERVER Checks (AWS S3)", "dev-SERVER-checks.yml", "dev SERVER checks", server_body)}
 </main>
