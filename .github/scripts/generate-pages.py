@@ -102,11 +102,9 @@ def td_ppt_breakdown(data, threshold=5):
     if data is None:
         return '<td class="na">—</td>'
     total = data.get("puppeteer_total_failed", data.get("puppeteer_failed", 0))
-    api   = data.get("puppeteer_api_failed", 0)
-    wopi  = data.get("puppeteer_wopi_failed", 0)
     is_ok = total <= threshold
     icon  = "✅" if is_ok else "❌"
-    return f'<td class="{status(is_ok)}">{icon} {total} (API: {api}, WOPI: {wopi})</td>'
+    return f'<td class="{status(is_ok)}">{icon} {total}</td>'
 
 
 def td_ds_errors(data):
@@ -263,15 +261,11 @@ def generate():
                 d_ver  = (docker or {}).get("version_actual", "?") or "?"
                 d_vok  = (docker or {}).get("version_ok", False)
                 d_ppt  = (docker or {}).get("puppeteer_failed", 0)
-                d_api  = (docker or {}).get("puppeteer_api_failed", 0)
-                d_wopi = (docker or {}).get("puppeteer_wopi_failed", 0)
                 d_pok  = d_ppt <= 5
                 n_hc   = (native or {}).get("healthy", False)
                 n_ver  = (native or {}).get("version_actual", "?") or "?"
                 n_vok  = (native or {}).get("version_ok", False)
                 n_ppt  = (native or {}).get("puppeteer_failed", 0)
-                n_api  = (native or {}).get("puppeteer_api_failed", 0)
-                n_wopi = (native or {}).get("puppeteer_wopi_failed", 0)
                 n_pok  = n_ppt <= 5
                 d_err  = (docker or {}).get("ds_log_errors", 0)
                 n_err  = (native or {}).get("ds_log_errors", 0)
@@ -284,8 +278,8 @@ def generate():
                     + f'<td class="{status(d_vok)}">{"✅" if d_vok else "❌"} {escape(d_ver)}</td>'
                     + f'<td class="{status(n_hc)}">{"✅ OK" if n_hc else "❌ FAILED"}</td>'
                     + f'<td class="{status(n_vok)}">{"✅" if n_vok else "❌"} {escape(n_ver)}</td>'
-                    + f'<td class="{status(d_pok)}">{"✅" if d_pok else "❌"} {d_ppt} (API: {d_api}, WOPI: {d_wopi})</td>'
-                    + f'<td class="{status(n_pok)}">{"✅" if n_pok else "❌"} {n_ppt} (API: {n_api}, WOPI: {n_wopi})</td>'
+                    + f'<td class="{status(d_pok)}">{"✅" if d_pok else "❌"} {d_ppt}</td>'
+                    + f'<td class="{status(n_pok)}">{"✅" if n_pok else "❌"} {n_ppt}</td>'
                     + f'<td class="{status(err_ok)}">{"✅" if err_ok else "❌"} {d_err + n_err}</td>'
                     + '</tr>'
                 )
@@ -392,8 +386,6 @@ def generate():
             sock    = d.get("redis_sock_ok", False)
             port    = d.get("port_6379_closed", False)
             ppt     = d.get("puppeteer_total_failed", 0)
-            ppt_api = d.get("puppeteer_api_failed", 0)
-            ppt_wopi= d.get("puppeteer_wopi_failed", 0)
             ppt_ok  = ppt <= 5
             ds_err  = d.get("ds_log_errors", 0)
             row = (
@@ -402,7 +394,7 @@ def generate():
                 + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver_act)}</td>'
                 + f'<td class="{status(sock)}">{"✅ OK" if sock else "❌ FAILED"}</td>'
                 + f'<td class="{status(port)}">{"✅ OK" if port else "❌ FAILED"}</td>'
-                + f'<td class="{status(ppt_ok)}">{"✅" if ppt_ok else "❌"} {ppt} (API: {ppt_api}, WOPI: {ppt_wopi})</td>'
+                + f'<td class="{status(ppt_ok)}">{"✅" if ppt_ok else "❌"} {ppt}</td>'
                 + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
                 + '</tr>'
             )

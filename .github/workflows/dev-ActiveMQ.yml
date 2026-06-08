@@ -178,7 +178,7 @@ jobs:
           VER_DETAIL="exp: ${EXPECTED}, act: ${VERSION_ACTUAL:-not set}"
 
           PPTR_TOTAL="${PUPPETEER_FAILED:-0}"
-          PPT_DETAIL="API: ${PUPPETEER_API_FAILED:-0}, WOPI: ${PUPPETEER_WOPI_FAILED:-0}, Total: ${PPTR_TOTAL} (threshold: 5)"
+          PPT_DETAIL="${PPTR_TOTAL} (threshold: 5)"
           if [ "$PPTR_TOTAL" -gt 5 ]; then
             PPT_ICON="❌"; PPT_LABEL="FAILED"; FAILED=1
           else
