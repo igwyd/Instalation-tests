@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate GitHub Pages index.html from workflow result JSON files."""
+"""Generate multi-page dashboard from workflow result JSON files."""
 
 import json
 import os
@@ -42,6 +42,10 @@ header h1 { font-size: 20px; font-weight: 600; }
 header p { margin-top: 6px; font-size: 13px; opacity: 0.85; }
 header a { color: #cae8ff; text-decoration: none; }
 header a:hover { text-decoration: underline; }
+nav.breadcrumb { background: #0550ae; padding: 8px 32px; font-size: 13px; }
+nav.breadcrumb a { color: #cae8ff; text-decoration: none; }
+nav.breadcrumb a:hover { text-decoration: underline; }
+nav.breadcrumb span { color: #cae8ff; opacity: 0.6; margin: 0 6px; }
 main { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
 section { background: white; border: 1px solid #d0d7de; border-radius: 6px; margin-bottom: 24px; overflow: hidden; }
 .section-header { padding: 12px 16px; border-bottom: 1px solid #d0d7de; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -58,6 +62,21 @@ tr:hover td { background: #f6f8fa; }
 td.ok { color: #1a7f37; }
 td.fail { color: #cf222e; }
 td.na { color: #8c959f; }
+.cards { display: flex; gap: 20px; flex-wrap: wrap; margin: 32px 0; }
+.card { flex: 1; min-width: 260px; background: white; border: 1px solid #d0d7de; border-radius: 8px; padding: 28px 24px; text-decoration: none; color: inherit; display: block; transition: border-color 0.15s, box-shadow 0.15s; }
+.card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+.card-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+.card-title { font-size: 32px; font-weight: 700; margin-bottom: 12px; }
+.card-desc { color: #57606a; font-size: 13px; line-height: 1.6; }
+.card-arrow { margin-top: 20px; font-size: 13px; font-weight: 600; }
+.card-dev .card-label, .card-dev .card-arrow { color: #0969da; }
+.card-dev:hover { border-color: #0969da; }
+.card-release .card-label, .card-release .card-arrow { color: #1a7f37; }
+.card-release:hover { border-color: #1a7f37; }
+.card-common .card-label, .card-common .card-arrow { color: #9a6700; }
+.card-common:hover { border-color: #9a6700; }
+.placeholder { text-align: center; padding: 64px 16px; color: #8c959f; }
+.placeholder p { font-size: 15px; }
 footer { text-align: center; padding: 20px 16px; color: #8c959f; font-size: 12px; }
 footer a { color: #8c959f; }
 """
@@ -237,9 +256,72 @@ def section(title, workflow_file, badge_label, body_html, run_date=""):
             f'</section>\n')
 
 
-def generate():
+def page_html(title, body, nav_html=""):
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{escape(title)}</title>
+<style>{CSS}</style>
+</head>
+<body>
+<header>
+  <h1>ONLYOFFICE Docs — Test Results</h1>
+  <p>Generated: <time>{now}</time> &nbsp;·&nbsp; <a href="{REPO}">GitHub Repository</a></p>
+</header>
+{nav_html}<main>
+{body}</main>
+<footer>Generated automatically · <a href="{REPO}/actions">GitHub Actions</a></footer>
+</body>
+</html>
+"""
 
+
+def breadcrumb(page_title):
+    return (f'<nav class="breadcrumb">'
+            f'<a href="index.html">← Main</a>'
+            f'<span>/</span>'
+            f'{escape(page_title)}'
+            f'</nav>\n')
+
+
+def write(filename, html):
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    out_path = os.path.join(OUTPUT_DIR, filename)
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(f"Generated: {out_path}")
+
+
+def generate_main():
+    cards_html = (
+        '<div class="cards">\n'
+        '<a class="card card-dev" href="dev.html">\n'
+        '  <div class="card-label">Pre-release builds</div>\n'
+        '  <div class="card-title">DEV</div>\n'
+        '  <div class="card-desc">DEB, RPM, Docker, OS (OneClickInstall),<br>Database, ActiveMQ, Redis, SERVER checks</div>\n'
+        '  <div class="card-arrow">Open →</div>\n'
+        '</a>\n'
+        '<a class="card card-release" href="release.html">\n'
+        '  <div class="card-label">Official releases</div>\n'
+        '  <div class="card-title">RELEASE</div>\n'
+        '  <div class="card-desc">DEB, RPM, Docker DEB, Docker RPM</div>\n'
+        '  <div class="card-arrow">Open →</div>\n'
+        '</a>\n'
+        '<a class="card card-common" href="common.html">\n'
+        '  <div class="card-label">Other tests</div>\n'
+        '  <div class="card-title">COMMON</div>\n'
+        '  <div class="card-desc">Compile from source, OneClickInstall,<br>k6 load tests, Puppeteer smoke tests</div>\n'
+        '  <div class="card-arrow">Open →</div>\n'
+        '</a>\n'
+        '</div>\n'
+    )
+    write("index.html", page_html("ONLYOFFICE Docs — Test Results", cards_html))
+
+
+def generate_dev():
     # OS section body
     os_run_date = ""
     os_rows = []
@@ -254,7 +336,7 @@ def generate():
             if d is None:
                 os_rows.append(
                     f'<tr><td>{escape(os_label)}</td><td>{arch}</td>'
-                    + '<td class="na">—</td>' * 8 + '</tr>'
+                    + '<td class="na">—</td>' * 7 + '</tr>'
                 )
             else:
                 d_hc   = (docker or {}).get("healthy", False)
@@ -294,31 +376,24 @@ def generate():
         + '</tbody></table>\n'
     )
 
-    deb_x64   = load("dev-deb-x64.json")
-    deb_arm64  = load("dev-deb-arm64.json")
-    rpm_x64   = load("dev-rpm-x64.json")
-    rpm_arm64  = load("dev-rpm-arm64.json")
+    deb_x64        = load("dev-deb-x64.json")
+    deb_arm64      = load("dev-deb-arm64.json")
+    rpm_x64        = load("dev-rpm-x64.json")
+    rpm_arm64      = load("dev-rpm-arm64.json")
     docker_deb_x64   = load("dev-docker-deb-x64.json")
     docker_deb_arm64 = load("dev-docker-deb-arm64.json")
     docker_rpm_x64   = load("dev-docker-rpm-x64.json")
     docker_rpm_arm64 = load("dev-docker-rpm-arm64.json")
-    db_data   = {key: load(f"dev-db-{key}.json") for _, key in DBS}
-    amq_artemis = load("dev-activemq-artemis.json")
-    amq_classic = load("dev-activemq-classic.json")
-    redis_redis   = load("dev-redis-sock-redis.json")
-    redis_ioredis = load("dev-redis-sock-ioredis.json")
-    server_checks = load("dev-server-checks.json")
+    db_data        = {key: load(f"dev-db-{key}.json") for _, key in DBS}
+    amq_artemis    = load("dev-activemq-artemis.json")
+    amq_classic    = load("dev-activemq-classic.json")
+    redis_redis    = load("dev-redis-sock-redis.json")
+    redis_ioredis  = load("dev-redis-sock-ioredis.json")
+    server_checks  = load("dev-server-checks.json")
 
-    # DEB section body
-    deb_body = pkg_table(deb_x64, "x64") + pkg_table(deb_arm64, "arm64")
-
-    # RPM section body
-    rpm_body = pkg_table(rpm_x64, "x64") + pkg_table(rpm_arm64, "arm64")
-
-    # Docker DEB section body
+    deb_body        = pkg_table(deb_x64, "x64") + pkg_table(deb_arm64, "arm64")
+    rpm_body        = pkg_table(rpm_x64, "x64") + pkg_table(rpm_arm64, "arm64")
     docker_deb_body = docker_table(docker_deb_x64, "x64") + docker_table(docker_deb_arm64, "arm64")
-
-    # Docker RPM section body
     docker_rpm_body = docker_table(docker_rpm_x64, "x64") + docker_table(docker_rpm_arm64, "arm64")
 
     # DB section body
@@ -405,8 +480,8 @@ def generate():
                   + redis_driver_table("ioredis", redis_ioredis))
 
     # SERVER checks section body
-    run_date = (server_checks or {}).get("run_date", "")
-    date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
+    server_run_date = (server_checks or {}).get("run_date", "")
+    server_date_part = f' <span class="date">· {escape(server_run_date)}</span>' if server_run_date else ""
     server_rows = []
     for label, key in [("S3 useDirectStorageUrls=false", "s3_false"), ("S3 useDirectStorageUrls=true", "s3_true")]:
         d = (server_checks or {}).get(key)
@@ -428,7 +503,7 @@ def generate():
                 + '</tr>'
             )
     server_body = (
-        f'<h3>EE{date_part}</h3>\n'
+        f'<h3>EE{server_date_part}</h3>\n'
         '<table><thead><tr>'
         '<th>Cycle</th><th>Healthcheck</th><th>Version</th>'
         '<th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
@@ -437,41 +512,32 @@ def generate():
         + '</tbody></table>\n'
     )
 
-    html = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ONLYOFFICE Docs — Test Results</title>
-<style>{CSS}</style>
-</head>
-<body>
-<header>
-  <h1>ONLYOFFICE Docs — Installation Test Results</h1>
-  <p>Generated: <time>{now}</time> &nbsp;·&nbsp; <a href="{REPO}">GitHub Repository</a></p>
-</header>
-<main>
-{section("DEB Packages (Ubuntu 24.04)", "dev-DEB-x64-arm64.yml", "dev-DEB-x64-arm64", deb_body)}
-{section("RPM Packages (CentOS 9)", "dev-RPM-x64-arm64.yml", "dev-RPM-x64-arm64", rpm_body)}
-{section("Docker DEB (Ubuntu 24.04)", "dev-Docker-DEB-x64-arm64.yml", "dev-Docker-DEB-x64-arm64", docker_deb_body)}
-{section("Docker RPM (CentOS 9)", "dev-Docker-RPM-x64-arm64.yml", "dev-Docker-RPM-x64-arm64", docker_rpm_body)}
-{section("OS Tests (OneClickInstall)", "dev-OS-x64-arm64.yml", "dev-OS-x64-arm64", os_body, os_run_date)}
-{section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body, db_run_date)}
-{section("ActiveMQ Tests", "dev-ActiveMQ.yml", "dev-ActiveMQ", amq_body, amq_run_date)}
-{section("Redis unix.sock Tests", "dev-Redis-unix.sock.yml", "dev-Redis-unix.sock x64", redis_body)}
-{section("SERVER Checks (AWS S3)", "dev-SERVER-checks.yml", "dev SERVER checks", server_body)}
-</main>
-<footer>Generated automatically · <a href="{REPO}/actions">GitHub Actions</a></footer>
-</body>
-</html>
-"""
+    body = (
+        section("DEB Packages (Ubuntu 24.04)", "dev-DEB-x64-arm64.yml", "dev-DEB-x64-arm64", deb_body)
+        + section("RPM Packages (CentOS 9)", "dev-RPM-x64-arm64.yml", "dev-RPM-x64-arm64", rpm_body)
+        + section("Docker DEB (Ubuntu 24.04)", "dev-Docker-DEB-x64-arm64.yml", "dev-Docker-DEB-x64-arm64", docker_deb_body)
+        + section("Docker RPM (CentOS 9)", "dev-Docker-RPM-x64-arm64.yml", "dev-Docker-RPM-x64-arm64", docker_rpm_body)
+        + section("OS Tests (OneClickInstall)", "dev-OS-x64-arm64.yml", "dev-OS-x64-arm64", os_body, os_run_date)
+        + section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body, db_run_date)
+        + section("ActiveMQ Tests", "dev-ActiveMQ.yml", "dev-ActiveMQ", amq_body, amq_run_date)
+        + section("Redis unix.sock Tests", "dev-Redis-unix.sock.yml", "dev-Redis-unix.sock x64", redis_body)
+        + section("SERVER Checks (AWS S3)", "dev-SERVER-checks.yml", "dev SERVER checks", server_body)
+    )
+    write("dev.html", page_html("DEV — ONLYOFFICE Docs Test Results", body, breadcrumb("DEV")))
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    out_path = os.path.join(OUTPUT_DIR, "index.html")
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write(html)
-    print(f"Generated: {out_path}")
+
+def generate_release():
+    body = '<div class="placeholder"><p>No data yet — coming soon</p></div>\n'
+    write("release.html", page_html("RELEASE — ONLYOFFICE Docs Test Results", body, breadcrumb("RELEASE")))
+
+
+def generate_common():
+    body = '<div class="placeholder"><p>No data yet — coming soon</p></div>\n'
+    write("common.html", page_html("COMMON — ONLYOFFICE Docs Test Results", body, breadcrumb("COMMON")))
 
 
 if __name__ == "__main__":
-    generate()
+    generate_main()
+    generate_dev()
+    generate_release()
+    generate_common()

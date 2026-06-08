@@ -25,12 +25,12 @@ jobs:
           aws s3 sync s3://${{ vars.DASHBOARD_BUCKET_NAME }}/results/ .github/workflow-results/ \
             --region ${{ vars.DASHBOARD_BUCKET_REGION }}
 
-      - name: Generate index.html
+      - name: Generate dashboard pages
         run: python3 .github/scripts/generate-pages.py
 
       - name: Upload dashboard to S3
         run: |
-          aws s3 cp _site/index.html s3://${{ vars.DASHBOARD_BUCKET_NAME }}/index.html \
+          aws s3 sync _site/ s3://${{ vars.DASHBOARD_BUCKET_NAME }}/ \
             --region ${{ vars.DASHBOARD_BUCKET_REGION }} \
             --content-type text/html \
             --cache-control "no-cache, no-store, must-revalidate"
