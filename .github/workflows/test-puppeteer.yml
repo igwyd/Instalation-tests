@@ -47,21 +47,28 @@ jobs:
           npm install
           cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
 
-      - name: Puppeteer API tests ONLYOFFICE-Docs EE
+      - name: Puppeteer API tests ONLYOFFICE-Docs
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"https://${{ vars.TEST_DSURL }}/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py \
+            --suite daily \
+            --disable_animation \
+            --config_params ${{ vars.TEST_PUPPETEER_CONFIGPARAMS }} testOptions.url=${{ vars.TEST_PUPPETEER_DSURL }} \
+            --providers example
 
-      - name: Puppeteer WOPI tests ONLYOFFICE-Docs EE
+      - name: Puppeteer WOPI tests ONLYOFFICE-Docs
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py \
+            --suite daily \
+            --disable_animation \
+            --config_params ${{ vars.TEST_PUPPETEER_CONFIGPARAMS }} testOptions.url=${{ vars.TEST_PUPPETEER_DSURL }} \
+            --providers wopi
