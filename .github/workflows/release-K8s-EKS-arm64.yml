@@ -244,7 +244,7 @@ jobs:
 
       - name: Parse puppeteer results
         if: always()
-        run: python3 .github/scripts/parse-puppeteer-results.py --edition EE
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition DE
 
       - name: Documentserver logs
         continue-on-error: true
@@ -291,7 +291,7 @@ jobs:
             PODS_ICON="❌"; PODS_LABEL="FAILED"; FAILED=1
           fi
 
-          PPT="${PUPPETEER_EE_FAILED:-0}"
+          PPT="${PUPPETEER_DE_FAILED:-0}"
           if [ "${PPT}" -gt 5 ]; then
             PPT_ICON="❌"; PPT_LABEL="FAILED"; FAILED=1
           else
@@ -364,11 +364,11 @@ jobs:
                   'version_ok':            b('VERSION_OK'),
                   'version_actual':        s('VERSION_ACTUAL'),
                   'pods_ok':               b('PODS_OK'),
-                  'puppeteer_failed':      n('PUPPETEER_EE_FAILED'),
-                  'puppeteer_api_failed':  n('PUPPETEER_EE_API_FAILED'),
-                  'puppeteer_wopi_failed': n('PUPPETEER_EE_WOPI_FAILED'),
+                  'puppeteer_failed':      n('PUPPETEER_DE_FAILED'),
+                  'puppeteer_api_failed':  n('PUPPETEER_DE_API_FAILED'),
+                  'puppeteer_wopi_failed': n('PUPPETEER_DE_WOPI_FAILED'),
                   'ds_log_errors':         n('DS_LOG_ERRORS'),
-                  'conclusion': 'success' if (b('HEALTHCHECK') and b('VERSION_OK') and b('PODS_OK') and ok5('PUPPETEER_EE_FAILED') and n('DS_LOG_ERRORS') == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK') and b('VERSION_OK') and b('PODS_OK') and ok5('PUPPETEER_DE_FAILED') and n('DS_LOG_ERRORS') == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
           }
