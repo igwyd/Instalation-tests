@@ -278,7 +278,7 @@ jobs:
 
       - name: Remove ONLYOFFICE-Docs EE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf remove onlyoffice-documentserver-ee -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
@@ -398,7 +398,7 @@ jobs:
 
       - name: Remove ONLYOFFICE-Docs DE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf remove onlyoffice-documentserver-de -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
@@ -518,7 +518,7 @@ jobs:
 
       - name: Remove ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf remove onlyoffice-documentserver -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
