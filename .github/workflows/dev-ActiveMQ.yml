@@ -119,24 +119,10 @@ jobs:
       - name: Start ds-example
         run: docker exec onlyoffice supervisorctl start ds:example
 
-      - name: Puppeteer API tests
-        continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${RUNNER_IP}/example\"#" ../config_chrome_linux.json
-          echo "-------------------------------------"
-          cat ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
-
-      - name: Puppeteer WOPI tests
-        continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
-          cat ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+      - name: Run Puppeteer Tests
+        uses: ./.github/actions/run-puppeteer
+        with:
+          url: http://${{ env.RUNNER_IP }}/example
 
       - name: Documentserver logs
         continue-on-error: true
