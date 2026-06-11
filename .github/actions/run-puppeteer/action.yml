@@ -16,8 +16,9 @@ runs:
     - name: Set puppeteer URL
       shell: bash
       run: |
+        which jq || sudo apt-get install -y jq
         cd Dep.Tests/puppeteer/engine
-        jq --arg url "${{ inputs.url }}" '.testOptions.url = $arg' ../config_chrome_linux.json > tmp.json
+        jq --arg url "${{ inputs.url }}" '.testOptions.url = $url' ../config_chrome_linux.json > tmp.json
         mv tmp.json ../config_chrome_linux.json
         echo "-------------------------------------"
         cat ../config_chrome_linux.json
