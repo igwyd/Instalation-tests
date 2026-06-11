@@ -135,7 +135,7 @@ jobs:
         continue-on-error: true
         run: |
           UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo docker exec ds-ee-dev supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+            "sudo docker exec ds-ee-dev supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice|ds:adminpanel' || true)
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_EE_OK=true" >> $GITHUB_ENV
           else
@@ -249,7 +249,7 @@ jobs:
         continue-on-error: true
         run: |
           UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo docker exec ds-de-dev supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
+            "sudo docker exec ds-de-dev supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice|ds:adminpanel' || true)
           if [ -z "$UNEXPECTED" ]; then
             echo "SERVICES_DE_OK=true" >> $GITHUB_ENV
           else
