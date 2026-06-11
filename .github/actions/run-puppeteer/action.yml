@@ -5,10 +5,6 @@ inputs:
   url:
     description: 'Value for testOptions.url (e.g. http://1.2.3.4/example/)'
     required: true
-  threads:
-    description: 'Number of parallel threads'
-    required: false
-    default: '2'
 
 runs:
   using: composite
@@ -36,7 +32,7 @@ runs:
           --suite daily \
           --disable_animation \
           --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 \
-          --threads ${{ inputs.threads }} \
+          --threads 2 \
           --providers example
 
     - name: Puppeteer WOPI tests
@@ -48,5 +44,5 @@ runs:
           --suite daily \
           --disable_animation \
           --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 \
-          --threads ${{ inputs.threads }} \
+          --threads 2 \
           --providers wopi
