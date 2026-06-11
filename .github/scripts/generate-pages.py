@@ -307,7 +307,7 @@ def generate_main():
         '<a class="card card-release" href="release.html">\n'
         '  <div class="card-label">Official releases</div>\n'
         '  <div class="card-title">RELEASE</div>\n'
-        '  <div class="card-desc">DEB, RPM, Docker DEB, Docker RPM</div>\n'
+        '  <div class="card-desc">DEB, RPM, Docker DEB, Docker RPM, K8s EKS arm64</div>\n'
         '  <div class="card-arrow">Open →</div>\n'
         '</a>\n'
         '<a class="card card-common" href="common.html">\n'
@@ -527,7 +527,42 @@ def generate_dev():
 
 
 def generate_release():
-    body = '<div class="placeholder"><p>No data yet — coming soon</p></div>\n'
+    k8s = load("release-k8s-eks-arm64.json")
+    run_date = (k8s or {}).get("run_date", "")
+    date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
+
+    ee = (k8s or {}).get("ee", {})
+    if k8s is None:
+        row = '<tr><td>EE</td>' + '<td class="na">—</td>' * 5 + '</tr>'
+    else:
+        hc      = ee.get("healthy", False)
+        ver_ok  = ee.get("version_ok", False)
+        ver_act = ee.get("version_actual", "?") or "?"
+        pods_ok = ee.get("pods_ok", False)
+        ppt     = ee.get("puppeteer_failed", 0)
+        ppt_ok  = ppt <= 5
+        ds_err  = ee.get("ds_log_errors", 0)
+        row = (
+            '<tr><td>EE</td>'
+            + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
+            + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver_act)}</td>'
+            + f'<td class="{status(pods_ok)}">{"✅ OK" if pods_ok else "❌ FAILED"}</td>'
+            + f'<td class="{status(ppt_ok)}">{"✅" if ppt_ok else "❌"} {ppt}</td>'
+            + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
+            + '</tr>'
+        )
+
+    k8s_body = (
+        f'<h3>arm64{date_part}</h3>\n'
+        '<table><thead><tr>'
+        '<th>Edition</th><th>Healthcheck</th><th>Version</th>'
+        '<th>Pods</th><th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
+        '</tr></thead><tbody>'
+        + row
+        + '</tbody></table>\n'
+    )
+
+    body = section("K8s EKS arm64", "release-K8s-EKS-arm64.yml", "release-K8s-EKS-arm64", k8s_body)
     write("release.html", page_html("RELEASE — ONLYOFFICE Docs Test Results", body, breadcrumb("RELEASE")))
 
 

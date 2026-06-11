@@ -1,4 +1,4 @@
-name: dev K8s EKS arm64
+name: release K8s EKS arm64
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ jobs:
     env:
       CLUSTER_NAME: onlyoffice-k8s-${{ github.run_id }}
       AWS_REGION: us-east-1
-      IMAGES_TAG: ${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+      IMAGES_TAG: ${{ vars.K8S_DOCS_RELEASE_VERSION }}
       HELM_CHART_VERSION: 6.1.1
       HELM_CHART: onlyoffice/docs
       K8S_BRANCH: master
@@ -56,7 +56,6 @@ jobs:
           helm repo add nfs-server-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner
           helm repo add onlyoffice https://download.onlyoffice.com/charts/stable
           helm repo add bitnami https://charts.bitnami.com/bitnami
-          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
           helm repo update
 
       - name: Install NFS Server Provisioner
@@ -97,11 +96,6 @@ jobs:
             --set image.tag=17.6.0-debian-12-r2 \
             --set metrics.enabled=false
 
-      - name: Install NGINX Ingress Controller
-        run: |
-          helm install ingress-nginx ingress-nginx/ingress-nginx \
-            --set controller.service.type=LoadBalancer
-
       - name: Wait for dependencies to start
         run: |
           echo "Waiting 60s for pods to start..."
@@ -111,25 +105,6 @@ jobs:
           kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=postgresql --timeout=180s || true
           kubectl get pods
 
-      - name: Get Ingress LoadBalancer hostname
-        run: |
-          echo "Waiting for LoadBalancer hostname..."
-          for i in $(seq 1 30); do
-            HOSTNAME=$(kubectl get svc ingress-nginx-controller \
-              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
-            if [ -n "$HOSTNAME" ]; then
-              echo "INGRESS_HOST=$HOSTNAME" >> $GITHUB_ENV
-              echo "Ingress hostname: $HOSTNAME"
-              break
-            fi
-            echo "Attempt $i/30: not ready, waiting 15s..."
-            sleep 15
-          done
-          if [ -z "${INGRESS_HOST}" ]; then
-            echo "ERROR: LoadBalancer hostname not available after 7.5 minutes"
-            exit 1
-          fi
-
       - name: Clone Kubernetes-Docs
         run: |
           git clone https://github.com/ONLYOFFICE/Kubernetes-Docs.git -b ${{ env.K8S_BRANCH }}
@@ -138,12 +113,11 @@ jobs:
         run: |
           helm install documentserver -f ./Kubernetes-Docs/values.yaml \
             --version ${{ env.HELM_CHART_VERSION }} ${{ env.HELM_CHART }} \
-            --set example.enabled=true \
-            --set example.dsUrl=http://${{ env.INGRESS_HOST }}/ \
-            --set ingress.enabled=true \
-            --set ingress.host=${{ env.INGRESS_HOST }} \
+            --set service.type=LoadBalancer \
+            --set service.port=80 \
+            --set example.enabled=false \
             --set wopi.enabled=true \
-            --set jwt.secret=doc-linux \
+            --set jwt.secret=mysupersecret \
             --set adminpanel.enabled=true \
             --set "proxy.infoAllowedIP={0.0.0.0/0}" \
             --set "images.tag=${{ env.IMAGES_TAG }}"
@@ -151,38 +125,79 @@ jobs:
       - name: Wait for DS startup
         run: sleep 300
 
-      - name: Info
+      - name: Get LoadBalancer hostname
+        run: |
+          echo "Waiting for LoadBalancer hostname..."
+          for i in $(seq 1 30); do
+            LB_HOST=$(kubectl get svc -l app.kubernetes.io/instance=documentserver \
+              -o jsonpath='{.items[*].status.loadBalancer.ingress[0].hostname}' 2>/dev/null \
+              | tr ' ' '\n' | grep -v '^$' | head -1 || echo "")
+            if [ -z "$LB_HOST" ]; then
+              LB_HOST=$(kubectl get svc -l app.kubernetes.io/instance=documentserver \
+                -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}' 2>/dev/null \
+                | tr ' ' '\n' | grep -v '^$' | head -1 || echo "")
+            fi
+            if [ -n "$LB_HOST" ]; then
+              echo "LB_HOST=$LB_HOST" >> $GITHUB_ENV
+              echo ""
+              echo "========================================"
+              echo "  LoadBalancer: http://$LB_HOST/"
+              echo "========================================"
+              echo ""
+              kubectl get svc -l app.kubernetes.io/instance=documentserver
+              break
+            fi
+            echo "Attempt $i/30: hostname not yet assigned, waiting 15s..."
+            sleep 15
+          done
+          if [ -z "${LB_HOST}" ]; then
+            echo "ERROR: LoadBalancer hostname not available after 7.5 minutes"
+            exit 1
+          fi
+
+      - name: Enable ds-example
+        run: |
+          helm upgrade documentserver ${{ env.HELM_CHART }} \
+            --version ${{ env.HELM_CHART_VERSION }} \
+            --reuse-values \
+            --set example.enabled=true \
+            --set example.dsUrl=http://${{ env.LB_HOST }}/
+
+      - name: Wait for DS startup
+        run: sleep 300
+
+      - name: INFO about installation
         continue-on-error: true
         run: |
           sudo apt-get update
           sudo apt-get install jq -y
 
           echo "-------------healthcheck-------------"
-          curl -s "http://${{ env.INGRESS_HOST }}/healthcheck"; echo
+          curl -s "http://${{ env.LB_HOST }}/healthcheck"; echo
           echo "-------------Pods status-------------"
           kubectl get pods -o wide
           echo "--------info.json--------"
-          curl -s "http://${{ env.INGRESS_HOST }}/info/info.json" | jq || true
+          curl -s "http://${{ env.LB_HOST }}/info/info.json" | jq || true
           echo "-------------WOPI discovery----------"
-          curl -s "http://${{ env.INGRESS_HOST }}/hosting/discovery" | tail -c 150; echo
+          curl -s "http://${{ env.LB_HOST }}/hosting/discovery" | tail -c 150; echo
 
       - name: Check healthcheck
         continue-on-error: true
         run: |
-          HC=$(curl -s "http://${{ env.INGRESS_HOST }}/healthcheck" || echo "error")
+          HC=$(curl -s "http://${{ env.LB_HOST }}/healthcheck" || echo "error")
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK=$HC" >> $GITHUB_ENV
 
       - name: Check version
         continue-on-error: true
         run: |
-          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
-          INFO=$(curl -s "http://${{ env.INGRESS_HOST }}/info/info.json" || echo "{}")
+          EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
+          INFO=$(curl -s "http://${{ env.LB_HOST }}/info/info.json" || echo "{}")
           BUILD_VERSION=$(echo "$INFO" | jq -r '.buildVersion // empty')
           BUILD_NUMBER=$(echo "$INFO" | jq -r '.buildNumber // empty')
           ACTUAL="${BUILD_VERSION}-${BUILD_NUMBER}"
           echo "Version: installed=$ACTUAL, expected=$EXPECTED"
-          if [ "$ACTUAL" = "$EXPECTED" ]; then
+          if [ "$BUILD_VERSION" = "$EXPECTED" ]; then
             echo "VERSION_OK=true" >> $GITHUB_ENV
           else
             echo "VERSION_OK=false" >> $GITHUB_ENV
@@ -209,7 +224,7 @@ jobs:
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.INGRESS_HOST }}/example/\"#" ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.LB_HOST }}/example/\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
@@ -255,7 +270,7 @@ jobs:
         if: always()
         run: |
           FAILED=0
-          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
 
           if [ "${HEALTHCHECK}" = "true" ]; then
             HC_ICON="✅"; HC_LABEL="OK"
@@ -356,14 +371,14 @@ jobs:
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
           }
-          path = '.github/workflow-results/dev-k8s-eks-arm64.json'
+          path = '.github/workflow-results/release-k8s-eks-arm64.json'
           with open(path, 'w') as f:
               json.dump(data, f, indent=2)
           print(f'Saved: {path}')
           PYEOF
 
-          aws s3 cp .github/workflow-results/dev-k8s-eks-arm64.json \
-            s3://${{ vars.DASHBOARD_BUCKET_NAME }}/results/dev-k8s-eks-arm64.json \
+          aws s3 cp .github/workflow-results/release-k8s-eks-arm64.json \
+            s3://${{ vars.DASHBOARD_BUCKET_NAME }}/results/release-k8s-eks-arm64.json \
             --region ${{ vars.DASHBOARD_BUCKET_REGION }}
 
       # - name: Delete EKS cluster
