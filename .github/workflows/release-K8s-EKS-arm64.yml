@@ -216,31 +216,10 @@ jobs:
             echo "PODS_OK=false" >> $GITHUB_ENV
           fi
 
-      - name: Clear puppeteer output
-        run: rm -rf Dep.Tests/puppeteer/out
-
-      - name: Puppeteer API tests
-        continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.LB_HOST }}/example/\"#" ../config_chrome_linux.json
-          echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation \
-            --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome \
-            --providers example --threads 2
-
-      - name: Puppeteer WOPI tests
-        continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation \
-            --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome \
-            --providers wopi --threads 2
+      - name: Run Puppeteer Tests
+        uses: ./.github/actions/run-puppeteer
+        with:
+          url: http://${{ env.LB_HOST }}/example/
 
       - name: Parse puppeteer results
         if: always()

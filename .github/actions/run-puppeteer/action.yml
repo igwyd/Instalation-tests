@@ -1,0 +1,52 @@
+name: Run Puppeteer Tests
+description: Patch DS URL in config, run API and WOPI smoke tests (--suite daily)
+
+inputs:
+  url:
+    description: 'Value for testOptions.url (e.g. http://1.2.3.4/example/)'
+    required: true
+  threads:
+    description: 'Number of parallel threads'
+    required: false
+    default: '2'
+
+runs:
+  using: composite
+  steps:
+    - name: Clear puppeteer output
+      shell: bash
+      run: rm -rf Dep.Tests/puppeteer/out
+
+    - name: Set puppeteer URL
+      shell: bash
+      run: |
+        cd Dep.Tests/puppeteer/engine
+        jq --arg url "${{ inputs.url }}" '.testOptions.url = $arg' ../config_chrome_linux.json > tmp.json
+        mv tmp.json ../config_chrome_linux.json
+        echo "-------------------------------------"
+        cat ../config_chrome_linux.json
+        echo "-------------------------------------"
+
+    - name: Puppeteer API tests
+      shell: bash
+      continue-on-error: true
+      run: |
+        cd Dep.Tests/puppeteer/engine
+        python3 run.py \
+          --suite daily \
+          --disable_animation \
+          --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 \
+          --threads ${{ inputs.threads }} \
+          --providers example
+
+    - name: Puppeteer WOPI tests
+      shell: bash
+      continue-on-error: true
+      run: |
+        cd Dep.Tests/puppeteer/engine
+        python3 run.py \
+          --suite daily \
+          --disable_animation \
+          --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 \
+          --threads ${{ inputs.threads }} \
+          --providers wopi
