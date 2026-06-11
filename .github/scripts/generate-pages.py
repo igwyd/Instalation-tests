@@ -63,12 +63,12 @@ td.ok { color: #1a7f37; }
 td.fail { color: #cf222e; }
 td.na { color: #8c959f; }
 .cards { display: flex; gap: 20px; flex-wrap: wrap; margin: 32px 0; }
-.card { flex: 1; min-width: 260px; background: white; border: 1px solid #d0d7de; border-radius: 8px; padding: 28px 24px; text-decoration: none; color: inherit; display: block; transition: border-color 0.15s, box-shadow 0.15s; }
+.card { flex: 1; min-width: 260px; background: white; border: 1px solid #d0d7de; border-radius: 8px; padding: 28px 24px; text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: border-color 0.15s, box-shadow 0.15s; }
 .card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
 .card-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
 .card-title { font-size: 32px; font-weight: 700; margin-bottom: 12px; }
 .card-desc { color: #57606a; font-size: 13px; line-height: 1.6; }
-.card-arrow { margin-top: 20px; font-size: 13px; font-weight: 600; }
+.card-arrow { margin-top: auto; padding-top: 20px; font-size: 13px; font-weight: 600; }
 .card-dev .card-label, .card-dev .card-arrow { color: #0969da; }
 .card-dev:hover { border-color: #0969da; }
 .card-release .card-label, .card-release .card-arrow { color: #1a7f37; }
