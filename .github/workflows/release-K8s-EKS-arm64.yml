@@ -129,13 +129,11 @@ jobs:
         run: |
           echo "Waiting for LoadBalancer hostname..."
           for i in $(seq 1 30); do
-            LB_HOST=$(kubectl get svc -l app.kubernetes.io/instance=documentserver \
-              -o jsonpath='{.items[*].status.loadBalancer.ingress[0].hostname}' 2>/dev/null \
-              | tr ' ' '\n' | grep -v '^$' | head -1 || echo "")
+            LB_HOST=$(kubectl get svc documentserver \
+              -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
             if [ -z "$LB_HOST" ]; then
-              LB_HOST=$(kubectl get svc -l app.kubernetes.io/instance=documentserver \
-                -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}' 2>/dev/null \
-                | tr ' ' '\n' | grep -v '^$' | head -1 || echo "")
+              LB_HOST=$(kubectl get svc documentserver \
+                -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
             fi
             if [ -n "$LB_HOST" ]; then
               echo "LB_HOST=$LB_HOST" >> $GITHUB_ENV
@@ -144,7 +142,7 @@ jobs:
               echo "  LoadBalancer: http://$LB_HOST/"
               echo "========================================"
               echo ""
-              kubectl get svc -l app.kubernetes.io/instance=documentserver
+              kubectl get svc documentserver
               break
             fi
             echo "Attempt $i/30: hostname not yet assigned, waiting 15s..."
@@ -207,8 +205,9 @@ jobs:
       - name: Check pods status
         continue-on-error: true
         run: |
-          NOT_RUNNING=$(kubectl get pods -l app.kubernetes.io/instance=documentserver \
-            --no-headers | grep -vE "Running|Completed" || true)
+          NOT_RUNNING=$(kubectl get pods --no-headers \
+            | grep -E "^(adminpanel|converter|docservice|example)" \
+            | grep -vE "Running|Completed" || true)
           if [ -z "$NOT_RUNNING" ]; then
             echo "PODS_OK=true" >> $GITHUB_ENV
           else
@@ -250,7 +249,8 @@ jobs:
       - name: Documentserver logs
         continue-on-error: true
         run: |
-          for pod in $(kubectl get pods -l app.kubernetes.io/instance=documentserver -o name 2>/dev/null); do
+          for pod in $(kubectl get pods --no-headers -o custom-columns=':metadata.name' \
+            | grep -E "^(adminpanel|converter|docservice|example)"); do
             echo "=== Logs: $pod ==="
             kubectl logs $pod --tail=200 || true
           done
@@ -259,7 +259,8 @@ jobs:
         continue-on-error: true
         run: |
           ERROR_COUNT=0
-          for pod in $(kubectl get pods -l app.kubernetes.io/instance=documentserver -o name 2>/dev/null); do
+          for pod in $(kubectl get pods --no-headers -o custom-columns=':metadata.name' \
+            | grep -E "^(adminpanel|converter|docservice|example)"); do
             COUNT=$(kubectl logs $pod 2>&1 | grep -ciE '\[ERROR\]|typeerror|failed to load|load error' || echo 0)
             ERROR_COUNT=$((ERROR_COUNT + COUNT))
           done
