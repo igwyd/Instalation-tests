@@ -533,7 +533,7 @@ def generate_release():
 
     ee = (k8s or {}).get("ee", {})
     if k8s is None:
-        row = '<tr><td>EE</td>' + '<td class="na">—</td>' * 5 + '</tr>'
+        row = '<tr><td>DE</td>' + '<td class="na">—</td>' * 5 + '</tr>'
     else:
         hc      = ee.get("healthy", False)
         ver_ok  = ee.get("version_ok", False)
@@ -543,7 +543,7 @@ def generate_release():
         ppt_ok  = ppt <= 5
         ds_err  = ee.get("ds_log_errors", 0)
         row = (
-            '<tr><td>EE</td>'
+            '<tr><td>DE</td>'
             + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
             + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver_act)}</td>'
             + f'<td class="{status(pods_ok)}">{"✅ OK" if pods_ok else "❌ FAILED"}</td>'
