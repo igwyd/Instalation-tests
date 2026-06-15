@@ -483,7 +483,7 @@ def generate_dev():
     server_run_date = (server_checks or {}).get("run_date", "")
     server_date_part = f' <span class="date">· {escape(server_run_date)}</span>' if server_run_date else ""
     server_rows = []
-    for label, key in [("S3 useDirectStorageUrls=false", "s3_false"), ("S3 useDirectStorageUrls=true", "s3_true")]:
+    for label, key in [("S3 useDirectStorageUrls=false", "s3_false"), ("S3 useDirectStorageUrls=true", "s3_true"), ("Virtual Path", "vpath")]:
         d = (server_checks or {}).get(key)
         if d is None:
             server_rows.append(f'<tr><td>{label}</td>'
@@ -506,7 +506,7 @@ def generate_dev():
         f'<h3>EE{server_date_part}</h3>\n'
         '<table><thead><tr>'
         '<th>Cycle</th><th>Healthcheck</th><th>Version</th>'
-        '<th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
+        '<th>Puppeteer (=0)</th><th>DS Log Errors</th>'
         '</tr></thead><tbody>'
         + '\n'.join(server_rows)
         + '</tbody></table>\n'
