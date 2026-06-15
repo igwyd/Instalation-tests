@@ -350,6 +350,120 @@ jobs:
           env_var: DS_LOG_ERRORS_AWS_S3_TRUE
           label: AWS_S3_TRUE
 
+      - name: DS-VPATH Docker reInstall
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker stop ds-ee-dev || true
+          sudo docker rm ds-ee-dev || true
+          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: DS-VPATH Enable nginx config
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo rm -f /etc/nginx/sites-enabled/* && \
+             sudo ln -s /etc/nginx/sites-available/default_proxy-to-virtual-path.conf /etc/nginx/sites-enabled/default_proxy-to-virtual-path.conf && \
+             sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: DS-VPATH Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s http://${{ secrets.AWS_DEV_SERVER_EC2_IP }}/ds-vpath/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s http://${{ secrets.AWS_DEV_SERVER_EC2_IP }}/ds-vpath/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: DS-VPATH Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ secrets.AWS_DEV_SERVER_EC2_IP }}/ds-vpath/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_DS_VPATH=$HC" >> $GITHUB_ENV
+
+      - name: DS-VPATH Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_DS_VPATH_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_DS_VPATH_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_DS_VPATH_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: DS-VPATH Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: DS-VPATH Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: DS-VPATH Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i -E "s#\"url\": \"https://[^\"]*/example\"#\"url\": \"http://${{ secrets.AWS_DEV_SERVER_EC2_IP }}/ds-vpath/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: DS-VPATH Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: DS-VPATH Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition DS_VPATH
+
+      - name: DS-VPATH Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+
+      - name: DS-VPATH Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_DS_VPATH
+          label: DS_VPATH
+
       - name: Final check
         if: always()
         run: |
@@ -416,6 +530,36 @@ jobs:
             DS2_ICON="✅"; DS2_LABEL="OK"
           fi
 
+          # --- DS_VPATH ---
+          if [ "${HEALTHCHECK_DS_VPATH}" = "true" ]; then
+            HC3_ICON="✅"; HC3_LABEL="OK";     HC3_DETAIL="${HEALTHCHECK_DS_VPATH}"
+          else
+            HC3_ICON="❌"; HC3_LABEL="FAILED"; HC3_DETAIL="${HEALTHCHECK_DS_VPATH:-not set}"; FAILED=1
+          fi
+
+          if [ "${VERSION_DS_VPATH_OK}" = "true" ]; then
+            VER3_ICON="✅"; VER3_LABEL="OK"
+          else
+            VER3_ICON="❌"; VER3_LABEL="FAILED"; FAILED=1
+          fi
+          VER3_DETAIL="exp: ${EXPECTED}, act: ${VERSION_DS_VPATH_ACTUAL:-not set}"
+
+          PPT3="${PUPPETEER_DS_VPATH_FAILED:-0}"
+          PPT3_DETAIL="${PPT3} failures (threshold: 0)"
+          if [ "$PPT3" -gt 0 ]; then
+            PPT3_ICON="❌"; PPT3_LABEL="FAILED"; FAILED=1
+          else
+            PPT3_ICON="✅"; PPT3_LABEL="OK"
+          fi
+
+          DS3="${DS_LOG_ERRORS_DS_VPATH:-0}"
+          DS3_DETAIL="${DS3} errors"
+          if [ "$DS3" -gt 0 ]; then
+            DS3_ICON="❌"; DS3_LABEL="FAILED"
+          else
+            DS3_ICON="✅"; DS3_LABEL="OK"
+          fi
+
           # --- GITHUB_STEP_SUMMARY (markdown table) ---
           {
             echo "## Final Check"
@@ -437,6 +581,15 @@ jobs:
             echo "| Version       | ${VER2_ICON} ${VER2_LABEL} | \`${VERSION_AWS_S3_TRUE_ACTUAL:-not set}\` |"
             echo "| Puppeteer     | ${PPT2_ICON} ${PPT2_LABEL} | ${PPT2_DETAIL} |"
             echo "| DS Log Errors | ${DS2_DETAIL} | |"
+            echo ""
+            echo "### Virtual Path"
+            echo ""
+            echo "| Check | Result | Details |"
+            echo "|-------|--------|---------|"
+            echo "| Healthcheck   | ${HC3_ICON} ${HC3_LABEL}  | ${HC3_DETAIL} |"
+            echo "| Version       | ${VER3_ICON} ${VER3_LABEL} | \`${VERSION_DS_VPATH_ACTUAL:-not set}\` |"
+            echo "| Puppeteer     | ${PPT3_ICON} ${PPT3_LABEL} | ${PPT3_DETAIL} |"
+            echo "| DS Log Errors | ${DS3_DETAIL} | |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -465,6 +618,16 @@ jobs:
           printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER2_LABEL}" "${VER2_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT2_LABEL}" "${PPT2_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS2_DETAIL}"
+          echo "$SEP"
+          echo ""
+          echo "=== Virtual Path ==="
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC3_LABEL}"  "${HC3_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER3_LABEL}" "${VER3_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT3_LABEL}" "${PPT3_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS3_DETAIL}"
           echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
@@ -495,8 +658,12 @@ jobs:
           s3t_ppt      = n('PUPPETEER_AWS_S3_TRUE_FAILED')
           s3t_api_ppt  = n('PUPPETEER_AWS_S3_TRUE_API_FAILED')
           s3t_wopi_ppt = n('PUPPETEER_AWS_S3_TRUE_WOPI_FAILED')
+          vp_ppt       = n('PUPPETEER_DS_VPATH_FAILED')
+          vp_api_ppt   = n('PUPPETEER_DS_VPATH_API_FAILED')
+          vp_wopi_ppt  = n('PUPPETEER_DS_VPATH_WOPI_FAILED')
           s3f_ds  = n('DS_LOG_ERRORS_AWS_S3_FALSE')
           s3t_ds  = n('DS_LOG_ERRORS_AWS_S3_TRUE')
+          vp_ds   = n('DS_LOG_ERRORS_DS_VPATH')
 
           data = {
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
@@ -519,6 +686,16 @@ jobs:
                   'puppeteer_wopi_failed': s3t_wopi_ppt,
                   'ds_log_errors':         s3t_ds,
                   'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_TRUE') and b('VERSION_AWS_S3_TRUE_OK') and ok5(s3t_ppt) and s3t_ds == 0) else 'failure',
+              },
+              'vpath': {
+                  'healthy':               b('HEALTHCHECK_DS_VPATH'),
+                  'version_ok':            b('VERSION_DS_VPATH_OK'),
+                  'version_actual':        s('VERSION_DS_VPATH_ACTUAL'),
+                  'puppeteer_failed':      vp_ppt,
+                  'puppeteer_api_failed':  vp_api_ppt,
+                  'puppeteer_wopi_failed': vp_wopi_ppt,
+                  'ds_log_errors':         vp_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_DS_VPATH') and b('VERSION_DS_VPATH_OK') and ok5(vp_ppt) and vp_ds == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
           }
