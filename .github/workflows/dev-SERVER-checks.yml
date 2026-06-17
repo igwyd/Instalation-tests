@@ -464,6 +464,259 @@ jobs:
           env_var: DS_LOG_ERRORS_DS_VPATH
           label: DS_VPATH
 
+      - name: AMQP_ARTEMIS Docker reInstall
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true
+          sudo docker rm \$(sudo docker ps -aq) 2>/dev/null || true
+          sudo docker network rm ds-network 2>/dev/null || true
+          sudo docker network create ds-network
+          sudo docker run -d --network ds-network \
+            --name onlyoffice-mq \
+            -e ARTEMIS_USER=artemis \
+            -e ARTEMIS_PASSWORD=artemis \
+            apache/activemq-artemis:2.40.0-alpine
+          sudo docker run -itd --network ds-network -p 8080:80 \
+            --name ds-ee-dev \
+            -e AMQP_TYPE=activemq \
+            -e AMQP_URI=amqp://artemis:artemis@onlyoffice-mq \
+            -e JWT_ENABLED=true \
+            -e JWT_SECRET=MYSECRET \
+            -e WOPI_ENABLED=true \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: AMQP_ARTEMIS Enable nginx config
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo rm -f /etc/nginx/sites-enabled/* && \
+             sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
+             sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: AMQP_ARTEMIS Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: AMQP_ARTEMIS Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_AMQP_ARTEMIS=$HC" >> $GITHUB_ENV
+
+      - name: AMQP_ARTEMIS Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_AMQP_ARTEMIS_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_AMQP_ARTEMIS_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_AMQP_ARTEMIS_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: AMQP_ARTEMIS Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: AMQP_ARTEMIS Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: AMQP_ARTEMIS Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i -E "s#\"url\": \"[^\"]+/example\"#\"url\": \"https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: AMQP_ARTEMIS Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: AMQP_ARTEMIS Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition AMQP_ARTEMIS
+
+      - name: AMQP_ARTEMIS Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+
+      - name: AMQP_ARTEMIS Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_AMQP_ARTEMIS
+          label: AMQP_ARTEMIS
+
+      - name: AMQP_CLASSIC Docker reInstall
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker stop ds-ee-dev onlyoffice-mq || true
+          sudo docker rm ds-ee-dev onlyoffice-mq || true
+          sudo docker run -d --network ds-network \
+            --name onlyoffice-mq \
+            -e ACTIVEMQ_USERNAME=admin \
+            -e ACTIVEMQ_PASSWORD=admin \
+            apache/activemq-classic:latest
+          sudo docker run -itd --network ds-network -p 8080:80 \
+            --name ds-ee-dev \
+            -e AMQP_TYPE=activemq \
+            -e AMQP_URI=amqp://admin:admin@onlyoffice-mq \
+            -e JWT_ENABLED=true \
+            -e JWT_SECRET=MYSECRET \
+            -e WOPI_ENABLED=true \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: AMQP_CLASSIC Enable nginx config
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo rm -f /etc/nginx/sites-enabled/* && \
+             sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
+             sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: AMQP_CLASSIC Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: AMQP_CLASSIC Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_AMQP_CLASSIC=$HC" >> $GITHUB_ENV
+
+      - name: AMQP_CLASSIC Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_AMQP_CLASSIC_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_AMQP_CLASSIC_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_AMQP_CLASSIC_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: AMQP_CLASSIC Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: AMQP_CLASSIC Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: AMQP_CLASSIC Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: AMQP_CLASSIC Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: AMQP_CLASSIC Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition AMQP_CLASSIC
+
+      - name: AMQP_CLASSIC Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+
+      - name: AMQP_CLASSIC Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_AMQP_CLASSIC
+          label: AMQP_CLASSIC
+
       - name: Final check
         if: always()
         run: |
@@ -560,6 +813,66 @@ jobs:
             DS3_ICON="✅"; DS3_LABEL="OK"
           fi
 
+          # --- AMQP_ARTEMIS ---
+          if [ "${HEALTHCHECK_AMQP_ARTEMIS}" = "true" ]; then
+            HC4_ICON="✅"; HC4_LABEL="OK";     HC4_DETAIL="${HEALTHCHECK_AMQP_ARTEMIS}"
+          else
+            HC4_ICON="❌"; HC4_LABEL="FAILED"; HC4_DETAIL="${HEALTHCHECK_AMQP_ARTEMIS:-not set}"; FAILED=1
+          fi
+
+          if [ "${VERSION_AMQP_ARTEMIS_OK}" = "true" ]; then
+            VER4_ICON="✅"; VER4_LABEL="OK"
+          else
+            VER4_ICON="❌"; VER4_LABEL="FAILED"; FAILED=1
+          fi
+          VER4_DETAIL="exp: ${EXPECTED}, act: ${VERSION_AMQP_ARTEMIS_ACTUAL:-not set}"
+
+          PPT4="${PUPPETEER_AMQP_ARTEMIS_FAILED:-0}"
+          PPT4_DETAIL="${PPT4} failures (threshold: 0)"
+          if [ "$PPT4" -gt 0 ]; then
+            PPT4_ICON="❌"; PPT4_LABEL="FAILED"; FAILED=1
+          else
+            PPT4_ICON="✅"; PPT4_LABEL="OK"
+          fi
+
+          DS4="${DS_LOG_ERRORS_AMQP_ARTEMIS:-0}"
+          DS4_DETAIL="${DS4} errors"
+          if [ "$DS4" -gt 0 ]; then
+            DS4_ICON="❌"; DS4_LABEL="FAILED"
+          else
+            DS4_ICON="✅"; DS4_LABEL="OK"
+          fi
+
+          # --- AMQP_CLASSIC ---
+          if [ "${HEALTHCHECK_AMQP_CLASSIC}" = "true" ]; then
+            HC5_ICON="✅"; HC5_LABEL="OK";     HC5_DETAIL="${HEALTHCHECK_AMQP_CLASSIC}"
+          else
+            HC5_ICON="❌"; HC5_LABEL="FAILED"; HC5_DETAIL="${HEALTHCHECK_AMQP_CLASSIC:-not set}"; FAILED=1
+          fi
+
+          if [ "${VERSION_AMQP_CLASSIC_OK}" = "true" ]; then
+            VER5_ICON="✅"; VER5_LABEL="OK"
+          else
+            VER5_ICON="❌"; VER5_LABEL="FAILED"; FAILED=1
+          fi
+          VER5_DETAIL="exp: ${EXPECTED}, act: ${VERSION_AMQP_CLASSIC_ACTUAL:-not set}"
+
+          PPT5="${PUPPETEER_AMQP_CLASSIC_FAILED:-0}"
+          PPT5_DETAIL="${PPT5} failures (threshold: 0)"
+          if [ "$PPT5" -gt 0 ]; then
+            PPT5_ICON="❌"; PPT5_LABEL="FAILED"; FAILED=1
+          else
+            PPT5_ICON="✅"; PPT5_LABEL="OK"
+          fi
+
+          DS5="${DS_LOG_ERRORS_AMQP_CLASSIC:-0}"
+          DS5_DETAIL="${DS5} errors"
+          if [ "$DS5" -gt 0 ]; then
+            DS5_ICON="❌"; DS5_LABEL="FAILED"
+          else
+            DS5_ICON="✅"; DS5_LABEL="OK"
+          fi
+
           # --- GITHUB_STEP_SUMMARY (markdown table) ---
           {
             echo "## Final Check"
@@ -590,6 +903,24 @@ jobs:
             echo "| Version       | ${VER3_ICON} ${VER3_LABEL} | \`${VERSION_DS_VPATH_ACTUAL:-not set}\` |"
             echo "| Puppeteer     | ${PPT3_ICON} ${PPT3_LABEL} | ${PPT3_DETAIL} |"
             echo "| DS Log Errors | ${DS3_DETAIL} | |"
+            echo ""
+            echo "### ActiveMQ Artemis"
+            echo ""
+            echo "| Check | Result | Details |"
+            echo "|-------|--------|---------|"
+            echo "| Healthcheck   | ${HC4_ICON} ${HC4_LABEL}  | ${HC4_DETAIL} |"
+            echo "| Version       | ${VER4_ICON} ${VER4_LABEL} | \`${VERSION_AMQP_ARTEMIS_ACTUAL:-not set}\` |"
+            echo "| Puppeteer     | ${PPT4_ICON} ${PPT4_LABEL} | ${PPT4_DETAIL} |"
+            echo "| DS Log Errors | ${DS4_DETAIL} | |"
+            echo ""
+            echo "### ActiveMQ Classic"
+            echo ""
+            echo "| Check | Result | Details |"
+            echo "|-------|--------|---------|"
+            echo "| Healthcheck   | ${HC5_ICON} ${HC5_LABEL}  | ${HC5_DETAIL} |"
+            echo "| Version       | ${VER5_ICON} ${VER5_LABEL} | \`${VERSION_AMQP_CLASSIC_ACTUAL:-not set}\` |"
+            echo "| Puppeteer     | ${PPT5_ICON} ${PPT5_LABEL} | ${PPT5_DETAIL} |"
+            echo "| DS Log Errors | ${DS5_DETAIL} | |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -629,6 +960,26 @@ jobs:
           printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT3_LABEL}" "${PPT3_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS3_DETAIL}"
           echo "$SEP"
+          echo ""
+          echo "=== ActiveMQ Artemis ==="
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC4_LABEL}"  "${HC4_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER4_LABEL}" "${VER4_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT4_LABEL}" "${PPT4_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS4_DETAIL}"
+          echo "$SEP"
+          echo ""
+          echo "=== ActiveMQ Classic ==="
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC5_LABEL}"  "${HC5_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER5_LABEL}" "${VER5_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT5_LABEL}" "${PPT5_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS5_DETAIL}"
+          echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
             echo "FINAL_CONCLUSION=failure" >> "$GITHUB_ENV"
@@ -661,9 +1012,17 @@ jobs:
           vp_ppt       = n('PUPPETEER_DS_VPATH_FAILED')
           vp_api_ppt   = n('PUPPETEER_DS_VPATH_API_FAILED')
           vp_wopi_ppt  = n('PUPPETEER_DS_VPATH_WOPI_FAILED')
+          art_ppt      = n('PUPPETEER_AMQP_ARTEMIS_FAILED')
+          art_api_ppt  = n('PUPPETEER_AMQP_ARTEMIS_API_FAILED')
+          art_wopi_ppt = n('PUPPETEER_AMQP_ARTEMIS_WOPI_FAILED')
+          cls_ppt      = n('PUPPETEER_AMQP_CLASSIC_FAILED')
+          cls_api_ppt  = n('PUPPETEER_AMQP_CLASSIC_API_FAILED')
+          cls_wopi_ppt = n('PUPPETEER_AMQP_CLASSIC_WOPI_FAILED')
           s3f_ds  = n('DS_LOG_ERRORS_AWS_S3_FALSE')
           s3t_ds  = n('DS_LOG_ERRORS_AWS_S3_TRUE')
           vp_ds   = n('DS_LOG_ERRORS_DS_VPATH')
+          art_ds  = n('DS_LOG_ERRORS_AMQP_ARTEMIS')
+          cls_ds  = n('DS_LOG_ERRORS_AMQP_CLASSIC')
 
           data = {
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
@@ -696,6 +1055,26 @@ jobs:
                   'puppeteer_wopi_failed': vp_wopi_ppt,
                   'ds_log_errors':         vp_ds,
                   'conclusion': 'success' if (b('HEALTHCHECK_DS_VPATH') and b('VERSION_DS_VPATH_OK') and ok5(vp_ppt) and vp_ds == 0) else 'failure',
+              },
+              'amqp_artemis': {
+                  'healthy':               b('HEALTHCHECK_AMQP_ARTEMIS'),
+                  'version_ok':            b('VERSION_AMQP_ARTEMIS_OK'),
+                  'version_actual':        s('VERSION_AMQP_ARTEMIS_ACTUAL'),
+                  'puppeteer_failed':      art_ppt,
+                  'puppeteer_api_failed':  art_api_ppt,
+                  'puppeteer_wopi_failed': art_wopi_ppt,
+                  'ds_log_errors':         art_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_AMQP_ARTEMIS') and b('VERSION_AMQP_ARTEMIS_OK') and ok5(art_ppt) and art_ds == 0) else 'failure',
+              },
+              'amqp_classic': {
+                  'healthy':               b('HEALTHCHECK_AMQP_CLASSIC'),
+                  'version_ok':            b('VERSION_AMQP_CLASSIC_OK'),
+                  'version_actual':        s('VERSION_AMQP_CLASSIC_ACTUAL'),
+                  'puppeteer_failed':      cls_ppt,
+                  'puppeteer_api_failed':  cls_api_ppt,
+                  'puppeteer_wopi_failed': cls_wopi_ppt,
+                  'ds_log_errors':         cls_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_AMQP_CLASSIC') and b('VERSION_AMQP_CLASSIC_OK') and ok5(cls_ppt) and cls_ds == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
           }

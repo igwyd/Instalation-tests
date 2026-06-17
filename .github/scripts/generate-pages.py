@@ -483,7 +483,7 @@ def generate_dev():
     server_run_date = (server_checks or {}).get("run_date", "")
     server_date_part = f' <span class="date">· {escape(server_run_date)}</span>' if server_run_date else ""
     server_rows = []
-    for label, key in [("S3 useDirectStorageUrls=false", "s3_false"), ("S3 useDirectStorageUrls=true", "s3_true"), ("Virtual Path", "vpath")]:
+    for label, key in [("S3 useDirectStorageUrls=false", "s3_false"), ("S3 useDirectStorageUrls=true", "s3_true"), ("Virtual Path", "vpath"), ("ActiveMQ Artemis", "amqp_artemis"), ("ActiveMQ Classic", "amqp_classic")]:
         d = (server_checks or {}).get(key)
         if d is None:
             server_rows.append(f'<tr><td>{label}</td>'
