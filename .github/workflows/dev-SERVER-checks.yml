@@ -717,6 +717,325 @@ jobs:
           env_var: DS_LOG_ERRORS_AMQP_CLASSIC
           label: AMQP_CLASSIC
 
+      - name: REDIS_REDIS Docker reInstall
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true
+          sudo docker rm \$(sudo docker ps -aq) 2>/dev/null || true
+          sudo docker network rm ds-network 2>/dev/null || true
+          sudo docker run -itd -p 8080:80 \
+            --name ds-ee-dev \
+            -e WOPI_ENABLED=true \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: REDIS_REDIS Enable nginx config
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo rm -f /etc/nginx/sites-enabled/* && \
+             sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
+             sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: REDIS_REDIS Configure unix.sock
+        run: |
+          scp -o StrictHostKeyChecking=no redis/redis-unix-sock/local-production-linux.json \
+            ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          echo "------------ STOP DS services -------------"
+          sudo docker exec ds-ee-dev supervisorctl stop ds:converter ds:docservice
+          echo "------------ Setup unix.sock and STOP redis server -------------"
+          sudo docker exec ds-ee-dev bash -c "sed -i 's/^port .*/port 0/' /etc/redis/redis.conf && echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf && echo 'unixsocketperm 777' >> /etc/redis/redis.conf && pkill -f redis-server"
+          sleep 10
+          echo "------------ START REDIS server -------------"
+          sudo docker exec ds-ee-dev service redis-server start
+          echo "------------ Redis ping -------------"
+          sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping
+          echo "------------ Redis port 6379 must be closed -------------"
+          sudo docker exec ds-ee-dev netstat -tulpn
+          echo "------------ Copy DS local-production-linux.json config -------------"
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo rm ~/local-production-linux.json
+          sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
+          echo "------------ START DS services -------------"
+          sudo docker exec ds-ee-dev supervisorctl start ds:converter ds:docservice
+          sleep 10
+          EOF
+
+      - name: REDIS_REDIS Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          echo "-------------healthcheck-------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: REDIS_REDIS Check healthcheck and socket
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_REDIS_REDIS=$HC" >> $GITHUB_ENV
+
+          PING=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping 2>/dev/null || echo 'error'")
+          echo "Redis socket ping: $PING"
+          if [ "$PING" = "PONG" ]; then
+            echo "REDIS_SOCK_OK_REDIS_REDIS=true" >> $GITHUB_ENV
+          else
+            echo "REDIS_SOCK_OK_REDIS_REDIS=false" >> $GITHUB_ENV
+          fi
+
+          PORT_CHECK=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev netstat -tulpn 2>/dev/null | grep ':6379' || echo ''")
+          echo "Port 6379 check: '${PORT_CHECK}'"
+          if [ -z "$PORT_CHECK" ]; then
+            echo "PORT_6379_CLOSED_REDIS_REDIS=true" >> $GITHUB_ENV
+          else
+            echo "PORT_6379_CLOSED_REDIS_REDIS=false" >> $GITHUB_ENV
+          fi
+
+      - name: REDIS_REDIS Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_REDIS_REDIS_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_REDIS_REDIS_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_REDIS_REDIS_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: REDIS_REDIS Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: REDIS_REDIS Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: REDIS_REDIS Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i -E "s#\"url\": \"[^\"]+/example\"#\"url\": \"https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: REDIS_REDIS Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: REDIS_REDIS Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition REDIS_REDIS
+
+      - name: REDIS_REDIS Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+
+      - name: REDIS_REDIS Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_REDIS_REDIS
+          label: REDIS_REDIS
+
+      - name: REDIS_IOREDIS Docker reInstall
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true
+          sudo docker rm \$(sudo docker ps -aq) 2>/dev/null || true
+          sudo docker network rm ds-network 2>/dev/null || true
+          sudo docker run -itd -p 8080:80 \
+            --name ds-ee-dev \
+            -e WOPI_ENABLED=true \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: REDIS_IOREDIS Enable nginx config
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo rm -f /etc/nginx/sites-enabled/* && \
+             sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
+             sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: REDIS_IOREDIS Configure unix.sock
+        run: |
+          scp -o StrictHostKeyChecking=no redis/ioredis-unix-sock/local-production-linux.json \
+            ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          echo "------------ STOP DS services -------------"
+          sudo docker exec ds-ee-dev supervisorctl stop ds:converter ds:docservice
+          echo "------------ Setup unix.sock and STOP redis server -------------"
+          sudo docker exec ds-ee-dev bash -c "sed -i 's/^port .*/port 0/' /etc/redis/redis.conf && echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf && echo 'unixsocketperm 777' >> /etc/redis/redis.conf && pkill -f redis-server"
+          sleep 10
+          echo "------------ START REDIS server -------------"
+          sudo docker exec ds-ee-dev service redis-server start
+          echo "------------ Redis ping -------------"
+          sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping
+          echo "------------ Redis port 6379 must be closed -------------"
+          sudo docker exec ds-ee-dev netstat -tulpn
+          echo "------------ Copy DS local-production-linux.json config -------------"
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo rm ~/local-production-linux.json
+          sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
+          echo "------------ START DS services -------------"
+          sudo docker exec ds-ee-dev supervisorctl start ds:converter ds:docservice
+          sleep 10
+          EOF
+
+      - name: REDIS_IOREDIS Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          echo "-------------healthcheck-------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: REDIS_IOREDIS Check healthcheck and socket
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_REDIS_IOREDIS=$HC" >> $GITHUB_ENV
+
+          PING=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping 2>/dev/null || echo 'error'")
+          echo "Redis socket ping: $PING"
+          if [ "$PING" = "PONG" ]; then
+            echo "REDIS_SOCK_OK_REDIS_IOREDIS=true" >> $GITHUB_ENV
+          else
+            echo "REDIS_SOCK_OK_REDIS_IOREDIS=false" >> $GITHUB_ENV
+          fi
+
+          PORT_CHECK=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev netstat -tulpn 2>/dev/null | grep ':6379' || echo ''")
+          echo "Port 6379 check: '${PORT_CHECK}'"
+          if [ -z "$PORT_CHECK" ]; then
+            echo "PORT_6379_CLOSED_REDIS_IOREDIS=true" >> $GITHUB_ENV
+          else
+            echo "PORT_6379_CLOSED_REDIS_IOREDIS=false" >> $GITHUB_ENV
+          fi
+
+      - name: REDIS_IOREDIS Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_REDIS_IOREDIS_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_REDIS_IOREDIS_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_REDIS_IOREDIS_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: REDIS_IOREDIS Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: REDIS_IOREDIS Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: REDIS_IOREDIS Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: REDIS_IOREDIS Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: REDIS_IOREDIS Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition REDIS_IOREDIS
+
+      - name: REDIS_IOREDIS Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+
+      - name: REDIS_IOREDIS Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_REDIS_IOREDIS
+          label: REDIS_IOREDIS
+
       - name: Final check
         if: always()
         run: |
@@ -873,6 +1192,94 @@ jobs:
             DS5_ICON="✅"; DS5_LABEL="OK"
           fi
 
+          # --- REDIS_REDIS ---
+          if [ "${HEALTHCHECK_REDIS_REDIS}" = "true" ]; then
+            HC6_ICON="✅"; HC6_LABEL="OK";     HC6_DETAIL="${HEALTHCHECK_REDIS_REDIS}"
+          else
+            HC6_ICON="❌"; HC6_LABEL="FAILED"; HC6_DETAIL="${HEALTHCHECK_REDIS_REDIS:-not set}"; FAILED=1
+          fi
+
+          if [ "${VERSION_REDIS_REDIS_OK}" = "true" ]; then
+            VER6_ICON="✅"; VER6_LABEL="OK"
+          else
+            VER6_ICON="❌"; VER6_LABEL="FAILED"; FAILED=1
+          fi
+          VER6_DETAIL="exp: ${EXPECTED}, act: ${VERSION_REDIS_REDIS_ACTUAL:-not set}"
+
+          if [ "${REDIS_SOCK_OK_REDIS_REDIS}" = "true" ]; then
+            SOCK6_ICON="✅"; SOCK6_LABEL="OK"
+          else
+            SOCK6_ICON="❌"; SOCK6_LABEL="FAILED"; FAILED=1
+          fi
+          SOCK6_DETAIL="PONG: ${REDIS_SOCK_OK_REDIS_REDIS:-not set}"
+
+          if [ "${PORT_6379_CLOSED_REDIS_REDIS}" = "true" ]; then
+            PORT6_ICON="✅"; PORT6_LABEL="OK"
+          else
+            PORT6_ICON="❌"; PORT6_LABEL="FAILED"; FAILED=1
+          fi
+          PORT6_DETAIL="closed: ${PORT_6379_CLOSED_REDIS_REDIS:-not set}"
+
+          PPT6="${PUPPETEER_REDIS_REDIS_FAILED:-0}"
+          PPT6_DETAIL="${PPT6} failures (threshold: 0)"
+          if [ "$PPT6" -gt 0 ]; then
+            PPT6_ICON="❌"; PPT6_LABEL="FAILED"; FAILED=1
+          else
+            PPT6_ICON="✅"; PPT6_LABEL="OK"
+          fi
+
+          DS6="${DS_LOG_ERRORS_REDIS_REDIS:-0}"
+          DS6_DETAIL="${DS6} errors"
+          if [ "$DS6" -gt 0 ]; then
+            DS6_ICON="❌"; DS6_LABEL="FAILED"
+          else
+            DS6_ICON="✅"; DS6_LABEL="OK"
+          fi
+
+          # --- REDIS_IOREDIS ---
+          if [ "${HEALTHCHECK_REDIS_IOREDIS}" = "true" ]; then
+            HC7_ICON="✅"; HC7_LABEL="OK";     HC7_DETAIL="${HEALTHCHECK_REDIS_IOREDIS}"
+          else
+            HC7_ICON="❌"; HC7_LABEL="FAILED"; HC7_DETAIL="${HEALTHCHECK_REDIS_IOREDIS:-not set}"; FAILED=1
+          fi
+
+          if [ "${VERSION_REDIS_IOREDIS_OK}" = "true" ]; then
+            VER7_ICON="✅"; VER7_LABEL="OK"
+          else
+            VER7_ICON="❌"; VER7_LABEL="FAILED"; FAILED=1
+          fi
+          VER7_DETAIL="exp: ${EXPECTED}, act: ${VERSION_REDIS_IOREDIS_ACTUAL:-not set}"
+
+          if [ "${REDIS_SOCK_OK_REDIS_IOREDIS}" = "true" ]; then
+            SOCK7_ICON="✅"; SOCK7_LABEL="OK"
+          else
+            SOCK7_ICON="❌"; SOCK7_LABEL="FAILED"; FAILED=1
+          fi
+          SOCK7_DETAIL="PONG: ${REDIS_SOCK_OK_REDIS_IOREDIS:-not set}"
+
+          if [ "${PORT_6379_CLOSED_REDIS_IOREDIS}" = "true" ]; then
+            PORT7_ICON="✅"; PORT7_LABEL="OK"
+          else
+            PORT7_ICON="❌"; PORT7_LABEL="FAILED"; FAILED=1
+          fi
+          PORT7_DETAIL="closed: ${PORT_6379_CLOSED_REDIS_IOREDIS:-not set}"
+
+          PPT7="${PUPPETEER_REDIS_IOREDIS_FAILED:-0}"
+          PPT7_DETAIL="${PPT7} failures (threshold: 0)"
+          if [ "$PPT7" -gt 0 ]; then
+            PPT7_ICON="❌"; PPT7_LABEL="FAILED"; FAILED=1
+          else
+            PPT7_ICON="✅"; PPT7_LABEL="OK"
+          fi
+
+          DS7="${DS_LOG_ERRORS_REDIS_IOREDIS:-0}"
+          DS7_DETAIL="${DS7} errors"
+          if [ "$DS7" -gt 0 ]; then
+            DS7_ICON="❌"; DS7_LABEL="FAILED"
+          else
+            DS7_ICON="✅"; DS7_LABEL="OK"
+          fi
+
           # --- GITHUB_STEP_SUMMARY (markdown table) ---
           {
             echo "## Final Check"
@@ -921,6 +1328,28 @@ jobs:
             echo "| Version       | ${VER5_ICON} ${VER5_LABEL} | \`${VERSION_AMQP_CLASSIC_ACTUAL:-not set}\` |"
             echo "| Puppeteer     | ${PPT5_ICON} ${PPT5_LABEL} | ${PPT5_DETAIL} |"
             echo "| DS Log Errors | ${DS5_DETAIL} | |"
+            echo ""
+            echo "### Redis unix.sock (redis driver)"
+            echo ""
+            echo "| Check | Result | Details |"
+            echo "|-------|--------|---------|"
+            echo "| Healthcheck     | ${HC6_ICON} ${HC6_LABEL}  | ${HC6_DETAIL} |"
+            echo "| Version         | ${VER6_ICON} ${VER6_LABEL} | \`${VERSION_REDIS_REDIS_ACTUAL:-not set}\` |"
+            echo "| Redis sock ping | ${SOCK6_ICON} ${SOCK6_LABEL} | ${SOCK6_DETAIL} |"
+            echo "| Port 6379       | ${PORT6_ICON} ${PORT6_LABEL} | ${PORT6_DETAIL} |"
+            echo "| Puppeteer       | ${PPT6_ICON} ${PPT6_LABEL} | ${PPT6_DETAIL} |"
+            echo "| DS Log Errors   | ${DS6_DETAIL} | |"
+            echo ""
+            echo "### Redis unix.sock (ioredis driver)"
+            echo ""
+            echo "| Check | Result | Details |"
+            echo "|-------|--------|---------|"
+            echo "| Healthcheck     | ${HC7_ICON} ${HC7_LABEL}  | ${HC7_DETAIL} |"
+            echo "| Version         | ${VER7_ICON} ${VER7_LABEL} | \`${VERSION_REDIS_IOREDIS_ACTUAL:-not set}\` |"
+            echo "| Redis sock ping | ${SOCK7_ICON} ${SOCK7_LABEL} | ${SOCK7_DETAIL} |"
+            echo "| Port 6379       | ${PORT7_ICON} ${PORT7_LABEL} | ${PORT7_DETAIL} |"
+            echo "| Puppeteer       | ${PPT7_ICON} ${PPT7_LABEL} | ${PPT7_DETAIL} |"
+            echo "| DS Log Errors   | ${DS7_DETAIL} | |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -980,6 +1409,30 @@ jobs:
           printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT5_LABEL}" "${PPT5_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS5_DETAIL}"
           echo "$SEP"
+          echo ""
+          echo "=== Redis unix.sock (redis driver) ==="
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"     "${HC6_LABEL}"   "${HC6_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Version"         "${VER6_LABEL}"  "${VER6_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Redis sock ping" "${SOCK6_LABEL}" "${SOCK6_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Port 6379"       "${PORT6_LABEL}" "${PORT6_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"       "${PPT6_LABEL}"  "${PPT6_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors"   ""   "${DS6_DETAIL}"
+          echo "$SEP"
+          echo ""
+          echo "=== Redis unix.sock (ioredis driver) ==="
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"     "${HC7_LABEL}"   "${HC7_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Version"         "${VER7_LABEL}"  "${VER7_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Redis sock ping" "${SOCK7_LABEL}" "${SOCK7_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Port 6379"       "${PORT7_LABEL}" "${PORT7_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"       "${PPT7_LABEL}"  "${PPT7_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors"   ""   "${DS7_DETAIL}"
+          echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
             echo "FINAL_CONCLUSION=failure" >> "$GITHUB_ENV"
@@ -1018,11 +1471,19 @@ jobs:
           cls_ppt      = n('PUPPETEER_AMQP_CLASSIC_FAILED')
           cls_api_ppt  = n('PUPPETEER_AMQP_CLASSIC_API_FAILED')
           cls_wopi_ppt = n('PUPPETEER_AMQP_CLASSIC_WOPI_FAILED')
+          rr_ppt       = n('PUPPETEER_REDIS_REDIS_FAILED')
+          rr_api_ppt   = n('PUPPETEER_REDIS_REDIS_API_FAILED')
+          rr_wopi_ppt  = n('PUPPETEER_REDIS_REDIS_WOPI_FAILED')
+          ri_ppt       = n('PUPPETEER_REDIS_IOREDIS_FAILED')
+          ri_api_ppt   = n('PUPPETEER_REDIS_IOREDIS_API_FAILED')
+          ri_wopi_ppt  = n('PUPPETEER_REDIS_IOREDIS_WOPI_FAILED')
           s3f_ds  = n('DS_LOG_ERRORS_AWS_S3_FALSE')
           s3t_ds  = n('DS_LOG_ERRORS_AWS_S3_TRUE')
           vp_ds   = n('DS_LOG_ERRORS_DS_VPATH')
           art_ds  = n('DS_LOG_ERRORS_AMQP_ARTEMIS')
           cls_ds  = n('DS_LOG_ERRORS_AMQP_CLASSIC')
+          rr_ds   = n('DS_LOG_ERRORS_REDIS_REDIS')
+          ri_ds   = n('DS_LOG_ERRORS_REDIS_IOREDIS')
 
           data = {
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
@@ -1075,6 +1536,30 @@ jobs:
                   'puppeteer_wopi_failed': cls_wopi_ppt,
                   'ds_log_errors':         cls_ds,
                   'conclusion': 'success' if (b('HEALTHCHECK_AMQP_CLASSIC') and b('VERSION_AMQP_CLASSIC_OK') and ok5(cls_ppt) and cls_ds == 0) else 'failure',
+              },
+              'redis_redis': {
+                  'healthy':               b('HEALTHCHECK_REDIS_REDIS'),
+                  'version_ok':            b('VERSION_REDIS_REDIS_OK'),
+                  'version_actual':        s('VERSION_REDIS_REDIS_ACTUAL'),
+                  'redis_sock_ok':         b('REDIS_SOCK_OK_REDIS_REDIS'),
+                  'port_6379_closed':      b('PORT_6379_CLOSED_REDIS_REDIS'),
+                  'puppeteer_failed':      rr_ppt,
+                  'puppeteer_api_failed':  rr_api_ppt,
+                  'puppeteer_wopi_failed': rr_wopi_ppt,
+                  'ds_log_errors':         rr_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_REDIS') and b('VERSION_REDIS_REDIS_OK') and b('REDIS_SOCK_OK_REDIS_REDIS') and b('PORT_6379_CLOSED_REDIS_REDIS') and ok5(rr_ppt) and rr_ds == 0) else 'failure',
+              },
+              'redis_ioredis': {
+                  'healthy':               b('HEALTHCHECK_REDIS_IOREDIS'),
+                  'version_ok':            b('VERSION_REDIS_IOREDIS_OK'),
+                  'version_actual':        s('VERSION_REDIS_IOREDIS_ACTUAL'),
+                  'redis_sock_ok':         b('REDIS_SOCK_OK_REDIS_IOREDIS'),
+                  'port_6379_closed':      b('PORT_6379_CLOSED_REDIS_IOREDIS'),
+                  'puppeteer_failed':      ri_ppt,
+                  'puppeteer_api_failed':  ri_api_ppt,
+                  'puppeteer_wopi_failed': ri_wopi_ppt,
+                  'ds_log_errors':         ri_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_IOREDIS') and b('VERSION_REDIS_IOREDIS_OK') and b('REDIS_SOCK_OK_REDIS_IOREDIS') and b('PORT_6379_CLOSED_REDIS_IOREDIS') and ok5(ri_ppt) and ri_ds == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
           }

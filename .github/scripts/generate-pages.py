@@ -502,6 +502,30 @@ def generate_dev():
                 + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
                 + '</tr>'
             )
+    redis_server_rows = []
+    for label, key in [("redis", "redis_redis"), ("ioredis", "redis_ioredis")]:
+        d = (server_checks or {}).get(key)
+        if d is None:
+            redis_server_rows.append(f'<tr><td>{label}</td>' + '<td class="na">—</td>' * 6 + '</tr>')
+        else:
+            hc     = d.get("healthy", False)
+            ver_ok = d.get("version_ok", False)
+            ver    = d.get("version_actual", "?") or "?"
+            sock   = d.get("redis_sock_ok", False)
+            port   = d.get("port_6379_closed", False)
+            ds_err = d.get("ds_log_errors", 0)
+            redis_server_rows.append(
+                f'<tr>'
+                f'<td>{label}</td>'
+                + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
+                + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
+                + f'<td class="{status(sock)}">{"✅ OK" if sock else "❌ FAILED"}</td>'
+                + f'<td class="{status(port)}">{"✅ OK" if port else "❌ FAILED"}</td>'
+                + td_ppt_breakdown(d)
+                + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
+                + '</tr>'
+            )
+
     server_body = (
         f'<h3>EE{server_date_part}</h3>\n'
         '<table><thead><tr>'
@@ -509,6 +533,14 @@ def generate_dev():
         '<th>Puppeteer (=0)</th><th>DS Log Errors</th>'
         '</tr></thead><tbody>'
         + '\n'.join(server_rows)
+        + '</tbody></table>\n'
+        + '<h3>EE — Redis unix.sock</h3>\n'
+        '<table><thead><tr>'
+        '<th>Driver</th><th>Healthcheck</th><th>Version</th>'
+        '<th>Redis sock ping</th><th>Port 6379 closed</th>'
+        '<th>Puppeteer (=0)</th><th>DS Log Errors</th>'
+        '</tr></thead><tbody>'
+        + '\n'.join(redis_server_rows)
         + '</tbody></table>\n'
     )
 
