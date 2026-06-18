@@ -39,9 +39,7 @@ Pre-release builds from S3 dev repo.
 
 | Test | Status |
 |------|--------|
-| dev-Redis-unix.sock (redis + ioredis) | [![dev-Redis](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Redis-unix.sock.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Redis-unix.sock.yml) |
 | dev-DB-check (MySQL, PostgreSQL, MSSQL, Oracle, Dameng, MariaDB) | [![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml) |
-| dev-ActiveMQ (Artemis + Classic) | [![dev-ActiveMQ](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-ActiveMQ.yml) |
 
 
 ## Release

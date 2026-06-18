@@ -385,10 +385,6 @@ def generate_dev():
     docker_rpm_x64   = load("dev-docker-rpm-x64.json")
     docker_rpm_arm64 = load("dev-docker-rpm-arm64.json")
     db_data        = {key: load(f"dev-db-{key}.json") for _, key in DBS}
-    amq_artemis    = load("dev-activemq-artemis.json")
-    amq_classic    = load("dev-activemq-classic.json")
-    redis_redis    = load("dev-redis-sock-redis.json")
-    redis_ioredis  = load("dev-redis-sock-ioredis.json")
     server_checks  = load("dev-server-checks.json")
 
     deb_body        = pkg_table(deb_x64, "x64") + pkg_table(deb_arm64, "arm64")
@@ -419,65 +415,6 @@ def generate_dev():
                '</tr></thead><tbody>'
                + '\n'.join(db_rows)
                + '</tbody></table>\n')
-
-    # ActiveMQ section body
-    amq_run_date = next((d.get("run_date", "") for d in [amq_artemis, amq_classic] if d), "")
-    amq_rows = []
-    for label, d in [("Artemis", amq_artemis), ("Classic", amq_classic)]:
-        if d is None:
-            amq_rows.append(f'<tr><td>{label}</td>'
-                            + '<td class="na">—</td>' * 4 + '</tr>')
-        else:
-            amq_rows.append(
-                f'<tr><td>{label}</td>'
-                + td_bool(d.get("healthy", False))
-                + td_version(d)
-                + td_ppt_breakdown(d)
-                + td_ds_errors(d)
-                + '</tr>'
-            )
-    amq_body = ('<table><thead><tr>'
-                '<th>Type</th><th>Healthcheck</th><th>Version</th>'
-                '<th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
-                '</tr></thead><tbody>'
-                + '\n'.join(amq_rows)
-                + '</tbody></table>\n')
-
-    # Redis section body
-    def redis_driver_table(label, d):
-        run_date = (d or {}).get("run_date", "")
-        date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
-        thead = ('<thead><tr>'
-                 '<th>Healthcheck</th><th>Version</th>'
-                 '<th>Redis sock ping</th><th>Port 6379 closed</th>'
-                 '<th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
-                 '</tr></thead>')
-        if d is None:
-            row = '<tr>' + '<td class="na">—</td>' * 6 + '</tr>'
-        else:
-            hc      = d.get("healthy", False)
-            ver_ok  = d.get("version_ok", False)
-            ver_act = d.get("version_actual", "?") or "?"
-            sock    = d.get("redis_sock_ok", False)
-            port    = d.get("port_6379_closed", False)
-            ppt     = d.get("puppeteer_total_failed", 0)
-            ppt_ok  = ppt <= 5
-            ds_err  = d.get("ds_log_errors", 0)
-            row = (
-                '<tr>'
-                + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
-                + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver_act)}</td>'
-                + f'<td class="{status(sock)}">{"✅ OK" if sock else "❌ FAILED"}</td>'
-                + f'<td class="{status(port)}">{"✅ OK" if port else "❌ FAILED"}</td>'
-                + f'<td class="{status(ppt_ok)}">{"✅" if ppt_ok else "❌"} {ppt}</td>'
-                + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
-                + '</tr>'
-            )
-        return (f'<h3>{escape(label)}{date_part}</h3>\n'
-                f'<table>{thead}<tbody>{row}</tbody></table>\n')
-
-    redis_body = (redis_driver_table("redis", redis_redis)
-                  + redis_driver_table("ioredis", redis_ioredis))
 
     # SERVER checks section body
     server_run_date = (server_checks or {}).get("run_date", "")
@@ -551,8 +488,6 @@ def generate_dev():
         + section("Docker RPM (CentOS 9)", "dev-Docker-RPM-x64-arm64.yml", "dev-Docker-RPM-x64-arm64", docker_rpm_body)
         + section("OS Tests (OneClickInstall)", "dev-OS-x64-arm64.yml", "dev-OS-x64-arm64", os_body, os_run_date)
         + section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body, db_run_date)
-        + section("ActiveMQ Tests", "dev-ActiveMQ.yml", "dev-ActiveMQ", amq_body, amq_run_date)
-        + section("Redis unix.sock Tests", "dev-Redis-unix.sock.yml", "dev-Redis-unix.sock x64", redis_body)
         + section("SERVER Checks (AWS S3)", "dev-SERVER-checks.yml", "dev SERVER checks", server_body)
     )
     write("dev.html", page_html("DEV — ONLYOFFICE Docs Test Results", body, breadcrumb("DEV")))
