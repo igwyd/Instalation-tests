@@ -34,4 +34,10 @@ jobs:
             --region ${{ vars.DASHBOARD_BUCKET_REGION }} \
             --content-type text/html \
             --cache-control "no-cache, no-store, must-revalidate"
-          echo "Dashboard: http://${{ vars.DASHBOARD_BUCKET_NAME }}.s3-website-${{ vars.DASHBOARD_BUCKET_REGION }}.amazonaws.com/" >> $GITHUB_STEP_SUMMARY
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+          echo "Dashboard: https://${{ vars.CLOUDFRONT_DOMAIN }}/" >> $GITHUB_STEP_SUMMARY
