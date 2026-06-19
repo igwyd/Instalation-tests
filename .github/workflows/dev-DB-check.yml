@@ -20,6 +20,7 @@ jobs:
             db_name: mysqldb
             db_port: 3306
             db_type: mysql
+            db_database: onlyoffice
             db_user: onlyoffice
             db_pwd: onlyoffice
             k6_stage_ramp: "1m:500"
@@ -29,6 +30,7 @@ jobs:
             db_name: postgresdb
             db_port: 5432
             db_type: postgres
+            db_database: onlyoffice
             db_user: onlyoffice
             db_pwd: onlyoffice
             k6_stage_ramp: "1m:500"
@@ -38,6 +40,7 @@ jobs:
             db_name: postgresdb
             db_port: 5432
             db_type: postgres
+            db_database: onlyoffice
             db_user: onlyoffice
             db_pwd: onlyoffice
             k6_stage_ramp: "1m:500"
@@ -47,6 +50,7 @@ jobs:
             db_name: postgresdb
             db_port: 5432
             db_type: postgres
+            db_database: onlyoffice
             db_user: onlyoffice
             db_pwd: onlyoffice
             k6_stage_ramp: "1m:500"
@@ -56,6 +60,7 @@ jobs:
             db_name: postgresdb
             db_port: 5432
             db_type: postgres
+            db_database: onlyoffice
             db_user: onlyoffice
             db_pwd: onlyoffice
             k6_stage_ramp: "1m:500"
@@ -65,6 +70,7 @@ jobs:
             db_name: postgresdb
             db_port: 5432
             db_type: postgres
+            db_database: onlyoffice
             db_user: onlyoffice
             db_pwd: onlyoffice
             k6_stage_ramp: "1m:500"
@@ -74,16 +80,18 @@ jobs:
             db_name: mssqldb
             db_port: 1433
             db_type: mssql
+            db_database: onlyoffice
             db_user: sa
             db_pwd: onlYoff1ce
             k6_stage_ramp: "1m:50"
             k6_stage_main: "9m:50"
           - db: oracle
-            db_image: gvenzl/oracle-xe:21-slim
+            db_image: container-registry.oracle.com/database/free:latest-lite
             db_name: oracledb
             db_port: 1521
             db_type: oracle
-            db_user: onlyoffice
+            db_database: FREEPDB1
+            db_user: SYSTEM
             db_pwd: onlyoffice
             k6_stage_ramp: "1m:500"
             k6_stage_main: "9m:500"
@@ -92,6 +100,7 @@ jobs:
             db_name: damengdb
             db_port: 5236
             db_type: dameng
+            db_database: onlyoffice
             db_user: onlyoffice
             db_pwd: Onlyoffice_2026
             k6_stage_ramp: "1m:500"
@@ -101,6 +110,7 @@ jobs:
             db_name: mariadbdb
             db_port: 3306
             db_type: mysql
+            db_database: onlyoffice
             db_user: onlyoffice
             db_pwd: onlyoffice
             k6_stage_ramp: "1m:500"
@@ -138,10 +148,7 @@ jobs:
               ;;
             oracle)
               docker run -d --network ds-network --name ${{ matrix.db_name }} \
-                -e ORACLE_PASSWORD=admin \
-                -e ORACLE_DATABASE=onlyoffice \
-                -e APP_USER=onlyoffice \
-                -e APP_USER_PASSWORD=onlyoffice \
+                -e ORACLE_PWD=${{ matrix.db_pwd }} \
                 ${{ matrix.db_image }}
               ;;
             dameng)
@@ -165,7 +172,7 @@ jobs:
             -e DB_TYPE=${{ matrix.db_type }} \
             -e DB_HOST=${{ matrix.db_name }} \
             -e DB_PORT=${{ matrix.db_port }} \
-            -e DB_NAME=onlyoffice \
+            -e DB_NAME=${{ matrix.db_database }} \
             -e DB_USER=${{ matrix.db_user }} \
             -e DB_PWD=${{ matrix.db_pwd }} \
             -e WOPI_ENABLED=true \
