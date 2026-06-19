@@ -1,0 +1,83 @@
+name: Save Weekly Snapshot
+
+on:
+  schedule:
+    - cron: '30 20 * * 3'  # Wednesday 23:30 Moscow (UTC+3)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region ${{ vars.DASHBOARD_BUCKET_REGION }}
+
+      - name: Set snapshot metadata
+        run: |
+          SNAPSHOT_DATE=$(date -u +%Y-%m-%d)
+          SNAPSHOT_VERSION="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          SNAPSHOT_ID="${SNAPSHOT_DATE}_v${SNAPSHOT_VERSION}"
+          SNAPSHOT_LABEL="${SNAPSHOT_DATE} · v${SNAPSHOT_VERSION}"
+          echo "SNAPSHOT_ID=$SNAPSHOT_ID" >> $GITHUB_ENV
+          echo "SNAPSHOT_LABEL=$SNAPSHOT_LABEL" >> $GITHUB_ENV
+          echo "SNAPSHOT_VERSION=$SNAPSHOT_VERSION" >> $GITHUB_ENV
+
+      - name: Download results from S3
+        run: |
+          mkdir -p .github/workflow-results
+          aws s3 sync s3://${{ vars.DASHBOARD_BUCKET_NAME }}/results/ .github/workflow-results/ \
+            --region ${{ vars.DASHBOARD_BUCKET_REGION }}
+
+      - name: Generate snapshot pages
+        run: python3 .github/scripts/generate-pages.py
+
+      - name: Update manifest
+        run: |
+          aws s3 cp s3://${{ vars.DASHBOARD_BUCKET_NAME }}/snapshots/manifest.json manifest.json \
+            --region ${{ vars.DASHBOARD_BUCKET_REGION }} 2>/dev/null || echo '{"snapshots":[]}' > manifest.json
+
+          python3 - << 'PYEOF'
+          import json, os
+          with open('manifest.json') as f:
+              data = json.load(f)
+          entry = {
+              "id":      os.environ['SNAPSHOT_ID'],
+              "version": os.environ['SNAPSHOT_VERSION'],
+              "label":   os.environ['SNAPSHOT_LABEL'],
+              "url":     f"/snapshots/{os.environ['SNAPSHOT_ID']}/index.html",
+          }
+          data['snapshots'] = [s for s in data['snapshots'] if s['id'] != entry['id']]
+          data['snapshots'].insert(0, entry)
+          with open('manifest.json', 'w') as f:
+              json.dump(data, f, indent=2)
+          print(f"Total snapshots: {len(data['snapshots'])}")
+          PYEOF
+
+      - name: Upload snapshot to S3
+        run: |
+          aws s3 sync _site/ s3://${{ vars.DASHBOARD_BUCKET_NAME }}/snapshots/${{ env.SNAPSHOT_ID }}/ \
+            --region ${{ vars.DASHBOARD_BUCKET_REGION }} \
+            --content-type text/html \
+            --cache-control "no-cache, no-store, must-revalidate"
+
+          aws s3 cp manifest.json s3://${{ vars.DASHBOARD_BUCKET_NAME }}/snapshots/manifest.json \
+            --region ${{ vars.DASHBOARD_BUCKET_REGION }} \
+            --content-type application/json \
+            --cache-control "no-cache, no-store, must-revalidate"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/snapshots/*"
+          echo "Snapshot: https://${{ vars.CLOUDFRONT_DOMAIN }}/snapshots/${{ env.SNAPSHOT_ID }}/index.html" >> $GITHUB_STEP_SUMMARY

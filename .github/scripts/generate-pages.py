@@ -79,6 +79,9 @@ td.na { color: #8c959f; }
 .placeholder p { font-size: 15px; }
 footer { text-align: center; padding: 20px 16px; color: #8c959f; font-size: 12px; }
 footer a { color: #8c959f; }
+.header-inner { display: flex; align-items: flex-start; gap: 16px; }
+.snap-picker select { font-size: 11px; padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.35); background: rgba(0,0,0,0.25); color: white; cursor: pointer; margin-top: 3px; max-width: 230px; }
+.snap-picker select option { background: #24292f; color: white; }
 .k6-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 4px; }
 .k6-chart-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #57606a; margin-bottom: 6px; }
 .k6-bar-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; font-size: 11px; }
@@ -264,6 +267,28 @@ def section(title, workflow_file, badge_label, body_html, run_date=""):
             f'</section>\n')
 
 
+SNAPSHOT_JS = """<script>
+(function(){
+  var sel = document.getElementById('snap-sel');
+  if (!sel) return;
+  var path = window.location.pathname;
+  fetch('/snapshots/manifest.json')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      (d.snapshots || []).forEach(function(s){
+        var o = document.createElement('option');
+        o.value = s.url;
+        o.textContent = s.label;
+        if (path.indexOf(s.id) !== -1) o.selected = true;
+        sel.appendChild(o);
+      });
+      if (path.indexOf('/snapshots/') === -1) sel.value = '/';
+    })
+    .catch(function(){});
+})();
+</script>"""
+
+
 def page_html(title, body, nav_html=""):
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     return f"""<!DOCTYPE html>
@@ -276,12 +301,22 @@ def page_html(title, body, nav_html=""):
 </head>
 <body>
 <header>
-  <h1>ONLYOFFICE Docs — Test Results</h1>
-  <p>Generated: <time>{now}</time> &nbsp;·&nbsp; <a href="{REPO}">GitHub Repository</a></p>
+  <div class="header-inner">
+    <div class="snap-picker">
+      <select id="snap-sel" onchange="if(this.value) window.location.href=this.value">
+        <option value="/">⬤ Latest</option>
+      </select>
+    </div>
+    <div>
+      <h1>ONLYOFFICE Docs — Test Results</h1>
+      <p>Generated: <time>{now}</time> &nbsp;·&nbsp; <a href="{REPO}">GitHub Repository</a></p>
+    </div>
+  </div>
 </header>
 {nav_html}<main>
 {body}</main>
 <footer>Generated automatically · <a href="{REPO}/actions">GitHub Actions</a></footer>
+{SNAPSHOT_JS}
 </body>
 </html>
 """
