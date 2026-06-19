@@ -79,6 +79,14 @@ td.na { color: #8c959f; }
 .placeholder p { font-size: 15px; }
 footer { text-align: center; padding: 20px 16px; color: #8c959f; font-size: 12px; }
 footer a { color: #8c959f; }
+.k6-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 4px; }
+.k6-chart-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #57606a; margin-bottom: 6px; }
+.k6-bar-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; font-size: 11px; }
+.k6-bar-label { width: 82px; text-align: right; flex-shrink: 0; color: #57606a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k6-bar-track { flex: 1; background: #eaecef; border-radius: 2px; height: 13px; overflow: hidden; min-width: 40px; }
+.k6-bar-fill { height: 100%; border-radius: 2px; }
+.k6-bar-val { width: 52px; text-align: right; flex-shrink: 0; color: #24292f; font-weight: 500; }
+.k6-bar-p90 { width: 76px; text-align: right; flex-shrink: 0; color: #8c959f; }
 """
 
 
@@ -295,6 +303,92 @@ def write(filename, html):
     print(f"Generated: {out_path}")
 
 
+def k6_section(db_data):
+    TRENDS = [
+        ("auth",        "Auth",        "#0969da"),
+        ("connect",     "Connect",     "#2da44e"),
+        ("convert",     "Convert",     "#bf8700"),
+        ("isSaveLock",  "isSaveLock",  "#8250df"),
+        ("open",        "Open",        "#cf222e"),
+        ("saveChanges", "SaveChanges", "#0a3069"),
+    ]
+    EXCEPTION_KEYS = ["auth", "connect", "convert", "isSaveLock", "open", "saveChanges"]
+
+    # --- Exceptions table ---
+    exc_rows = []
+    for label, key in DBS:
+        d = db_data.get(key)
+        k6 = (d or {}).get("k6")
+        if k6 is None:
+            exc_rows.append(
+                f'<tr><td>{escape(label)}</td>'
+                + '<td class="na" colspan="8">—</td></tr>'
+            )
+            continue
+        exc = k6.get("exceptions", {})
+        total = exc.get("all", 0)
+        exc_ok = total == 0
+        row = (f'<tr><td>{escape(label)}</td>'
+               + f'<td class="{status(exc_ok)}">{"✅" if exc_ok else "❌"} {total}</td>')
+        for ek in EXCEPTION_KEYS:
+            row += f'<td>{exc.get(ek, 0)}</td>'
+        row += f'<td>{exc.get("manual_close", "—")}</td></tr>'
+        exc_rows.append(row)
+
+    exc_html = (
+        '<table><thead><tr>'
+        '<th>DB</th><th>All Exceptions</th>'
+        '<th>Auth</th><th>Connect</th><th>Convert</th>'
+        '<th>isSaveLock</th><th>Open</th><th>SaveChanges</th>'
+        '<th>Manual Close</th>'
+        '</tr></thead><tbody>'
+        + '\n'.join(exc_rows)
+        + '</tbody></table>\n'
+    )
+
+    # --- Bar charts (one per trend metric) ---
+    charts_html = '<div class="k6-grid">\n'
+    for trend_key, trend_label, color in TRENDS:
+        vals = []
+        for db_label, db_key in DBS:
+            d = db_data.get(db_key)
+            k6 = (d or {}).get("k6") or {}
+            t = k6.get("trends", {}).get(trend_key, {})
+            avg = t.get("avg") if t else None
+            p90 = t.get("p90") if t else None
+            vals.append((db_label, avg, p90))
+
+        max_val = max((v[1] for v in vals if v[1] is not None and v[1] > 0), default=1) or 1
+
+        chart = f'<div>\n<div class="k6-chart-title">{escape(trend_label)} avg (ms)</div>\n'
+        for db_label, avg, p90 in vals:
+            chart += '<div class="k6-bar-row">'
+            chart += f'<span class="k6-bar-label">{escape(db_label)}</span>'
+            if avg is None:
+                chart += '<div class="k6-bar-track"></div>'
+                chart += '<span class="k6-bar-val">—</span>'
+                chart += '<span class="k6-bar-p90"></span>'
+            else:
+                pct = min(avg / max_val * 100, 100)
+                chart += (f'<div class="k6-bar-track">'
+                          f'<div class="k6-bar-fill" style="width:{pct:.1f}%;background-color:{color}"></div>'
+                          f'</div>')
+                chart += f'<span class="k6-bar-val">{avg:.2f}ms</span>'
+                p90_str = f'p90: {p90:.2f}ms' if p90 is not None else ''
+                chart += f'<span class="k6-bar-p90">{p90_str}</span>'
+            chart += '</div>\n'
+        chart += '</div>\n'
+        charts_html += chart
+    charts_html += '</div>\n'
+
+    return (
+        '<h3>k6 Load Test — Exceptions</h3>\n'
+        + exc_html
+        + '<h3>k6 Load Test — Response Times</h3>\n'
+        + charts_html
+    )
+
+
 def generate_main():
     cards_html = (
         '<div class="cards">\n'
@@ -414,7 +508,8 @@ def generate_dev():
                '<th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
                '</tr></thead><tbody>'
                + '\n'.join(db_rows)
-               + '</tbody></table>\n')
+               + '</tbody></table>\n'
+               + k6_section(db_data))
 
     # SERVER checks section body
     server_run_date = (server_checks or {}).get("run_date", "")

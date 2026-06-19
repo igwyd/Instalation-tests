@@ -296,13 +296,61 @@ jobs:
       - name: Run K6 LOAD test
         working-directory: document-server-stress-testing/K6
         run: |
+          set -o pipefail
           docker run --rm \
             -u "$(id -u):$(id -g)" \
             --network ds-network \
             -v "$(pwd)":/k6 \
             grafana/k6 run /k6/save-changes-document-random-close.js \
             --quiet \
-            -s "${{ matrix.k6_stage_ramp }}" -s "${{ matrix.k6_stage_main }}"
+            -s "${{ matrix.k6_stage_ramp }}" -s "${{ matrix.k6_stage_main }}" \
+            | tee k6-output.txt
+
+      - name: Parse K6 results
+        continue-on-error: true
+        run: |
+          python3 - << 'PYEOF'
+          import re, os
+          try:
+              with open('document-server-stress-testing/K6/k6-output.txt') as f:
+                  text = f.read()
+              def counter(name):
+                  m = re.search(rf'{re.escape(name)}[.\s]+:\s+(\d+)', text)
+                  return int(m.group(1)) if m else 0
+              def trend_avg(name):
+                  m = re.search(rf'{re.escape(name)}[.\s]+:.*?avg=([0-9.]+)ms', text)
+                  return round(float(m.group(1)), 2) if m else 0.0
+              def trend_p90(name):
+                  m = re.search(rf'{re.escape(name)}[.\s]+:.*?p\(90\)=([0-9.]+)ms', text)
+                  return round(float(m.group(1)), 2) if m else 0.0
+              lines = [
+                  f"K6_EXC_ALL={counter('custom_counter_exception_all')}",
+                  f"K6_EXC_AUTH={counter('custom_counter_exception_auth')}",
+                  f"K6_EXC_CONNECT={counter('custom_counter_exception_connect')}",
+                  f"K6_EXC_CONVERT={counter('custom_counter_exception_convert')}",
+                  f"K6_EXC_ISSAVELOCK={counter('custom_counter_exception_isSaveLock')}",
+                  f"K6_EXC_OPEN={counter('custom_counter_exception_open')}",
+                  f"K6_EXC_SAVECHANGES={counter('custom_counter_exception_saveChanges')}",
+                  f"K6_MANUAL_CLOSE={counter('custom_counter_manual_close')}",
+                  f"K6_AUTH_AVG={trend_avg('custom_trend_auth')}",
+                  f"K6_AUTH_P90={trend_p90('custom_trend_auth')}",
+                  f"K6_CONNECT_AVG={trend_avg('custom_trend_connect')}",
+                  f"K6_CONNECT_P90={trend_p90('custom_trend_connect')}",
+                  f"K6_CONVERT_AVG={trend_avg('custom_trend_convert')}",
+                  f"K6_CONVERT_P90={trend_p90('custom_trend_convert')}",
+                  f"K6_ISSAVELOCK_AVG={trend_avg('custom_trend_isSaveLock')}",
+                  f"K6_ISSAVELOCK_P90={trend_p90('custom_trend_isSaveLock')}",
+                  f"K6_OPEN_AVG={trend_avg('custom_trend_open')}",
+                  f"K6_OPEN_P90={trend_p90('custom_trend_open')}",
+                  f"K6_SAVECHANGES_AVG={trend_avg('custom_trend_saveChanges')}",
+                  f"K6_SAVECHANGES_P90={trend_p90('custom_trend_saveChanges')}",
+              ]
+              with open(os.environ['GITHUB_ENV'], 'a') as f:
+                  f.write('\n'.join(lines) + '\n')
+              print('\n'.join(lines))
+          except Exception as e:
+              print(f"Warning: could not parse k6 output: {e}")
+          PYEOF
 
       - name: Documentserver logs
         continue-on-error: true
@@ -421,6 +469,26 @@ jobs:
               "puppeteer_total_failed": int(os.environ.get('PUPPETEER_FAILED', '0') or '0'),
               "ds_log_errors": int(os.environ.get('DS_LOG_ERRORS', '0') or '0'),
               "conclusion": os.environ.get('FINAL_CONCLUSION', 'failure'),
+              "k6": {
+                  "exceptions": {
+                      "all":          int(os.environ.get('K6_EXC_ALL', '0') or '0'),
+                      "auth":         int(os.environ.get('K6_EXC_AUTH', '0') or '0'),
+                      "connect":      int(os.environ.get('K6_EXC_CONNECT', '0') or '0'),
+                      "convert":      int(os.environ.get('K6_EXC_CONVERT', '0') or '0'),
+                      "isSaveLock":   int(os.environ.get('K6_EXC_ISSAVELOCK', '0') or '0'),
+                      "open":         int(os.environ.get('K6_EXC_OPEN', '0') or '0'),
+                      "saveChanges":  int(os.environ.get('K6_EXC_SAVECHANGES', '0') or '0'),
+                      "manual_close": int(os.environ.get('K6_MANUAL_CLOSE', '0') or '0'),
+                  },
+                  "trends": {
+                      "auth":        {"avg": float(os.environ.get('K6_AUTH_AVG', '0') or '0'),        "p90": float(os.environ.get('K6_AUTH_P90', '0') or '0')},
+                      "connect":     {"avg": float(os.environ.get('K6_CONNECT_AVG', '0') or '0'),     "p90": float(os.environ.get('K6_CONNECT_P90', '0') or '0')},
+                      "convert":     {"avg": float(os.environ.get('K6_CONVERT_AVG', '0') or '0'),     "p90": float(os.environ.get('K6_CONVERT_P90', '0') or '0')},
+                      "isSaveLock":  {"avg": float(os.environ.get('K6_ISSAVELOCK_AVG', '0') or '0'), "p90": float(os.environ.get('K6_ISSAVELOCK_P90', '0') or '0')},
+                      "open":        {"avg": float(os.environ.get('K6_OPEN_AVG', '0') or '0'),        "p90": float(os.environ.get('K6_OPEN_P90', '0') or '0')},
+                      "saveChanges": {"avg": float(os.environ.get('K6_SAVECHANGES_AVG', '0') or '0'), "p90": float(os.environ.get('K6_SAVECHANGES_P90', '0') or '0')},
+                  },
+              },
           }
           db = os.environ.get('DB_NAME', 'unknown')
           path = f'.github/workflow-results/dev-db-{db}.json'
