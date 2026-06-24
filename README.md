@@ -4,7 +4,7 @@ Automated installation testing of ONLYOFFICE Docs packages via GitHub Actions.
 
 📊 **[Test Results Dashboard](https://d2a3vv866b8brc.cloudfront.net/)** — detailed results for all dev builds
 
-## Develop **<!-- onlyoffice-version-start -->v9.5.0-20<!-- onlyoffice-version-end -->**
+## Develop **<!-- onlyoffice-version-start -->v9.5.0-33<!-- onlyoffice-version-end -->**
 
 Pre-release builds from S3 dev repo.
 
