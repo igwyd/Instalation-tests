@@ -1028,7 +1028,7 @@ jobs:
             ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           echo "------------ STOP DS services -------------"
-          sudo docker exec ds-ee-dev supervisorctl stop ds:converter ds:docservice
+          sudo docker exec ds-ee-dev supervisorctl stop ds:converter ds:docservice ds:adminpanel
           echo "------------ Setup unix.sock and STOP redis server -------------"
           sudo docker exec ds-ee-dev bash -c "sed -i 's/^port .*/port 0/' /etc/redis/redis.conf && echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf && echo 'unixsocketperm 777' >> /etc/redis/redis.conf && pkill -f redis-server"
           sleep 10
@@ -1043,7 +1043,7 @@ jobs:
           sudo rm ~/local-production-linux.json
           sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
           echo "------------ START DS services -------------"
-          sudo docker exec ds-ee-dev supervisorctl start ds:converter ds:docservice
+          sudo docker exec ds-ee-dev supervisorctl start ds:converter ds:docservice ds:adminpanel
           sleep 10
           EOF
 
@@ -1191,7 +1191,7 @@ jobs:
             ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           echo "------------ STOP DS services -------------"
-          sudo docker exec ds-ee-dev supervisorctl stop ds:converter ds:docservice
+          sudo docker exec ds-ee-dev supervisorctl stop ds:converter ds:docservice ds:adminpanel
           echo "------------ Setup unix.sock and STOP redis server -------------"
           sudo docker exec ds-ee-dev bash -c "sed -i 's/^port .*/port 0/' /etc/redis/redis.conf && echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf && echo 'unixsocketperm 777' >> /etc/redis/redis.conf && pkill -f redis-server"
           sleep 10
@@ -1206,7 +1206,7 @@ jobs:
           sudo rm ~/local-production-linux.json
           sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
           echo "------------ START DS services -------------"
-          sudo docker exec ds-ee-dev supervisorctl start ds:converter ds:docservice
+          sudo docker exec ds-ee-dev supervisorctl start ds:converter ds:docservice ds:adminpanel
           sleep 10
           EOF
 
