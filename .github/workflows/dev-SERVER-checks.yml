@@ -45,7 +45,7 @@ jobs:
       - name: Wait for SSH to be Ready
         run: |
           for i in $(seq 1 10); do
-            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} exit 2>/dev/null; then
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} exit 2>/dev/null; then
               echo "SSH is ready"
               exit 0
             fi
@@ -57,18 +57,18 @@ jobs:
 
       - name: Update EC2 Instance
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo apt-get update && sudo apt-get upgrade -y"
 
       - name: Reboot EC2 Instance
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} "sudo reboot" || true
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} "sudo reboot" || true
 
       - name: Wait for instance to reboot
         run: |
           sleep 60
           for i in $(seq 1 10); do
-            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} exit 2>/dev/null; then
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} exit 2>/dev/null; then
               echo "SSH is ready"
               exit 0
             fi
@@ -80,17 +80,17 @@ jobs:
 
       - name: Renew SSL certificates
         run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=3 ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=3 ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo certbot renew --non-interactive -v && sudo systemctl reload nginx"
 
       - name: Docker cleanup before run
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true && sudo docker system prune -af"
 
       - name: Docker run ONLYOFFICE-Docs EE
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
@@ -101,7 +101,7 @@ jobs:
       - name: AWS_S3_FALSE Enable nginx config
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo rm -f /etc/nginx/sites-enabled/* && \
              sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
              sudo nginx -t && sudo systemctl reload nginx"
@@ -117,8 +117,8 @@ jobs:
             < dev-SERVER-checks/aws-s3/useDirectStorageUrls-false/local-production-linux.json \
             > /tmp/local-production-linux.json
           scp -o StrictHostKeyChecking=no /tmp/local-production-linux.json \
-            ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+            ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
           sudo rm ~/local-production-linux.json
           sudo docker exec ds-ee-dev supervisorctl restart ds:converter ds:docservice
@@ -128,10 +128,10 @@ jobs:
       - name: AWS_S3_FALSE Info
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -139,20 +139,20 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI--------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: AWS_S3_FALSE Check healthcheck
         continue-on-error: true
         run: |
-          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AWS_S3_FALSE=$HC" >> $GITHUB_ENV
 
       - name: AWS_S3_FALSE Check version
         continue-on-error: true
         run: |
-          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version: installed=$VERSION, expected=$EXPECTED"
@@ -166,7 +166,7 @@ jobs:
       - name: AWS_S3_FALSE Start ds-example
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output
@@ -176,7 +176,7 @@ jobs:
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/example\"#" ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
@@ -208,7 +208,7 @@ jobs:
         uses: ./.github/actions/ds-logs
         with:
           mode: ssh-docker
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
 
       - name: AWS_S3_FALSE Check DS logs for errors
@@ -216,7 +216,7 @@ jobs:
         uses: ./.github/actions/check-ds-logs
         with:
           mode: ssh-docker-logs
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
           env_var: DS_LOG_ERRORS_AWS_S3_FALSE
           label: AWS_S3_FALSE
@@ -224,7 +224,7 @@ jobs:
       - name: AWS_S3_TRUE Docker reInstall
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
           sudo docker rm ds-ee-dev || true
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
@@ -236,7 +236,7 @@ jobs:
       - name: AWS_S3_TRUE Enable nginx config
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo rm -f /etc/nginx/sites-enabled/* && \
              sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
              sudo nginx -t && sudo systemctl reload nginx"
@@ -252,8 +252,8 @@ jobs:
             < dev-SERVER-checks/aws-s3/useDirectStorageUrls-true/local-production-linux.json \
             > /tmp/local-production-linux.json
           scp -o StrictHostKeyChecking=no /tmp/local-production-linux.json \
-            ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+            ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
           sudo rm ~/local-production-linux.json
           sudo docker exec ds-ee-dev supervisorctl restart ds:converter ds:docservice
@@ -263,10 +263,10 @@ jobs:
       - name: AWS_S3_TRUE Info
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -274,20 +274,20 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI--------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: AWS_S3_TRUE Check healthcheck
         continue-on-error: true
         run: |
-          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AWS_S3_TRUE=$HC" >> $GITHUB_ENV
 
       - name: AWS_S3_TRUE Check version
         continue-on-error: true
         run: |
-          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version: installed=$VERSION, expected=$EXPECTED"
@@ -301,7 +301,7 @@ jobs:
       - name: AWS_S3_TRUE Start ds-example
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output
@@ -342,7 +342,7 @@ jobs:
         uses: ./.github/actions/ds-logs
         with:
           mode: ssh-docker
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
 
       - name: AWS_S3_TRUE Check DS logs for errors
@@ -350,7 +350,7 @@ jobs:
         uses: ./.github/actions/check-ds-logs
         with:
           mode: ssh-docker-logs
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
           env_var: DS_LOG_ERRORS_AWS_S3_TRUE
           label: AWS_S3_TRUE
@@ -358,7 +358,7 @@ jobs:
       - name: AWS_S3_PATH-STYLE Docker reInstall
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
           sudo docker rm ds-ee-dev || true
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
@@ -370,7 +370,7 @@ jobs:
       - name: AWS_S3_PATH-STYLE Enable nginx config
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo rm -f /etc/nginx/sites-enabled/* && \
              sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
              sudo nginx -t && sudo systemctl reload nginx"
@@ -386,8 +386,8 @@ jobs:
             < dev-SERVER-checks/aws-s3/s3ForcePathStyle-true/local-production-linux.json \
             > /tmp/local-production-linux.json
           scp -o StrictHostKeyChecking=no /tmp/local-production-linux.json \
-            ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+            ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
           sudo rm ~/local-production-linux.json
           sudo docker exec ds-ee-dev supervisorctl restart ds:converter ds:docservice
@@ -397,10 +397,10 @@ jobs:
       - name: AWS_S3_PATH-STYLE Info
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -408,20 +408,20 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI--------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: AWS_S3_PATH-STYLE Check healthcheck
         continue-on-error: true
         run: |
-          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AWS_S3_PATH_STYLE=$HC" >> $GITHUB_ENV
 
       - name: AWS_S3_PATH-STYLE Check version
         continue-on-error: true
         run: |
-          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version: installed=$VERSION, expected=$EXPECTED"
@@ -435,7 +435,7 @@ jobs:
       - name: AWS_S3_PATH-STYLE Start ds-example
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output
@@ -476,7 +476,7 @@ jobs:
         uses: ./.github/actions/ds-logs
         with:
           mode: ssh-docker
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
 
       - name: AWS_S3_PATH-STYLE Check DS logs for errors
@@ -484,7 +484,7 @@ jobs:
         uses: ./.github/actions/check-ds-logs
         with:
           mode: ssh-docker-logs
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
           env_var: DS_LOG_ERRORS_AWS_S3_PATH_STYLE
           label: AWS_S3_PATH-STYLE
@@ -492,7 +492,7 @@ jobs:
       - name: DS-VPATH Docker reInstall
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
           sudo docker rm ds-ee-dev || true
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
@@ -504,7 +504,7 @@ jobs:
       - name: DS-VPATH Enable nginx config
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo rm -f /etc/nginx/sites-enabled/* && \
              sudo ln -s /etc/nginx/sites-available/default_proxy-to-virtual-path.conf /etc/nginx/sites-enabled/default_proxy-to-virtual-path.conf && \
              sudo nginx -t && sudo systemctl reload nginx"
@@ -512,10 +512,10 @@ jobs:
       - name: DS-VPATH Info
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s http://${{ secrets.AWS_DEV_SERVER_EC2_IP }}/ds-vpath/healthcheck; echo
+          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/ds-vpath/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -523,20 +523,20 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI--------------"
-          curl -s http://${{ secrets.AWS_DEV_SERVER_EC2_IP }}/ds-vpath/hosting/discovery | tail -c 150; echo
+          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/ds-vpath/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: DS-VPATH Check healthcheck
         continue-on-error: true
         run: |
-          HC=$(curl -s "http://${{ secrets.AWS_DEV_SERVER_EC2_IP }}/ds-vpath/healthcheck" || echo "error")
+          HC=$(curl -s "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/ds-vpath/healthcheck" || echo "error")
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_DS_VPATH=$HC" >> $GITHUB_ENV
 
       - name: DS-VPATH Check version
         continue-on-error: true
         run: |
-          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version: installed=$VERSION, expected=$EXPECTED"
@@ -550,7 +550,7 @@ jobs:
       - name: DS-VPATH Start ds-example
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: DS-VPATH Clear puppeteer output
@@ -560,7 +560,7 @@ jobs:
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"https://[^\"]*/example\"#\"url\": \"http://${{ secrets.AWS_DEV_SERVER_EC2_IP }}/ds-vpath/example\"#" ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"https://[^\"]*/example\"#\"url\": \"http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/ds-vpath/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
@@ -592,7 +592,7 @@ jobs:
         uses: ./.github/actions/ds-logs
         with:
           mode: ssh-docker
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
 
       - name: DS-VPATH Check DS logs for errors
@@ -600,7 +600,7 @@ jobs:
         uses: ./.github/actions/check-ds-logs
         with:
           mode: ssh-docker-logs
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
           env_var: DS_LOG_ERRORS_DS_VPATH
           label: DS_VPATH
@@ -608,7 +608,7 @@ jobs:
       - name: AMQP_ARTEMIS Docker reInstall
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true
           sudo docker rm \$(sudo docker ps -aq) 2>/dev/null || true
           sudo docker network rm ds-network 2>/dev/null || true
@@ -634,7 +634,7 @@ jobs:
       - name: AMQP_ARTEMIS Enable nginx config
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo rm -f /etc/nginx/sites-enabled/* && \
              sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
              sudo nginx -t && sudo systemctl reload nginx"
@@ -642,10 +642,10 @@ jobs:
       - name: AMQP_ARTEMIS Info
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -653,20 +653,20 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI--------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: AMQP_ARTEMIS Check healthcheck
         continue-on-error: true
         run: |
-          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AMQP_ARTEMIS=$HC" >> $GITHUB_ENV
 
       - name: AMQP_ARTEMIS Check version
         continue-on-error: true
         run: |
-          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version: installed=$VERSION, expected=$EXPECTED"
@@ -680,7 +680,7 @@ jobs:
       - name: AMQP_ARTEMIS Start ds-example
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: AMQP_ARTEMIS Clear puppeteer output
@@ -690,7 +690,7 @@ jobs:
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"[^\"]+/example\"#\"url\": \"https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/example\"#" ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"[^\"]+/example\"#\"url\": \"https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
@@ -722,7 +722,7 @@ jobs:
         uses: ./.github/actions/ds-logs
         with:
           mode: ssh-docker
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
 
       - name: AMQP_ARTEMIS Check DS logs for errors
@@ -730,7 +730,7 @@ jobs:
         uses: ./.github/actions/check-ds-logs
         with:
           mode: ssh-docker-logs
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
           env_var: DS_LOG_ERRORS_AMQP_ARTEMIS
           label: AMQP_ARTEMIS
@@ -738,7 +738,7 @@ jobs:
       - name: AMQP_CLASSIC Docker reInstall
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev onlyoffice-mq || true
           sudo docker rm ds-ee-dev onlyoffice-mq || true
           sudo docker run -d --network ds-network \
@@ -762,7 +762,7 @@ jobs:
       - name: AMQP_CLASSIC Enable nginx config
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo rm -f /etc/nginx/sites-enabled/* && \
              sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
              sudo nginx -t && sudo systemctl reload nginx"
@@ -770,10 +770,10 @@ jobs:
       - name: AMQP_CLASSIC Info
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -781,20 +781,20 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI--------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: AMQP_CLASSIC Check healthcheck
         continue-on-error: true
         run: |
-          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AMQP_CLASSIC=$HC" >> $GITHUB_ENV
 
       - name: AMQP_CLASSIC Check version
         continue-on-error: true
         run: |
-          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version: installed=$VERSION, expected=$EXPECTED"
@@ -808,7 +808,7 @@ jobs:
       - name: AMQP_CLASSIC Start ds-example
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: AMQP_CLASSIC Clear puppeteer output
@@ -849,7 +849,7 @@ jobs:
         uses: ./.github/actions/ds-logs
         with:
           mode: ssh-docker
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
 
       - name: AMQP_CLASSIC Check DS logs for errors
@@ -857,7 +857,7 @@ jobs:
         uses: ./.github/actions/check-ds-logs
         with:
           mode: ssh-docker-logs
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
           env_var: DS_LOG_ERRORS_AMQP_CLASSIC
           label: AMQP_CLASSIC
@@ -865,7 +865,7 @@ jobs:
       - name: REDIS_REDIS Docker reInstall
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true
           sudo docker rm \$(sudo docker ps -aq) 2>/dev/null || true
           sudo docker network rm ds-network 2>/dev/null || true
@@ -881,7 +881,7 @@ jobs:
       - name: REDIS_REDIS Enable nginx config
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo rm -f /etc/nginx/sites-enabled/* && \
              sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
              sudo nginx -t && sudo systemctl reload nginx"
@@ -890,8 +890,8 @@ jobs:
         continue-on-error: true
         run: |
           scp -o StrictHostKeyChecking=no redis/redis-unix-sock/local-production-linux.json \
-            ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+            ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           echo "------------ STOP DS services -------------"
           sudo docker exec ds-ee-dev supervisorctl stop ds:converter ds:docservice
           echo "------------ Setup unix.sock and STOP redis server -------------"
@@ -915,9 +915,9 @@ jobs:
       - name: REDIS_REDIS Info
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -925,17 +925,17 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI--------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: REDIS_REDIS Check healthcheck and socket
         continue-on-error: true
         run: |
-          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_REDIS_REDIS=$HC" >> $GITHUB_ENV
 
-          PING=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          PING=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping 2>/dev/null || echo 'error'")
           echo "Redis socket ping: $PING"
           if [ "$PING" = "PONG" ]; then
@@ -944,7 +944,7 @@ jobs:
             echo "REDIS_SOCK_OK_REDIS_REDIS=false" >> $GITHUB_ENV
           fi
 
-          PORT_CHECK=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          PORT_CHECK=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev netstat -tulpn 2>/dev/null | grep ':6379' || echo ''")
           echo "Port 6379 check: '${PORT_CHECK}'"
           if [ -z "$PORT_CHECK" ]; then
@@ -956,7 +956,7 @@ jobs:
       - name: REDIS_REDIS Check version
         continue-on-error: true
         run: |
-          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version: installed=$VERSION, expected=$EXPECTED"
@@ -970,7 +970,7 @@ jobs:
       - name: REDIS_REDIS Start ds-example
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: REDIS_REDIS Clear puppeteer output
@@ -980,7 +980,7 @@ jobs:
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"[^\"]+/example\"#\"url\": \"https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/example\"#" ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"[^\"]+/example\"#\"url\": \"https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
@@ -1012,7 +1012,7 @@ jobs:
         uses: ./.github/actions/ds-logs
         with:
           mode: ssh-docker
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
 
       - name: REDIS_REDIS Check DS logs for errors
@@ -1020,7 +1020,7 @@ jobs:
         uses: ./.github/actions/check-ds-logs
         with:
           mode: ssh-docker-logs
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
           env_var: DS_LOG_ERRORS_REDIS_REDIS
           label: REDIS_REDIS
@@ -1028,7 +1028,7 @@ jobs:
       - name: REDIS_IOREDIS Docker reInstall
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true
           sudo docker rm \$(sudo docker ps -aq) 2>/dev/null || true
           sudo docker network rm ds-network 2>/dev/null || true
@@ -1044,7 +1044,7 @@ jobs:
       - name: REDIS_IOREDIS Enable nginx config
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo rm -f /etc/nginx/sites-enabled/* && \
              sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
              sudo nginx -t && sudo systemctl reload nginx"
@@ -1053,8 +1053,8 @@ jobs:
         continue-on-error: true
         run: |
           scp -o StrictHostKeyChecking=no redis/ioredis-unix-sock/local-production-linux.json \
-            ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+            ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           echo "------------ STOP DS services -------------"
           sudo docker exec ds-ee-dev supervisorctl stop ds:converter ds:docservice
           echo "------------ Setup unix.sock and STOP redis server -------------"
@@ -1078,9 +1078,9 @@ jobs:
       - name: REDIS_IOREDIS Info
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -1088,17 +1088,17 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI--------------"
-          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: REDIS_IOREDIS Check healthcheck and socket
         continue-on-error: true
         run: |
-          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_REDIS_IOREDIS=$HC" >> $GITHUB_ENV
 
-          PING=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          PING=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping 2>/dev/null || echo 'error'")
           echo "Redis socket ping: $PING"
           if [ "$PING" = "PONG" ]; then
@@ -1107,7 +1107,7 @@ jobs:
             echo "REDIS_SOCK_OK_REDIS_IOREDIS=false" >> $GITHUB_ENV
           fi
 
-          PORT_CHECK=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          PORT_CHECK=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev netstat -tulpn 2>/dev/null | grep ':6379' || echo ''")
           echo "Port 6379 check: '${PORT_CHECK}'"
           if [ -z "$PORT_CHECK" ]; then
@@ -1119,7 +1119,7 @@ jobs:
       - name: REDIS_IOREDIS Check version
         continue-on-error: true
         run: |
-          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
           echo "Version: installed=$VERSION, expected=$EXPECTED"
@@ -1133,7 +1133,7 @@ jobs:
       - name: REDIS_IOREDIS Start ds-example
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: REDIS_IOREDIS Clear puppeteer output
@@ -1174,7 +1174,7 @@ jobs:
         uses: ./.github/actions/ds-logs
         with:
           mode: ssh-docker
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
 
       - name: REDIS_IOREDIS Check DS logs for errors
@@ -1182,7 +1182,7 @@ jobs:
         uses: ./.github/actions/check-ds-logs
         with:
           mode: ssh-docker-logs
-          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
           container: ds-ee-dev
           env_var: DS_LOG_ERRORS_REDIS_IOREDIS
           label: REDIS_IOREDIS
@@ -1795,7 +1795,7 @@ jobs:
       - name: Docker cleanup after run
         if: always()
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true && sudo docker system prune -af"
 
       - name: Stop EC2 Instance
