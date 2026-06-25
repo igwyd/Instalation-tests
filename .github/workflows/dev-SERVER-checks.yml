@@ -489,6 +489,141 @@ jobs:
           env_var: DS_LOG_ERRORS_AWS_S3_PATH_STYLE
           label: AWS_S3_PATH-STYLE
 
+      - name: AWS_S3_KMS Docker reInstall
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker stop ds-ee-dev || true
+          sudo docker rm ds-ee-dev || true
+          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: AWS_S3_KMS Enable nginx config
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo rm -f /etc/nginx/sites-enabled/* && \
+             sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
+             sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: AWS_S3_KMS Configure
+        continue-on-error: true
+        env:
+          AWS_DEV_SERVER_BUCKET_NAME: ${{ secrets.AWS_DEV_SERVER_BUCKET_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_KMS_KEY_ID: ${{ secrets.AWS_KMS_KEY_ID }}
+        run: |
+          envsubst '${AWS_DEV_SERVER_BUCKET_NAME} ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY} ${AWS_KMS_KEY_ID}' \
+            < dev-SERVER-checks/aws-s3/aws-kms/local-production-linux.json \
+            > /tmp/local-production-linux.json
+          scp -o StrictHostKeyChecking=no /tmp/local-production-linux.json \
+            ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo rm ~/local-production-linux.json
+          sudo docker exec ds-ee-dev supervisorctl restart ds:converter ds:docservice
+          sleep 30
+          EOF
+
+      - name: AWS_S3_KMS Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: AWS_S3_KMS Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_AWS_S3_KMS=$HC" >> $GITHUB_ENV
+
+      - name: AWS_S3_KMS Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_AWS_S3_KMS_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_AWS_S3_KMS_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_AWS_S3_KMS_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: AWS_S3_KMS Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: AWS_S3_KMS Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: AWS_S3_KMS Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: AWS_S3_KMS Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition AWS_S3_KMS
+
+      - name: AWS_S3_KMS Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+
+      - name: AWS_S3_KMS Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_AWS_S3_KMS
+          label: AWS_S3_KMS
+
       - name: DS-VPATH Docker reInstall
         continue-on-error: true
         run: |
@@ -1283,6 +1418,36 @@ jobs:
             DS8_ICON="✅"; DS8_LABEL="OK"
           fi
 
+          # --- AWS_S3_KMS ---
+          if [ "${HEALTHCHECK_AWS_S3_KMS}" = "true" ]; then
+            HC9_ICON="✅"; HC9_LABEL="OK";     HC9_DETAIL="${HEALTHCHECK_AWS_S3_KMS}"
+          else
+            HC9_ICON="❌"; HC9_LABEL="FAILED"; HC9_DETAIL="${HEALTHCHECK_AWS_S3_KMS:-not set}"; FAILED=1
+          fi
+
+          if [ "${VERSION_AWS_S3_KMS_OK}" = "true" ]; then
+            VER9_ICON="✅"; VER9_LABEL="OK"
+          else
+            VER9_ICON="❌"; VER9_LABEL="FAILED"; FAILED=1
+          fi
+          VER9_DETAIL="exp: ${EXPECTED}, act: ${VERSION_AWS_S3_KMS_ACTUAL:-not set}"
+
+          PPT9="${PUPPETEER_AWS_S3_KMS_FAILED:-0}"
+          PPT9_DETAIL="${PPT9} failures (threshold: 0)"
+          if [ "$PPT9" -gt 0 ]; then
+            PPT9_ICON="❌"; PPT9_LABEL="FAILED"; FAILED=1
+          else
+            PPT9_ICON="✅"; PPT9_LABEL="OK"
+          fi
+
+          DS9="${DS_LOG_ERRORS_AWS_S3_KMS:-0}"
+          DS9_DETAIL="${DS9} errors"
+          if [ "$DS9" -gt 0 ]; then
+            DS9_ICON="❌"; DS9_LABEL="FAILED"
+          else
+            DS9_ICON="✅"; DS9_LABEL="OK"
+          fi
+
           # --- DS_VPATH ---
           if [ "${HEALTHCHECK_DS_VPATH}" = "true" ]; then
             HC3_ICON="✅"; HC3_LABEL="OK";     HC3_DETAIL="${HEALTHCHECK_DS_VPATH}"
@@ -1492,6 +1657,15 @@ jobs:
             echo "| Puppeteer     | ${PPT8_ICON} ${PPT8_LABEL} | ${PPT8_DETAIL} |"
             echo "| DS Log Errors | ${DS8_DETAIL} | |"
             echo ""
+            echo "### S3 AWS KMS"
+            echo ""
+            echo "| Check | Result | Details |"
+            echo "|-------|--------|---------|"
+            echo "| Healthcheck   | ${HC9_ICON} ${HC9_LABEL}  | ${HC9_DETAIL} |"
+            echo "| Version       | ${VER9_ICON} ${VER9_LABEL} | \`${VERSION_AWS_S3_KMS_ACTUAL:-not set}\` |"
+            echo "| Puppeteer     | ${PPT9_ICON} ${PPT9_LABEL} | ${PPT9_DETAIL} |"
+            echo "| DS Log Errors | ${DS9_DETAIL} | |"
+            echo ""
             echo "### Virtual Path"
             echo ""
             echo "| Check | Result | Details |"
@@ -1580,6 +1754,16 @@ jobs:
           printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS8_DETAIL}"
           echo "$SEP"
           echo ""
+          echo "=== S3 AWS KMS ==="
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC9_LABEL}"  "${HC9_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER9_LABEL}" "${VER9_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT9_LABEL}" "${PPT9_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS9_DETAIL}"
+          echo "$SEP"
+          echo ""
           echo "=== Virtual Path ==="
           echo "$SEP"
           printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
@@ -1665,6 +1849,9 @@ jobs:
           sp_ppt       = n('PUPPETEER_AWS_S3_PATH_STYLE_FAILED')
           sp_api_ppt   = n('PUPPETEER_AWS_S3_PATH_STYLE_API_FAILED')
           sp_wopi_ppt  = n('PUPPETEER_AWS_S3_PATH_STYLE_WOPI_FAILED')
+          kms_ppt      = n('PUPPETEER_AWS_S3_KMS_FAILED')
+          kms_api_ppt  = n('PUPPETEER_AWS_S3_KMS_API_FAILED')
+          kms_wopi_ppt = n('PUPPETEER_AWS_S3_KMS_WOPI_FAILED')
           vp_ppt       = n('PUPPETEER_DS_VPATH_FAILED')
           vp_api_ppt   = n('PUPPETEER_DS_VPATH_API_FAILED')
           vp_wopi_ppt  = n('PUPPETEER_DS_VPATH_WOPI_FAILED')
@@ -1683,6 +1870,7 @@ jobs:
           s3f_ds  = n('DS_LOG_ERRORS_AWS_S3_FALSE')
           s3t_ds  = n('DS_LOG_ERRORS_AWS_S3_TRUE')
           sp_ds   = n('DS_LOG_ERRORS_AWS_S3_PATH_STYLE')
+          kms_ds  = n('DS_LOG_ERRORS_AWS_S3_KMS')
           vp_ds   = n('DS_LOG_ERRORS_DS_VPATH')
           art_ds  = n('DS_LOG_ERRORS_AMQP_ARTEMIS')
           cls_ds  = n('DS_LOG_ERRORS_AMQP_CLASSIC')
@@ -1720,6 +1908,16 @@ jobs:
                   'puppeteer_wopi_failed': sp_wopi_ppt,
                   'ds_log_errors':         sp_ds,
                   'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_PATH_STYLE') and b('VERSION_AWS_S3_PATH_STYLE_OK') and ok5(sp_ppt) and sp_ds == 0) else 'failure',
+              },
+              's3_kms': {
+                  'healthy':               b('HEALTHCHECK_AWS_S3_KMS'),
+                  'version_ok':            b('VERSION_AWS_S3_KMS_OK'),
+                  'version_actual':        s('VERSION_AWS_S3_KMS_ACTUAL'),
+                  'puppeteer_failed':      kms_ppt,
+                  'puppeteer_api_failed':  kms_api_ppt,
+                  'puppeteer_wopi_failed': kms_wopi_ppt,
+                  'ds_log_errors':         kms_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_KMS') and b('VERSION_AWS_S3_KMS_OK') and ok5(kms_ppt) and kms_ds == 0) else 'failure',
               },
               'vpath': {
                   'healthy':               b('HEALTHCHECK_DS_VPATH'),
