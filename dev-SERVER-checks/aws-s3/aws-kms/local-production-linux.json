@@ -1,0 +1,30 @@
+{
+  "storage": {
+    "name": "storage-s3",
+    "region": "us-east-1",
+    "endpoint": "https://s3.us-east-1.amazonaws.com/",
+    "bucketName": "${AWS_DEV_SERVER_BUCKET_NAME}",
+    "storageFolderName": "files",
+    "urlExpires": 604800,
+    "accessKeyId": "${AWS_ACCESS_KEY_ID}",
+    "secretAccessKey": "${AWS_SECRET_ACCESS_KEY}",
+    "sslEnabled": true,
+    "s3ForcePathStyle": false,
+    "externalHost": "",
+    "useDirectStorageUrls": false,
+    "commandOptions": {
+      "s3": {
+        "putObject": {
+          "ServerSideEncryption": "aws:kms",
+          "SSEKMSKeyId": "${AWS_KMS_KEY_ID}",
+          "BucketKeyEnabled": true
+         },
+        "copyObject": {
+          "ServerSideEncryption": "aws:kms",
+          "SSEKMSKeyId": "${AWS_KMS_KEY_ID}",
+          "BucketKeyEnabled": true
+        }
+      }
+    }
+  }
+}
