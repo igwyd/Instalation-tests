@@ -355,6 +355,140 @@ jobs:
           env_var: DS_LOG_ERRORS_AWS_S3_TRUE
           label: AWS_S3_TRUE
 
+      - name: AWS_S3_PATH-STYLE Docker reInstall
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker stop ds-ee-dev || true
+          sudo docker rm ds-ee-dev || true
+          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: AWS_S3_PATH-STYLE Enable nginx config
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo rm -f /etc/nginx/sites-enabled/* && \
+             sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
+             sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: AWS_S3_PATH-STYLE Configure
+        continue-on-error: true
+        env:
+          AWS_DEV_SERVER_BUCKET_NAME: ${{ secrets.AWS_DEV_SERVER_BUCKET_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          envsubst '${AWS_DEV_SERVER_BUCKET_NAME} ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY}' \
+            < dev-SERVER-checks/aws-s3/s3ForcePathStyle-true/local-production-linux.json \
+            > /tmp/local-production-linux.json
+          scp -o StrictHostKeyChecking=no /tmp/local-production-linux.json \
+            ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo rm ~/local-production-linux.json
+          sudo docker exec ds-ee-dev supervisorctl restart ds:converter ds:docservice
+          sleep 30
+          EOF
+
+      - name: AWS_S3_PATH-STYLE Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: AWS_S3_PATH-STYLE Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "https://${{ secrets.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_AWS_S3_PATH_STYLE=$HC" >> $GITHUB_ENV
+
+      - name: AWS_S3_PATH-STYLE Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_AWS_S3_PATH_STYLE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_AWS_S3_PATH_STYLE_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_AWS_S3_PATH_STYLE_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: AWS_S3_PATH-STYLE Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: AWS_S3_PATH-STYLE Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: AWS_S3_PATH-STYLE Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: AWS_S3_PATH-STYLE Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition AWS_S3_PATH_STYLE
+
+      - name: AWS_S3_PATH-STYLE Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+
+      - name: AWS_S3_PATH-STYLE Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ secrets.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_AWS_S3_PATH_STYLE
+          label: AWS_S3_PATH-STYLE
+
       - name: DS-VPATH Docker reInstall
         continue-on-error: true
         run: |
@@ -1119,6 +1253,36 @@ jobs:
             DS2_ICON="✅"; DS2_LABEL="OK"
           fi
 
+          # --- AWS_S3_PATH_STYLE ---
+          if [ "${HEALTHCHECK_AWS_S3_PATH_STYLE}" = "true" ]; then
+            HC8_ICON="✅"; HC8_LABEL="OK";     HC8_DETAIL="${HEALTHCHECK_AWS_S3_PATH_STYLE}"
+          else
+            HC8_ICON="❌"; HC8_LABEL="FAILED"; HC8_DETAIL="${HEALTHCHECK_AWS_S3_PATH_STYLE:-not set}"; FAILED=1
+          fi
+
+          if [ "${VERSION_AWS_S3_PATH_STYLE_OK}" = "true" ]; then
+            VER8_ICON="✅"; VER8_LABEL="OK"
+          else
+            VER8_ICON="❌"; VER8_LABEL="FAILED"; FAILED=1
+          fi
+          VER8_DETAIL="exp: ${EXPECTED}, act: ${VERSION_AWS_S3_PATH_STYLE_ACTUAL:-not set}"
+
+          PPT8="${PUPPETEER_AWS_S3_PATH_STYLE_FAILED:-0}"
+          PPT8_DETAIL="${PPT8} failures (threshold: 0)"
+          if [ "$PPT8" -gt 0 ]; then
+            PPT8_ICON="❌"; PPT8_LABEL="FAILED"; FAILED=1
+          else
+            PPT8_ICON="✅"; PPT8_LABEL="OK"
+          fi
+
+          DS8="${DS_LOG_ERRORS_AWS_S3_PATH_STYLE:-0}"
+          DS8_DETAIL="${DS8} errors"
+          if [ "$DS8" -gt 0 ]; then
+            DS8_ICON="❌"; DS8_LABEL="FAILED"
+          else
+            DS8_ICON="✅"; DS8_LABEL="OK"
+          fi
+
           # --- DS_VPATH ---
           if [ "${HEALTHCHECK_DS_VPATH}" = "true" ]; then
             HC3_ICON="✅"; HC3_LABEL="OK";     HC3_DETAIL="${HEALTHCHECK_DS_VPATH}"
@@ -1319,6 +1483,15 @@ jobs:
             echo "| Puppeteer     | ${PPT2_ICON} ${PPT2_LABEL} | ${PPT2_DETAIL} |"
             echo "| DS Log Errors | ${DS2_DETAIL} | |"
             echo ""
+            echo "### S3 s3ForcePathStyle=true"
+            echo ""
+            echo "| Check | Result | Details |"
+            echo "|-------|--------|---------|"
+            echo "| Healthcheck   | ${HC8_ICON} ${HC8_LABEL}  | ${HC8_DETAIL} |"
+            echo "| Version       | ${VER8_ICON} ${VER8_LABEL} | \`${VERSION_AWS_S3_PATH_STYLE_ACTUAL:-not set}\` |"
+            echo "| Puppeteer     | ${PPT8_ICON} ${PPT8_LABEL} | ${PPT8_DETAIL} |"
+            echo "| DS Log Errors | ${DS8_DETAIL} | |"
+            echo ""
             echo "### Virtual Path"
             echo ""
             echo "| Check | Result | Details |"
@@ -1395,6 +1568,16 @@ jobs:
           printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER2_LABEL}" "${VER2_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT2_LABEL}" "${PPT2_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS2_DETAIL}"
+          echo "$SEP"
+          echo ""
+          echo "=== S3 s3ForcePathStyle=true ==="
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC8_LABEL}"  "${HC8_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER8_LABEL}" "${VER8_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT8_LABEL}" "${PPT8_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS8_DETAIL}"
           echo "$SEP"
           echo ""
           echo "=== Virtual Path ==="
@@ -1479,6 +1662,9 @@ jobs:
           s3t_ppt      = n('PUPPETEER_AWS_S3_TRUE_FAILED')
           s3t_api_ppt  = n('PUPPETEER_AWS_S3_TRUE_API_FAILED')
           s3t_wopi_ppt = n('PUPPETEER_AWS_S3_TRUE_WOPI_FAILED')
+          sp_ppt       = n('PUPPETEER_AWS_S3_PATH_STYLE_FAILED')
+          sp_api_ppt   = n('PUPPETEER_AWS_S3_PATH_STYLE_API_FAILED')
+          sp_wopi_ppt  = n('PUPPETEER_AWS_S3_PATH_STYLE_WOPI_FAILED')
           vp_ppt       = n('PUPPETEER_DS_VPATH_FAILED')
           vp_api_ppt   = n('PUPPETEER_DS_VPATH_API_FAILED')
           vp_wopi_ppt  = n('PUPPETEER_DS_VPATH_WOPI_FAILED')
@@ -1496,6 +1682,7 @@ jobs:
           ri_wopi_ppt  = n('PUPPETEER_REDIS_IOREDIS_WOPI_FAILED')
           s3f_ds  = n('DS_LOG_ERRORS_AWS_S3_FALSE')
           s3t_ds  = n('DS_LOG_ERRORS_AWS_S3_TRUE')
+          sp_ds   = n('DS_LOG_ERRORS_AWS_S3_PATH_STYLE')
           vp_ds   = n('DS_LOG_ERRORS_DS_VPATH')
           art_ds  = n('DS_LOG_ERRORS_AMQP_ARTEMIS')
           cls_ds  = n('DS_LOG_ERRORS_AMQP_CLASSIC')
@@ -1523,6 +1710,16 @@ jobs:
                   'puppeteer_wopi_failed': s3t_wopi_ppt,
                   'ds_log_errors':         s3t_ds,
                   'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_TRUE') and b('VERSION_AWS_S3_TRUE_OK') and ok5(s3t_ppt) and s3t_ds == 0) else 'failure',
+              },
+              's3_path_style': {
+                  'healthy':               b('HEALTHCHECK_AWS_S3_PATH_STYLE'),
+                  'version_ok':            b('VERSION_AWS_S3_PATH_STYLE_OK'),
+                  'version_actual':        s('VERSION_AWS_S3_PATH_STYLE_ACTUAL'),
+                  'puppeteer_failed':      sp_ppt,
+                  'puppeteer_api_failed':  sp_api_ppt,
+                  'puppeteer_wopi_failed': sp_wopi_ppt,
+                  'ds_log_errors':         sp_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_PATH_STYLE') and b('VERSION_AWS_S3_PATH_STYLE_OK') and ok5(sp_ppt) and sp_ds == 0) else 'failure',
               },
               'vpath': {
                   'healthy':               b('HEALTHCHECK_DS_VPATH'),
