@@ -1726,7 +1726,7 @@ jobs:
         if: always()
         env:
           EXPECTED_VERSION: "${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
-        run: bash .github/scripts/final-check.sh
+        run: bash .github/scripts/dev-server-checks/final-check.sh
 
       - name: Save results
         if: always()
