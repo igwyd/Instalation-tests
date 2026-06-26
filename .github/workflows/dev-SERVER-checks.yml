@@ -890,6 +890,140 @@ jobs:
           env_var: DS_LOG_ERRORS_AZURE_STORAGE_DIRECTURL_TRUE
           label: AZURE_STORAGE_DIRECTURL_TRUE
 
+      - name: AZURE_STORAGE_ENCRYPTION_SCOPE Docker reInstall
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker stop ds-ee-dev || true
+          sudo docker rm ds-ee-dev || true
+          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: AZURE_STORAGE_ENCRYPTION_SCOPE Enable nginx config
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo rm -f /etc/nginx/sites-enabled/* && \
+             sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
+             sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: AZURE_STORAGE_ENCRYPTION_SCOPE Configure
+        continue-on-error: true
+        env:
+          AZURE_STORAGE_KEY_ID: ${{ secrets.AZURE_STORAGE_KEY_ID }}
+          AZURE_STORAGE_ACCESS_KEY: ${{ secrets.AZURE_STORAGE_ACCESS_KEY }}
+          AZURE_STORAGE_ENCRYPTION_SCOPE: ${{ secrets.AZURE_STORAGE_ENCRYPTION_SCOPE }}
+        run: |
+          envsubst '${AZURE_STORAGE_KEY_ID} ${AZURE_STORAGE_ACCESS_KEY} ${AZURE_STORAGE_ENCRYPTION_SCOPE}' \
+            < dev-SERVER-checks/azure-blob-storage/az-encryptionScope/local-production-linux.json \
+            > /tmp/local-production-linux.json
+          scp -o StrictHostKeyChecking=no /tmp/local-production-linux.json \
+            ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo rm ~/local-production-linux.json
+          sudo docker exec ds-ee-dev supervisorctl restart ds:converter ds:docservice
+          sleep 30
+          EOF
+
+      - name: AZURE_STORAGE_ENCRYPTION_SCOPE Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: AZURE_STORAGE_ENCRYPTION_SCOPE Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_AZURE_STORAGE_ENCRYPTION_SCOPE=$HC" >> $GITHUB_ENV
+
+      - name: AZURE_STORAGE_ENCRYPTION_SCOPE Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: AZURE_STORAGE_ENCRYPTION_SCOPE Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: AZURE_STORAGE_ENCRYPTION_SCOPE Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: AZURE_STORAGE_ENCRYPTION_SCOPE Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: AZURE_STORAGE_ENCRYPTION_SCOPE Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition AZURE_STORAGE_ENCRYPTION_SCOPE
+
+      - name: AZURE_STORAGE_ENCRYPTION_SCOPE Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+
+      - name: AZURE_STORAGE_ENCRYPTION_SCOPE Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_AZURE_STORAGE_ENCRYPTION_SCOPE
+          label: AZURE_STORAGE_ENCRYPTION_SCOPE
+
       - name: DS-VPATH Docker reInstall
         continue-on-error: true
         run: |
@@ -1774,6 +1908,36 @@ jobs:
             DS11_ICON="✅"; DS11_LABEL="OK"
           fi
 
+          # --- AZURE_STORAGE_ENCRYPTION_SCOPE ---
+          if [ "${HEALTHCHECK_AZURE_STORAGE_ENCRYPTION_SCOPE}" = "true" ]; then
+            HC12_ICON="✅"; HC12_LABEL="OK";     HC12_DETAIL="${HEALTHCHECK_AZURE_STORAGE_ENCRYPTION_SCOPE}"
+          else
+            HC12_ICON="❌"; HC12_LABEL="FAILED"; HC12_DETAIL="${HEALTHCHECK_AZURE_STORAGE_ENCRYPTION_SCOPE:-not set}"; FAILED=1
+          fi
+
+          if [ "${VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_OK}" = "true" ]; then
+            VER12_ICON="✅"; VER12_LABEL="OK"
+          else
+            VER12_ICON="❌"; VER12_LABEL="FAILED"; FAILED=1
+          fi
+          VER12_DETAIL="exp: ${EXPECTED}, act: ${VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_ACTUAL:-not set}"
+
+          PPT12="${PUPPETEER_AZURE_STORAGE_ENCRYPTION_SCOPE_FAILED:-0}"
+          PPT12_DETAIL="${PPT12} failures (threshold: 0)"
+          if [ "$PPT12" -gt 0 ]; then
+            PPT12_ICON="❌"; PPT12_LABEL="FAILED"; FAILED=1
+          else
+            PPT12_ICON="✅"; PPT12_LABEL="OK"
+          fi
+
+          DS12="${DS_LOG_ERRORS_AZURE_STORAGE_ENCRYPTION_SCOPE:-0}"
+          DS12_DETAIL="${DS12} errors"
+          if [ "$DS12" -gt 0 ]; then
+            DS12_ICON="❌"; DS12_LABEL="FAILED"
+          else
+            DS12_ICON="✅"; DS12_LABEL="OK"
+          fi
+
           # --- DS_VPATH ---
           if [ "${HEALTHCHECK_DS_VPATH}" = "true" ]; then
             HC3_ICON="✅"; HC3_LABEL="OK";     HC3_DETAIL="${HEALTHCHECK_DS_VPATH}"
@@ -2010,6 +2174,15 @@ jobs:
             echo "| Puppeteer     | ${PPT11_ICON} ${PPT11_LABEL} | ${PPT11_DETAIL} |"
             echo "| DS Log Errors | ${DS11_DETAIL} | |"
             echo ""
+            echo "### Azure Blob Storage encryptionScope"
+            echo ""
+            echo "| Check | Result | Details |"
+            echo "|-------|--------|---------|"
+            echo "| Healthcheck   | ${HC12_ICON} ${HC12_LABEL}  | ${HC12_DETAIL} |"
+            echo "| Version       | ${VER12_ICON} ${VER12_LABEL} | \`${VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_ACTUAL:-not set}\` |"
+            echo "| Puppeteer     | ${PPT12_ICON} ${PPT12_LABEL} | ${PPT12_DETAIL} |"
+            echo "| DS Log Errors | ${DS12_DETAIL} | |"
+            echo ""
             echo "### Virtual Path"
             echo ""
             echo "| Check | Result | Details |"
@@ -2128,6 +2301,16 @@ jobs:
           printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS11_DETAIL}"
           echo "$SEP"
           echo ""
+          echo "=== Azure Blob Storage encryptionScope ==="
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC12_LABEL}"  "${HC12_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER12_LABEL}" "${VER12_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT12_LABEL}" "${PPT12_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS12_DETAIL}"
+          echo "$SEP"
+          echo ""
           echo "=== Virtual Path ==="
           echo "$SEP"
           printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
@@ -2222,6 +2405,9 @@ jobs:
           azt_ppt      = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_TRUE_FAILED')
           azt_api_ppt  = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_TRUE_API_FAILED')
           azt_wopi_ppt = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_TRUE_WOPI_FAILED')
+          aze_ppt      = n('PUPPETEER_AZURE_STORAGE_ENCRYPTION_SCOPE_FAILED')
+          aze_api_ppt  = n('PUPPETEER_AZURE_STORAGE_ENCRYPTION_SCOPE_API_FAILED')
+          aze_wopi_ppt = n('PUPPETEER_AZURE_STORAGE_ENCRYPTION_SCOPE_WOPI_FAILED')
           vp_ppt       = n('PUPPETEER_DS_VPATH_FAILED')
           vp_api_ppt   = n('PUPPETEER_DS_VPATH_API_FAILED')
           vp_wopi_ppt  = n('PUPPETEER_DS_VPATH_WOPI_FAILED')
@@ -2243,6 +2429,7 @@ jobs:
           kms_ds  = n('DS_LOG_ERRORS_AWS_S3_KMS')
           azf_ds  = n('DS_LOG_ERRORS_AZURE_STORAGE_DIRECTURL_FALSE')
           azt_ds  = n('DS_LOG_ERRORS_AZURE_STORAGE_DIRECTURL_TRUE')
+          aze_ds  = n('DS_LOG_ERRORS_AZURE_STORAGE_ENCRYPTION_SCOPE')
           vp_ds   = n('DS_LOG_ERRORS_DS_VPATH')
           art_ds  = n('DS_LOG_ERRORS_AMQP_ARTEMIS')
           cls_ds  = n('DS_LOG_ERRORS_AMQP_CLASSIC')
@@ -2310,6 +2497,16 @@ jobs:
                   'puppeteer_wopi_failed': azt_wopi_ppt,
                   'ds_log_errors':         azt_ds,
                   'conclusion': 'success' if (b('HEALTHCHECK_AZURE_STORAGE_DIRECTURL_TRUE') and b('VERSION_AZURE_STORAGE_DIRECTURL_TRUE_OK') and ok5(azt_ppt) and azt_ds == 0) else 'failure',
+              },
+              'az_encryption_scope': {
+                  'healthy':               b('HEALTHCHECK_AZURE_STORAGE_ENCRYPTION_SCOPE'),
+                  'version_ok':            b('VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_OK'),
+                  'version_actual':        s('VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_ACTUAL'),
+                  'puppeteer_failed':      aze_ppt,
+                  'puppeteer_api_failed':  aze_api_ppt,
+                  'puppeteer_wopi_failed': aze_wopi_ppt,
+                  'ds_log_errors':         aze_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_AZURE_STORAGE_ENCRYPTION_SCOPE') and b('VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_OK') and ok5(aze_ppt) and aze_ds == 0) else 'failure',
               },
               'vpath': {
                   'healthy':               b('HEALTHCHECK_DS_VPATH'),

@@ -1,0 +1,17 @@
+{
+  "storage": {
+    "name": "storage-az",
+    "endpoint": "https://${AZURE_STORAGE_KEY_ID}.blob.core.windows.net",
+    "bucketName": "test-container",
+    "accessKeyId": "${AZURE_STORAGE_KEY_ID}",
+    "secretAccessKey": "${AZURE_STORAGE_ACCESS_KEY}",
+    "useDirectStorageUrls": false,
+    "commandOptions": {
+      "az": {
+        "uploadData": {"encryptionScope": "${AZURE_STORAGE_ENCRYPTION_SCOPE}"},
+        "uploadStream": {"encryptionScope": "${AZURE_STORAGE_ENCRYPTION_SCOPE}"},
+        "syncCopyFromURL": {"encryptionScope": "${AZURE_STORAGE_ENCRYPTION_SCOPE}"}
+      }
+    }
+  }
+}
