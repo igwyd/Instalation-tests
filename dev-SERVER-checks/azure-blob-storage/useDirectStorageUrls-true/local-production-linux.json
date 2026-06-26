@@ -1,0 +1,10 @@
+{
+  "storage": {
+    "name": "storage-az",
+    "endpoint": "https://${AZURE_STORAGE_KEY_ID}.blob.core.windows.net",
+    "bucketName": "test-container",
+    "accessKeyId": "${AZURE_STORAGE_KEY_ID}",
+    "secretAccessKey": "${AZURE_STORAGE_ACCESS_KEY}",
+    "useDirectStorageUrls": true
+  }
+}
