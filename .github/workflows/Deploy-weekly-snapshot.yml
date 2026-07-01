@@ -1,4 +1,4 @@
-name: Save Weekly Snapshot
+name: Deploy Weekly Snapshot
 
 on:
   schedule:
