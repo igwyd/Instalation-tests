@@ -2,7 +2,7 @@ name: Deploy Weekly Snapshot
 
 on:
   schedule:
-    - cron: '30 20 * * 3'  # Wednesday 23:30 Moscow (UTC+3)
+    - cron: '30 21 * * 3'  # Thursday 00:30 Moscow (UTC+3)
   workflow_dispatch:
 
 permissions:
