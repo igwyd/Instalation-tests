@@ -93,8 +93,8 @@ jobs:
             db_database: FREEPDB1
             db_user: SYSTEM
             db_pwd: onlyoffice
-            k6_stage_ramp: "1m:500"
-            k6_stage_main: "9m:500"
+            k6_stage_ramp: "1m:100"
+            k6_stage_main: "9m:100"
           - db: dameng
             db_image: igwyd890/dameng-onlyoffice:8.1.3
             db_name: damengdb
