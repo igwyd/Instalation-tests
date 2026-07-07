@@ -1,0 +1,318 @@
+name: dev TLS dependencies
+
+on:
+  schedule:
+    - cron: '0 15 * * 3'  # Wednesday 18:00 Moscow time (UTC+3)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tls-check:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Create docker network
+        run: docker network create tls-network
+
+      - name: Generate TLS certificates (CA, server, client)
+        run: |
+          mkdir -p pg-certs
+          cd pg-certs
+
+          # Root CA
+          openssl req -new -x509 -days 3650 -nodes -subj "/CN=test-ca" \
+            -keyout ca.key -out ca.crt
+
+          # PostgreSQL server certificate, SAN must match DB_HOST (container name: pg-tls)
+          openssl req -new -nodes -subj "/CN=pg-tls" \
+            -addext "subjectAltName=DNS:pg-tls" \
+            -keyout server.key -out server.csr
+          openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key \
+            -CAcreateserial -days 3650 -copy_extensions copy -out server.crt
+
+          # Client certificate for mTLS (verify-full)
+          openssl req -new -nodes -subj "/CN=onlyoffice_client" \
+            -keyout client.key -out client.csr
+          openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key \
+            -CAcreateserial -days 3650 -out client.crt
+
+          chmod 600 *.key
+          sudo chown 999:999 *
+
+          echo "-------------SAN check-------------"
+          openssl x509 -in server.crt -noout -text | grep -A1 "Subject Alternative Name"
+
+      - name: Create pg_hba.conf
+        run: |
+          cat > pg-certs/pg_hba.conf <<'EOF'
+          local   all all                                trust
+          host    all all 127.0.0.1/32                   trust
+          host    all all ::1/128                        trust
+          hostssl all all 0.0.0.0/0                       scram-sha-256
+          hostnossl all all 0.0.0.0/0                     reject
+          EOF
+
+      - name: Run PostgreSQL with TLS
+        run: |
+          docker run -d --name pg-tls --network tls-network \
+            -e POSTGRES_USER=onlyoffice \
+            -e POSTGRES_PASSWORD=StrongPass123 \
+            -e POSTGRES_DB=onlyoffice \
+            -v "$(pwd)/pg-certs":/var/lib/postgresql/certs:ro \
+            -v "$(pwd)/pg-certs/pg_hba.conf":/etc/postgresql/pg_hba.conf:ro \
+            postgres:16 \
+            -c ssl=on \
+            -c ssl_cert_file=/var/lib/postgresql/certs/server.crt \
+            -c ssl_key_file=/var/lib/postgresql/certs/server.key \
+            -c ssl_ca_file=/var/lib/postgresql/certs/ca.crt \
+            -c hba_file=/etc/postgresql/pg_hba.conf \
+            -c log_connections=on
+
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          for i in $(seq 1 15); do
+            if docker exec pg-tls pg_isready -U onlyoffice >/dev/null 2>&1; then
+              echo "PostgreSQL is ready"
+              break
+            fi
+            echo "Attempt $i/15 — waiting for PostgreSQL..."
+            sleep 4
+          done
+          docker logs pg-tls --tail 30
+          docker exec pg-tls psql -U onlyoffice -c "SHOW ssl;"
+          docker exec pg-tls psql -U onlyoffice -c "SHOW hba_file;"
+
+      - name: Prepare DS client certificates
+        run: |
+          mkdir -p ds-certs
+          cp pg-certs/ca.crt pg-certs/client.crt pg-certs/client.key ds-certs/
+
+      - name: Docker pull and run ONLYOFFICE Docs EE with TLS_MODE
+        run: |
+          docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          docker run -d --name onlyoffice --network tls-network -p 80:80 \
+            -e DB_TYPE=postgres \
+            -e DB_HOST=pg-tls \
+            -e DB_PORT=5432 \
+            -e DB_NAME=onlyoffice \
+            -e DB_USER=onlyoffice \
+            -e DB_PWD=StrongPass123 \
+            -e TLS_MODE=verify-full \
+            -e TLS_CA_CERT=/certs/ca.crt \
+            -e TLS_CERT=/certs/client.crt \
+            -e TLS_KEY=/certs/client.key \
+            -v "$(pwd)/ds-certs":/certs:ro \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+
+      - name: Wait for DS startup
+        run: sleep 240
+
+      - name: Get runner IP
+        id: runner_ip
+        run: |
+          IP=$(ip route get 1 | awk '{print $7}')
+          echo "RUNNER_IP=$IP" >> $GITHUB_ENV
+          echo "Runner IP is $IP"
+
+      - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
+        run: |
+          sudo apt-get install jq -y
+
+          echo "-------------healthcheck-------------"
+          HEALTHCHECK_RESULT=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          echo "Healthcheck: $HEALTHCHECK_RESULT"
+          echo "HEALTHCHECK_RESULT=$HEALTHCHECK_RESULT" >> $GITHUB_ENV
+          echo "-------------DS services-------------"
+          docker exec onlyoffice supervisorctl status all || true
+          echo "---------Installed packages----------"
+          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType must be 1--------"
+          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------pgPoolExtraOptions TLS config-------------"
+          docker exec onlyoffice node -e "
+          const c = require('/etc/onlyoffice/documentserver/local.json');
+          console.log(JSON.stringify(c.services.CoAuthoring.sql.pgPoolExtraOptions, null, 2));
+          "
+
+      - name: Setup Puppeteer
+        uses: ./.github/actions/setup-puppeteer
+        with:
+          git_ssh_private_key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
+
+      - name: Start ds-example
+        run: docker exec onlyoffice supervisorctl start ds:example
+
+      - name: Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          jq --arg url "http://${RUNNER_IP}/example" '.testOptions.url = $url' ../config_chrome_linux.json > tmp.json
+          mv tmp.json ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py
+
+      - name: Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: docker-local
+          container: onlyoffice
+
+      - name: Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: docker-local
+          container: onlyoffice
+          env_var: DS_LOG_ERRORS
+
+      - name: Check PostgreSQL sees TLS connection from DS
+        continue-on-error: true
+        run: |
+          echo "-------------pg_stat_ssl / pg_stat_activity-------------"
+          ROWS=$(docker exec pg-tls psql -U onlyoffice -t -A -F'|' -c \
+            "SELECT ssl, client_dn FROM pg_stat_ssl JOIN pg_stat_activity USING (pid) WHERE usename = 'onlyoffice';")
+          echo "$ROWS"
+
+          if echo "$ROWS" | grep -q '^t|/CN=onlyoffice_client$'; then
+            echo "TLS_CONNECTION_OK=true" >> $GITHUB_ENV
+          else
+            echo "TLS_CONNECTION_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: Final check
+        if: always()
+        run: |
+          FAILED=0
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+
+          if [ "${HEALTHCHECK_RESULT}" = "true" ]; then
+            HC_ICON="✅"; HC_LABEL="OK";     HC_DETAIL="${HEALTHCHECK_RESULT}"
+          else
+            HC_ICON="❌"; HC_LABEL="FAILED"; HC_DETAIL="${HEALTHCHECK_RESULT:-not set}"; FAILED=1
+          fi
+
+          VERSION_ACTUAL=$(docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice-documentserver-ee" | awk '{print $3}' | head -n 1)
+          echo "VERSION_ACTUAL=$VERSION_ACTUAL" >> "$GITHUB_ENV"
+          if [ "$VERSION_ACTUAL" = "$EXPECTED" ]; then
+            VER_ICON="✅"; VER_LABEL="OK"
+            echo "VERSION_OK=true" >> "$GITHUB_ENV"
+          else
+            VER_ICON="❌"; VER_LABEL="FAILED"; FAILED=1
+            echo "VERSION_OK=false" >> "$GITHUB_ENV"
+          fi
+          VER_DETAIL="exp: ${EXPECTED}, act: ${VERSION_ACTUAL:-not set}"
+
+          PPTR_TOTAL="${PUPPETEER_FAILED:-999}"
+          PPT_DETAIL="${PPTR_TOTAL} (threshold: 0)"
+          if [ "$PPTR_TOTAL" -gt 0 ]; then
+            PPT_ICON="❌"; PPT_LABEL="FAILED"; FAILED=1
+          else
+            PPT_ICON="✅"; PPT_LABEL="OK"
+          fi
+
+          if [ "${TLS_CONNECTION_OK}" = "true" ]; then
+            TLS_ICON="✅"; TLS_LABEL="OK"
+          else
+            TLS_ICON="❌"; TLS_LABEL="FAILED"; FAILED=1
+          fi
+
+          DS_ERRORS="${DS_LOG_ERRORS:-0}"
+          DS_DETAIL="${DS_ERRORS} errors"
+
+          {
+            echo "## Final Check — TLS dependencies (PostgreSQL)"
+            echo ""
+            echo "| Check | Result | Details |"
+            echo "|-------|--------|---------|"
+            echo "| Healthcheck    | ${HC_ICON} ${HC_LABEL}  | ${HC_DETAIL} |"
+            echo "| Version        | ${VER_ICON} ${VER_LABEL} | \`${EXPECTED}\` → \`${VERSION_ACTUAL:-not set}\` |"
+            echo "| Puppeteer      | ${PPT_ICON} ${PPT_LABEL} | ${PPT_DETAIL} |"
+            echo "| TLS connection | ${TLS_ICON} ${TLS_LABEL} | ssl=t, client_dn=/CN=onlyoffice_client |"
+            echo "| DS Log Errors  | ${DS_DETAIL} | |"
+            echo ""
+            if [ "$FAILED" -eq 1 ]; then
+              echo "> ❌ **Final check FAILED**"
+            else
+              echo "> ✅ **All checks passed**"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          SEP="+----------------------+--------+--------------------------------------------+"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+          echo "$SEP"
+          printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"    "${HC_LABEL}"  "${HC_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Version"        "${VER_LABEL}" "${VER_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"      "${PPT_LABEL}" "${PPT_DETAIL}"
+          printf "| %-20s | %-6s | %-42s |\n" "TLS connection" "${TLS_LABEL}" "ssl=t, client_dn=/CN=onlyoffice_client"
+          printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors"  ""            "${DS_DETAIL}"
+          echo "$SEP"
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "FINAL_CONCLUSION=failure" >> "$GITHUB_ENV"
+            exit 1
+          else
+            echo "FINAL_CONCLUSION=success" >> "$GITHUB_ENV"
+          fi
+
+      - name: Save results
+        if: always()
+        continue-on-error: true
+        env:
+          EXPECTED_VERSION: ${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.DASHBOARD_BUCKET_REGION }}
+        run: |
+          mkdir -p .github/workflow-results
+          python3 - << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+
+          data = {
+              "run_date": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              "healthy": os.environ.get('HEALTHCHECK_RESULT', '') == 'true',
+              "version_expected": os.environ.get('EXPECTED_VERSION', ''),
+              "version_actual": os.environ.get('VERSION_ACTUAL', 'not set'),
+              "version_ok": os.environ.get('VERSION_OK', '') == 'true',
+              "puppeteer_failed": int(os.environ.get('PUPPETEER_FAILED', '0') or '0'),
+              "tls_connection_ok": os.environ.get('TLS_CONNECTION_OK', '') == 'true',
+              "ds_log_errors": int(os.environ.get('DS_LOG_ERRORS', '0') or '0'),
+              "conclusion": os.environ.get('FINAL_CONCLUSION', 'failure'),
+          }
+          path = '.github/workflow-results/dev-tls-dependencies.json'
+          with open(path, 'w') as f:
+              json.dump(data, f, indent=2)
+          print(f"Saved: {path}")
+          PYEOF
+
+          aws s3 cp .github/workflow-results/dev-tls-dependencies.json \
+            s3://${{ vars.DASHBOARD_BUCKET_NAME }}/results/dev-tls-dependencies.json \
+            --region ${{ vars.DASHBOARD_BUCKET_REGION }}
+
+      - name: Cleanup containers and network
+        if: always()
+        run: |
+          docker stop onlyoffice pg-tls 2>/dev/null || true
+          docker rm onlyoffice pg-tls 2>/dev/null || true
+          docker network rm tls-network 2>/dev/null || true

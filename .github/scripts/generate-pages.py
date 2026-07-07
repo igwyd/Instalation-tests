@@ -515,6 +515,7 @@ def generate_dev():
     docker_rpm_arm64 = load("dev-docker-rpm-arm64.json")
     db_data        = {key: load(f"dev-db-{key}.json") for _, key in DBS}
     server_checks  = load("dev-server-checks.json")
+    tls_deps       = load("dev-tls-dependencies.json")
 
     deb_body        = pkg_table(deb_x64, "x64") + pkg_table(deb_arm64, "arm64")
     rpm_body        = pkg_table(rpm_x64, "x64") + pkg_table(rpm_arm64, "arm64")
@@ -619,6 +620,7 @@ def generate_dev():
         + section("OS Tests (OneClickInstall)", "dev-OS-x64-arm64.yml", "dev-OS-x64-arm64", os_body, os_run_date)
         + section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body, db_run_date)
         + section("SERVER Checks (AWS S3)", "dev-SERVER-checks.yml", "dev SERVER checks", server_body)
+        + section("TLS Dependencies", "dev-TLS-dependencies.yaml", "dev TLS dependencies", tls_body(tls_deps))
     )
     write("dev.html", page_html("DEV — ONLYOFFICE Docs Test Results", body, breadcrumb("DEV")))
 
@@ -661,6 +663,32 @@ def generate_release():
 
     body = section("K8s EKS arm64", "release-K8s-EKS-arm64.yml", "release-K8s-EKS-arm64", k8s_body)
     write("release.html", page_html("RELEASE — ONLYOFFICE Docs Test Results", body, breadcrumb("RELEASE")))
+
+
+def tls_body(data):
+    run_date = (data or {}).get("run_date", "")
+    date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
+
+    if data is None:
+        row = '<tr><td>PostgreSQL</td>' + '<td class="na">—</td>' * 4 + '</tr>'
+    else:
+        tls_ok = data.get("tls_connection_ok", False)
+        row = (
+            '<tr><td>PostgreSQL</td>'
+            + td_bool(data.get("healthy", False))
+            + td_version(data)
+            + f'<td class="{status(tls_ok)}">{"✅ OK" if tls_ok else "❌ FAILED"}</td>'
+            + td_ppt_breakdown(data, threshold=0)
+            + td_ds_errors(data)
+            + '</tr>'
+        )
+
+    thead = ('<thead><tr>'
+             '<th>Dependency</th><th>Healthcheck</th><th>Version</th>'
+             '<th>TLS connection</th><th>Puppeteer (=0)</th><th>DS Log Errors</th>'
+             '</tr></thead>')
+    return (f'<h3>EE{date_part}</h3>\n'
+            f'<table>{thead}<tbody>{row}</tbody></table>\n')
 
 
 def generate_common():
