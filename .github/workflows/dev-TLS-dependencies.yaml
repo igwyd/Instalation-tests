@@ -90,7 +90,9 @@ jobs:
       - name: Prepare DS client certificates
         run: |
           mkdir -p ds-certs
-          cp pg-certs/ca.crt pg-certs/client.crt pg-certs/client.key ds-certs/
+          sudo cp pg-certs/ca.crt pg-certs/client.crt pg-certs/client.key ds-certs/
+          sudo chown "$(id -u)":"$(id -g)" ds-certs/*
+          chmod 644 ds-certs/*
 
       - name: Docker pull and run ONLYOFFICE Docs EE with TLS_MODE
         run: |
