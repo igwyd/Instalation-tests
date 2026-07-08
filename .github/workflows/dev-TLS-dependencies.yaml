@@ -162,7 +162,7 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/desktop/word/smoke/open-close-file-tab.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
           python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
           python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
           python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
