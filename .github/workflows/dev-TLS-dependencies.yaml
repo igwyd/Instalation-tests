@@ -56,6 +56,8 @@ jobs:
           hostssl all all 0.0.0.0/0                       scram-sha-256
           hostnossl all all 0.0.0.0/0                     reject
           EOF
+          echo "--------------pg_hba.conf check-------------"
+          cat pg-certs/pg_hba.conf
 
       - name: Run PostgreSQL with TLS
         run: |
@@ -92,7 +94,8 @@ jobs:
           mkdir -p ds-certs
           sudo cp pg-certs/ca.crt pg-certs/client.crt pg-certs/client.key ds-certs/
           sudo chown "$(id -u)":"$(id -g)" ds-certs/*
-          chmod 644 ds-certs/*
+          chmod 644 ds-certs/ca.crt ds-certs/client.crt
+          chmod 600 ds-certs/client.key
 
       - name: Docker pull and run ONLYOFFICE Docs EE with TLS_MODE
         run: |
