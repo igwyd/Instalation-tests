@@ -140,10 +140,7 @@ jobs:
           echo "--------packageType must be 1--------"
           docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------pgPoolExtraOptions TLS config-------------"
-          docker exec onlyoffice node -e "
-          const c = require('/etc/onlyoffice/documentserver/local.json');
-          console.log(JSON.stringify(c.services.CoAuthoring.sql.pgPoolExtraOptions, null, 2));
-          "
+          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json | jq '.services.CoAuthoring.sql.pgPoolExtraOptions'
 
       - name: Setup Puppeteer
         uses: ./.github/actions/setup-puppeteer
