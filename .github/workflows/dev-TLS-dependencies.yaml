@@ -2,7 +2,7 @@ name: dev TLS dependencies
 
 on:
   schedule:
-    - cron: '0 15 * * 3'  # Wednesday 18:00 Moscow time (UTC+3)
+    - cron: '0 13 * * 3'  # Wednesday 16:00 Moscow time (UTC+3)
   workflow_dispatch:
 
 permissions:

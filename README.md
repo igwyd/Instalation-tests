@@ -27,16 +27,17 @@ Pre-release builds from S3 dev repo.
 | dev-Docker-RPM (CentOS 9) | [![dev-Docker-RPM](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-RPM-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-RPM-x64-arm64.yml) |
 
 
-### Server checks (1 runner at the same time)
+### Server checks (2 runners at the same time)
 - dev Docker image with server tests (Scheduled every Wednesday at 16:00 UTC+3)
 
 | Test | Status |
 |------|--------|
 | dev-SERVER-checks | [![dev-SERVER-checks](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-SERVER-checks.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-SERVER-checks.yml) |
+| dev-TLS-dependencies | [![dev-TLS-dependencies](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-TLS-dependencies.yaml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-TLS-dependencies.yaml) |
 
 
 ### Backend tests (10 runners at the same time)
-- dev Docket images with differnet DB's (Scheduled every Wednesday at 17:00 UTC+3)
+- dev Docker images with differnet DB's (Scheduled every Wednesday at 17:00 UTC+3)
 
 | Test | Status |
 |------|--------|
