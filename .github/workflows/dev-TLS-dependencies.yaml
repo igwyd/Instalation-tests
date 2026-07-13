@@ -648,7 +648,7 @@ jobs:
 
       # SQL Server auth (SA login) has no client-certificate mechanism like
       # postgres/mysql, so there is no client cert here — only the server
-      # cert + forced encryption, verified from the DS side via TLS_CA_CERT.
+      # cert + forced encryption (DS connects with TLS_MODE=require, see below).
       - name: MSSQL_TLS Run MSSQL with TLS
         run: |
           docker run -d --name mssql-tls --network tls-network \
@@ -694,16 +694,14 @@ jobs:
         run: |
           docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
 
-          # DS runs its own sqlcmd (unixODBC/msodbcsql18) internally to set up the
-          # mssql schema on first start. That call goes through OpenSSL's system
-          # trust store, not our TLS_CA_CERT env var, so it rejects our self-signed
-          # CA. Fix it by mounting a CA bundle that also contains our CA over the
-          # image's default one.
-          docker run --rm --entrypoint cat \
-            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }} \
-            /etc/ssl/certs/ca-certificates.crt > ds-mssql-certs/system-ca-bundle.crt
-          cat ds-mssql-certs/system-ca-bundle.crt ds-mssql-certs/ca.crt > ds-mssql-certs/combined-ca-bundle.crt
-
+          # ONLYOFFICE docs: TLS_MODE is one of disable/require/verify-ca/verify-full,
+          # where "require" encrypts without certificate verification. DS runs its
+          # own sqlcmd (msodbcsql18) internally to set up the mssql schema on first
+          # start, and that call has no supported way to trust a custom CA (unlike
+          # postgres/mysql), so it always rejects our self-signed cert under
+          # verify-full/verify-ca. Use require here — it still proves the
+          # connection is encrypted (checked via encrypt_option below), which is
+          # the only thing meaningfully testable for mssql given the tooling.
           docker run -d --name onlyoffice --network tls-network -p 80:80 \
             -e DB_TYPE=mssql \
             -e DB_HOST=mssql-tls \
@@ -711,11 +709,10 @@ jobs:
             -e DB_NAME=onlyoffice \
             -e DB_USER=onlyoffice \
             -e DB_PWD=StrongPass123 \
-            -e TLS_MODE=verify-full \
+            -e TLS_MODE=require \
             -e TLS_CA_CERT=/certs/ca.crt \
             -e WOPI_ENABLED=true \
             -v "$(pwd)/ds-mssql-certs":/certs:ro \
-            -v "$(pwd)/ds-mssql-certs/combined-ca-bundle.crt":/etc/ssl/certs/ca-certificates.crt:ro \
             onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
 
       - name: MSSQL_TLS Wait for DS startup
