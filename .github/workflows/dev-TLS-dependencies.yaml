@@ -282,13 +282,17 @@ jobs:
 
       - name: MYSQL_TLS Wait for MySQL to be ready
         run: |
-          for i in $(seq 1 15); do
-            if docker exec mysql-tls mysqladmin ping -uroot -pStrongPass123 --silent >/dev/null 2>&1; then
+          # mysqladmin ping also answers from the entrypoint's temporary
+          # (--initialize-insecure) server, so wait on an authenticated
+          # query instead — it only succeeds once the final server with
+          # MYSQL_ROOT_PASSWORD applied is up.
+          for i in $(seq 1 30); do
+            if docker exec mysql-tls mysql -uroot -pStrongPass123 -e "SELECT 1" >/dev/null 2>&1; then
               echo "MySQL is ready"
               break
             fi
-            echo "Attempt $i/15 — waiting for MySQL..."
-            sleep 4
+            echo "Attempt $i/30 — waiting for MySQL..."
+            sleep 5
           done
           docker logs mysql-tls --tail 30
           docker exec mysql-tls mysql -uroot -pStrongPass123 -e "SHOW VARIABLES LIKE 'have_ssl';"
