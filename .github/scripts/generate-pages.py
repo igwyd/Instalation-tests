@@ -670,7 +670,7 @@ def tls_body(data):
     date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
 
     rows = []
-    for label, key in [("PostgreSQL", "postgres"), ("MySQL", "mysql"), ("MariaDB", "mariadb")]:
+    for label, key in [("PostgreSQL", "postgres"), ("MySQL", "mysql"), ("MariaDB", "mariadb"), ("MSSQL", "mssql")]:
         d = (data or {}).get(key)
         if d is None:
             rows.append(f'<tr><td>{label}</td>' + '<td class="na">—</td>' * 4 + '</tr>')
