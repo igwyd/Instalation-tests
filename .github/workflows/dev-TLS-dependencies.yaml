@@ -675,13 +675,13 @@ jobs:
           docker logs mssql-tls --tail 30
           docker exec mssql-tls /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "StrongPass123" -C -Q "SELECT @@VERSION"
 
-      - name: MSSQL_TLS Create onlyoffice database and schema
+      - name: MSSQL_TLS Create onlyoffice database and user
         run: |
+          # Tables are created by DS itself on startup — only the database,
+          # login and password need to exist beforehand.
           docker exec mssql-tls /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "StrongPass123" -C -Q "CREATE DATABASE onlyoffice;"
-
-          curl -O https://raw.githubusercontent.com/ONLYOFFICE/server/master/schema/mssql/createdb.sql
-          docker cp createdb.sql mssql-tls:/createdb.sql
-          docker exec mssql-tls /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "StrongPass123" -C -i /createdb.sql
+          docker exec mssql-tls /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "StrongPass123" -C -Q "CREATE LOGIN onlyoffice WITH PASSWORD = 'StrongPass123';"
+          docker exec mssql-tls /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "StrongPass123" -C -d onlyoffice -Q "CREATE USER onlyoffice FOR LOGIN onlyoffice; ALTER ROLE db_owner ADD MEMBER onlyoffice;"
 
       - name: MSSQL_TLS Prepare DS client certificates
         run: |
@@ -698,7 +698,7 @@ jobs:
             -e DB_HOST=mssql-tls \
             -e DB_PORT=1433 \
             -e DB_NAME=onlyoffice \
-            -e DB_USER=sa \
+            -e DB_USER=onlyoffice \
             -e DB_PWD=StrongPass123 \
             -e TLS_MODE=verify-full \
             -e TLS_CA_CERT=/certs/ca.crt \
@@ -782,7 +782,7 @@ jobs:
         run: |
           echo "-------------sys.dm_exec_connections encrypt_option-------------"
           ROWS=$(docker exec mssql-tls /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "StrongPass123" -C -h -1 -Q \
-            "SET NOCOUNT ON; SELECT c.encrypt_option FROM sys.dm_exec_connections c JOIN sys.dm_exec_sessions s ON c.session_id = s.session_id WHERE s.login_name = 'sa' AND c.session_id <> @@SPID;")
+            "SET NOCOUNT ON; SELECT c.encrypt_option FROM sys.dm_exec_connections c JOIN sys.dm_exec_sessions s ON c.session_id = s.session_id WHERE s.login_name = 'onlyoffice' AND c.session_id <> @@SPID;")
           echo "$ROWS"
 
           if echo "$ROWS" | grep -qi 'TRUE'; then
