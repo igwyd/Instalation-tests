@@ -693,6 +693,17 @@ jobs:
       - name: MSSQL_TLS Docker pull and run ONLYOFFICE Docs EE with TLS_MODE
         run: |
           docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+
+          # DS runs its own sqlcmd (unixODBC/msodbcsql18) internally to set up the
+          # mssql schema on first start. That call goes through OpenSSL's system
+          # trust store, not our TLS_CA_CERT env var, so it rejects our self-signed
+          # CA. Fix it by mounting a CA bundle that also contains our CA over the
+          # image's default one.
+          docker run --rm --entrypoint cat \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }} \
+            /etc/ssl/certs/ca-certificates.crt > ds-mssql-certs/system-ca-bundle.crt
+          cat ds-mssql-certs/system-ca-bundle.crt ds-mssql-certs/ca.crt > ds-mssql-certs/combined-ca-bundle.crt
+
           docker run -d --name onlyoffice --network tls-network -p 80:80 \
             -e DB_TYPE=mssql \
             -e DB_HOST=mssql-tls \
@@ -704,6 +715,7 @@ jobs:
             -e TLS_CA_CERT=/certs/ca.crt \
             -e WOPI_ENABLED=true \
             -v "$(pwd)/ds-mssql-certs":/certs:ro \
+            -v "$(pwd)/ds-mssql-certs/combined-ca-bundle.crt":/etc/ssl/certs/ca-certificates.crt:ro \
             onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
 
       - name: MSSQL_TLS Wait for DS startup
