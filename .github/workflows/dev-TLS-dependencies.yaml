@@ -818,6 +818,209 @@ jobs:
           docker stop onlyoffice mssql-tls 2>/dev/null || true
           docker rm onlyoffice mssql-tls 2>/dev/null || true
 
+      # ==================== REDIS_TLS ====================
+
+      - name: REDIS_TLS Generate TLS certificates (CA, server, client)
+        run: |
+          mkdir -p redis-certs
+          cd redis-certs
+
+          # Root CA
+          openssl req -new -x509 -days 3650 -nodes -subj "/CN=test-ca" \
+            -keyout ca.key -out ca.crt
+
+          # Redis server certificate, SAN must match REDIS_SERVER_HOST (container name: redis-tls)
+          openssl req -new -nodes -subj "/CN=redis-tls" \
+            -addext "subjectAltName=DNS:redis-tls" \
+            -keyout server.key -out server.csr
+          openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key \
+            -CAcreateserial -days 3650 -copy_extensions copy -out server.crt
+
+          # Client certificate for mTLS (REDIS_TLS_AUTH_CLIENTS=yes)
+          openssl req -new -nodes -subj "/CN=onlyoffice_client" \
+            -keyout client.key -out client.csr
+          openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key \
+            -CAcreateserial -days 3650 -out client.crt
+
+          chmod 644 *.crt *.key
+
+          echo "-------------SAN check-------------"
+          openssl x509 -in server.crt -noout -text | grep -A1 "Subject Alternative Name"
+
+      # bitnami/redis is used because the official redis image is not built with TLS support.
+      # REDIS_PORT_NUMBER=0 disables the plaintext port entirely, REDIS_TLS_AUTH_CLIENTS=yes
+      # requires a client certificate — together this forces mTLS for every connection.
+      - name: REDIS_TLS Run Redis with TLS
+        run: |
+          docker run -d --name redis-tls --network tls-network \
+            -e REDIS_PASSWORD=StrongPass123 \
+            -e REDIS_PORT_NUMBER=0 \
+            -e REDIS_TLS_ENABLED=yes \
+            -e REDIS_TLS_PORT_NUMBER=6380 \
+            -e REDIS_TLS_CERT_FILE=/certs/server.crt \
+            -e REDIS_TLS_KEY_FILE=/certs/server.key \
+            -e REDIS_TLS_CA_FILE=/certs/ca.crt \
+            -e REDIS_TLS_AUTH_CLIENTS=yes \
+            -v "$(pwd)/redis-certs":/certs:ro \
+            bitnami/redis:7.4
+
+      - name: REDIS_TLS Wait for Redis to be ready
+        run: |
+          for i in $(seq 1 15); do
+            if docker exec redis-tls redis-cli --tls --cert /certs/client.crt --key /certs/client.key --cacert /certs/ca.crt -p 6380 -a StrongPass123 --no-auth-warning ping 2>/dev/null | grep -q PONG; then
+              echo "Redis is ready"
+              break
+            fi
+            echo "Attempt $i/15 — waiting for Redis..."
+            sleep 4
+          done
+          docker logs redis-tls --tail 30
+
+      - name: REDIS_TLS Prepare DS client certificates
+        run: |
+          mkdir -p ds-redis-certs
+          sudo cp redis-certs/ca.crt redis-certs/client.crt redis-certs/client.key ds-redis-certs/
+          sudo chown "$(id -u)":"$(id -g)" ds-redis-certs/*
+          chmod 644 ds-redis-certs/ca.crt ds-redis-certs/client.crt ds-redis-certs/client.key
+
+      - name: REDIS_TLS Docker pull and run ONLYOFFICE Docs EE with TLS_MODE
+        run: |
+          docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+
+          # No DB_TYPE/DB_HOST is set on purpose — DS falls back to its bundled local
+          # PostgreSQL, so this cycle isolates the TLS check to the Redis connection only.
+          docker run -d --name onlyoffice --network tls-network -p 80:80 \
+            -e REDIS_SERVER_HOST=redis-tls \
+            -e REDIS_SERVER_PORT=6380 \
+            -e REDIS_SERVER_PASS=StrongPass123 \
+            -e TLS_MODE=verify-full \
+            -e TLS_CA_CERT=/certs/ca.crt \
+            -e TLS_CERT=/certs/client.crt \
+            -e TLS_KEY=/certs/client.key \
+            -e WOPI_ENABLED=true \
+            -v "$(pwd)/ds-redis-certs":/certs:ro \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+
+      - name: REDIS_TLS Wait for DS startup
+        run: sleep 240
+
+      - name: REDIS_TLS INFO about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
+        run: |
+          sudo apt-get install jq -y
+
+          echo "-------------healthcheck-------------"
+          HEALTHCHECK_REDIS=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          echo "Healthcheck: $HEALTHCHECK_REDIS"
+          echo "HEALTHCHECK_REDIS=$HEALTHCHECK_REDIS" >> $GITHUB_ENV
+          echo "-------------DS services-------------"
+          docker exec onlyoffice supervisorctl status all || true
+          echo "---------Installed packages----------"
+          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType must be 1--------"
+          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------Redis TLS options-------------"
+          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json | jq '.services.CoAuthoring.redis'
+
+      - name: REDIS_TLS Start ds-example
+        run: docker exec onlyoffice supervisorctl start ds:example
+
+      - name: REDIS_TLS Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: REDIS_TLS Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          jq --arg url "http://${RUNNER_IP}/example" '.testOptions.url = $url' ../config_chrome_linux.json > tmp.json
+          mv tmp.json ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: REDIS_TLS Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          python3 run.py ../tests/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: REDIS_TLS Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition REDIS
+
+      - name: REDIS_TLS Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: docker-local
+          container: onlyoffice
+
+      - name: REDIS_TLS Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: docker-local
+          container: onlyoffice
+          env_var: DS_LOG_ERRORS_REDIS
+
+      - name: REDIS_TLS Check Redis sees TLS connection from DS
+        continue-on-error: true
+        run: |
+          echo "-------------plain (non-TLS) port must be closed-------------"
+          if docker exec redis-tls redis-cli -p 6379 ping 2>&1 | grep -qiE "could not connect|connection refused"; then
+            PLAIN_CLOSED=true
+          else
+            PLAIN_CLOSED=false
+          fi
+          echo "Plain port closed: $PLAIN_CLOSED"
+
+          echo "-------------TLS port must reject connections without a client certificate-------------"
+          if docker exec redis-tls redis-cli --tls --cacert /certs/ca.crt -p 6380 ping 2>&1 | grep -qiE "error|certificate"; then
+            NOCERT_REJECTED=true
+          else
+            NOCERT_REJECTED=false
+          fi
+          echo "No-cert connection rejected: $NOCERT_REJECTED"
+
+          echo "-------------CLIENT LIST over mTLS (proves DS's authenticated connections)-------------"
+          CLIENTS=$(docker exec redis-tls redis-cli --tls --cert /certs/client.crt --key /certs/client.key --cacert /certs/ca.crt -p 6380 -a StrongPass123 --no-auth-warning CLIENT LIST)
+          echo "$CLIENTS"
+          CONNECTED=$(echo "$CLIENTS" | grep -c "addr=")
+          echo "Connected clients: $CONNECTED"
+
+          if [ "$PLAIN_CLOSED" = "true" ] && [ "$NOCERT_REJECTED" = "true" ] && [ "$CONNECTED" -gt 0 ]; then
+            echo "TLS_CONNECTION_REDIS_OK=true" >> $GITHUB_ENV
+          else
+            echo "TLS_CONNECTION_REDIS_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: REDIS_TLS Check version
+        continue-on-error: true
+        run: |
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          VERSION_REDIS_ACTUAL=$(docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice-documentserver-ee" | awk '{print $3}' | head -n 1)
+          echo "VERSION_REDIS_ACTUAL=$VERSION_REDIS_ACTUAL" >> "$GITHUB_ENV"
+          if [ "$VERSION_REDIS_ACTUAL" = "$EXPECTED" ]; then
+            echo "VERSION_REDIS_OK=true" >> "$GITHUB_ENV"
+          else
+            echo "VERSION_REDIS_OK=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: REDIS_TLS Cleanup containers
+        if: always()
+        run: |
+          docker stop onlyoffice redis-tls 2>/dev/null || true
+          docker rm onlyoffice redis-tls 2>/dev/null || true
+
       # ==================== FINAL ====================
 
       - name: Final check
@@ -832,7 +1035,7 @@ jobs:
           declare -A TLS_ICON TLS_LABEL TLS_DETAIL
           declare -A DS_DETAIL
 
-          for CYCLE in POSTGRES MYSQL MARIADB MSSQL; do
+          for CYCLE in POSTGRES MYSQL MARIADB MSSQL REDIS; do
             HC_VAR="HEALTHCHECK_${CYCLE}"
             if [ "${!HC_VAR}" = "true" ]; then
               HC_ICON[$CYCLE]="✅"; HC_LABEL[$CYCLE]="OK";     HC_DETAIL[$CYCLE]="${!HC_VAR}"
@@ -879,6 +1082,7 @@ jobs:
             echo "| MySQL      | ${HC_ICON[MYSQL]} ${HC_LABEL[MYSQL]}    | ${VER_ICON[MYSQL]} \`${VER_DETAIL[MYSQL]}\`    | ${TLS_ICON[MYSQL]} ${TLS_LABEL[MYSQL]}    | ${PPT_ICON[MYSQL]} ${PPT_DETAIL[MYSQL]}    | ${DS_DETAIL[MYSQL]} |"
             echo "| MariaDB    | ${HC_ICON[MARIADB]} ${HC_LABEL[MARIADB]} | ${VER_ICON[MARIADB]} \`${VER_DETAIL[MARIADB]}\` | ${TLS_ICON[MARIADB]} ${TLS_LABEL[MARIADB]} | ${PPT_ICON[MARIADB]} ${PPT_DETAIL[MARIADB]} | ${DS_DETAIL[MARIADB]} |"
             echo "| MSSQL      | ${HC_ICON[MSSQL]} ${HC_LABEL[MSSQL]}    | ${VER_ICON[MSSQL]} \`${VER_DETAIL[MSSQL]}\`    | ${TLS_ICON[MSSQL]} ${TLS_LABEL[MSSQL]}    | ${PPT_ICON[MSSQL]} ${PPT_DETAIL[MSSQL]}    | ${DS_DETAIL[MSSQL]} |"
+            echo "| Redis      | ${HC_ICON[REDIS]} ${HC_LABEL[REDIS]}    | ${VER_ICON[REDIS]} \`${VER_DETAIL[REDIS]}\`    | ${TLS_ICON[REDIS]} ${TLS_LABEL[REDIS]}    | ${PPT_ICON[REDIS]} ${PPT_DETAIL[REDIS]}    | ${DS_DETAIL[REDIS]} |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -940,6 +1144,7 @@ jobs:
               "mysql": cycle_data("MYSQL"),
               "mariadb": cycle_data("MARIADB"),
               "mssql": cycle_data("MSSQL"),
+              "redis": cycle_data("REDIS"),
               "conclusion": os.environ.get('FINAL_CONCLUSION', 'failure'),
           }
           path = '.github/workflow-results/dev-tls-dependencies.json'
