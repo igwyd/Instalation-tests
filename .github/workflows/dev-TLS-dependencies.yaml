@@ -148,7 +148,7 @@ jobs:
           echo "--------packageType must be 1--------"
           docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------DB TLS options-------------"
-          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json | jq '.services.CoAuthoring.sql'
+          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json
 
       - name: POSTGRES_TLS Start ds-example
         run: docker exec onlyoffice supervisorctl start ds:example
@@ -344,7 +344,7 @@ jobs:
           echo "--------packageType must be 1--------"
           docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------DB TLS options-------------"
-          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json | jq '.services.CoAuthoring.sql'
+          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json
 
       - name: MYSQL_TLS Start ds-example
         run: docker exec onlyoffice supervisorctl start ds:example
@@ -539,7 +539,7 @@ jobs:
           echo "--------packageType must be 1--------"
           docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------DB TLS options-------------"
-          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json | jq '.services.CoAuthoring.sql'
+          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json
 
       - name: MARIADB_TLS Start ds-example
         run: docker exec onlyoffice supervisorctl start ds:example
@@ -734,7 +734,7 @@ jobs:
           echo "--------packageType must be 1--------"
           docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------DB TLS options-------------"
-          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json | jq '.services.CoAuthoring.sql'
+          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json
 
       - name: MSSQL_TLS Start ds-example
         run: docker exec onlyoffice supervisorctl start ds:example
@@ -922,7 +922,7 @@ jobs:
           echo "--------packageType must be 1--------"
           docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------Redis TLS options-------------"
-          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json | jq '.services.CoAuthoring.redis'
+          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json
 
       - name: REDIS_TLS Start ds-example
         run: docker exec onlyoffice supervisorctl start ds:example
@@ -1133,7 +1133,7 @@ jobs:
           echo "--------packageType must be 1--------"
           docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------RabbitMQ TLS options-------------"
-          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json | jq '.rabbitmq'
+          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json
 
       - name: RABBITMQ_TLS Start ds-example
         run: docker exec onlyoffice supervisorctl start ds:example
