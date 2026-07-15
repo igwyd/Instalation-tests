@@ -140,13 +140,17 @@ jobs:
           echo "-------------healthcheck-------------"
           HEALTHCHECK_POSTGRES=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
           echo "Healthcheck: $HEALTHCHECK_POSTGRES"
-          echo "HEALTHCHECK_POSTGRES=$HEALTHCHECK_POSTGRES" >> $GITHUB_ENV
+          {
+            echo "HEALTHCHECK_POSTGRES<<EOF_HC"
+            echo "$HEALTHCHECK_POSTGRES"
+            echo "EOF_HC"
+          } >> "$GITHUB_ENV"
           echo "-------------DS services-------------"
           docker exec onlyoffice supervisorctl status all || true
           echo "---------Installed packages----------"
-          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice"
+          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice" || true
           echo "--------packageType must be 1--------"
-          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType || true
           echo "-------------DB TLS options-------------"
           docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json
 
@@ -336,13 +340,17 @@ jobs:
           echo "-------------healthcheck-------------"
           HEALTHCHECK_MYSQL=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
           echo "Healthcheck: $HEALTHCHECK_MYSQL"
-          echo "HEALTHCHECK_MYSQL=$HEALTHCHECK_MYSQL" >> $GITHUB_ENV
+          {
+            echo "HEALTHCHECK_MYSQL<<EOF_HC"
+            echo "$HEALTHCHECK_MYSQL"
+            echo "EOF_HC"
+          } >> "$GITHUB_ENV"
           echo "-------------DS services-------------"
           docker exec onlyoffice supervisorctl status all || true
           echo "---------Installed packages----------"
-          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice"
+          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice" || true
           echo "--------packageType must be 1--------"
-          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType || true
           echo "-------------DB TLS options-------------"
           docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json
 
@@ -531,13 +539,17 @@ jobs:
           echo "-------------healthcheck-------------"
           HEALTHCHECK_MARIADB=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
           echo "Healthcheck: $HEALTHCHECK_MARIADB"
-          echo "HEALTHCHECK_MARIADB=$HEALTHCHECK_MARIADB" >> $GITHUB_ENV
+          {
+            echo "HEALTHCHECK_MARIADB<<EOF_HC"
+            echo "$HEALTHCHECK_MARIADB"
+            echo "EOF_HC"
+          } >> "$GITHUB_ENV"
           echo "-------------DS services-------------"
           docker exec onlyoffice supervisorctl status all || true
           echo "---------Installed packages----------"
-          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice"
+          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice" || true
           echo "--------packageType must be 1--------"
-          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType || true
           echo "-------------DB TLS options-------------"
           docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json
 
@@ -726,13 +738,17 @@ jobs:
           echo "-------------healthcheck-------------"
           HEALTHCHECK_MSSQL=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
           echo "Healthcheck: $HEALTHCHECK_MSSQL"
-          echo "HEALTHCHECK_MSSQL=$HEALTHCHECK_MSSQL" >> $GITHUB_ENV
+          {
+            echo "HEALTHCHECK_MSSQL<<EOF_HC"
+            echo "$HEALTHCHECK_MSSQL"
+            echo "EOF_HC"
+          } >> "$GITHUB_ENV"
           echo "-------------DS services-------------"
           docker exec onlyoffice supervisorctl status all || true
           echo "---------Installed packages----------"
-          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice"
+          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice" || true
           echo "--------packageType must be 1--------"
-          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType || true
           echo "-------------DB TLS options-------------"
           docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json
 
@@ -914,13 +930,17 @@ jobs:
           echo "-------------healthcheck-------------"
           HEALTHCHECK_REDIS=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
           echo "Healthcheck: $HEALTHCHECK_REDIS"
-          echo "HEALTHCHECK_REDIS=$HEALTHCHECK_REDIS" >> $GITHUB_ENV
+          {
+            echo "HEALTHCHECK_REDIS<<EOF_HC"
+            echo "$HEALTHCHECK_REDIS"
+            echo "EOF_HC"
+          } >> "$GITHUB_ENV"
           echo "-------------DS services-------------"
           docker exec onlyoffice supervisorctl status all || true
           echo "---------Installed packages----------"
-          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice"
+          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice" || true
           echo "--------packageType must be 1--------"
-          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType || true
           echo "-------------Redis TLS options-------------"
           docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json
 
@@ -1125,13 +1145,17 @@ jobs:
           echo "-------------healthcheck-------------"
           HEALTHCHECK_RABBITMQ=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
           echo "Healthcheck: $HEALTHCHECK_RABBITMQ"
-          echo "HEALTHCHECK_RABBITMQ=$HEALTHCHECK_RABBITMQ" >> $GITHUB_ENV
+          {
+            echo "HEALTHCHECK_RABBITMQ<<EOF_HC"
+            echo "$HEALTHCHECK_RABBITMQ"
+            echo "EOF_HC"
+          } >> "$GITHUB_ENV"
           echo "-------------DS services-------------"
           docker exec onlyoffice supervisorctl status all || true
           echo "---------Installed packages----------"
-          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice"
+          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice" || true
           echo "--------packageType must be 1--------"
-          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType || true
           echo "-------------RabbitMQ TLS options-------------"
           docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json
 
