@@ -850,6 +850,8 @@ jobs:
       # bitnami/redis is used because the official redis image is not built with TLS support.
       # REDIS_PORT_NUMBER=0 disables the plaintext port entirely, REDIS_TLS_AUTH_CLIENTS=yes
       # requires a client certificate — together this forces mTLS for every connection.
+      # bitnamilegacy/redis (not bitnami/redis) is used because Bitnami now only publishes
+      # "latest" under bitnami/*; pinned version tags like 7.4 live in bitnamilegacy/*.
       - name: REDIS_TLS Run Redis with TLS
         run: |
           docker run -d --name redis-tls --network tls-network \
@@ -862,7 +864,7 @@ jobs:
             -e REDIS_TLS_CA_FILE=/certs/ca.crt \
             -e REDIS_TLS_AUTH_CLIENTS=yes \
             -v "$(pwd)/redis-certs":/certs:ro \
-            bitnami/redis:7.4
+            bitnamilegacy/redis:7.4
 
       - name: REDIS_TLS Wait for Redis to be ready
         run: |
