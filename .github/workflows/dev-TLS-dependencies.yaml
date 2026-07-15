@@ -899,7 +899,8 @@ jobs:
           mkdir -p ds-redis-certs
           sudo cp redis-certs/ca.crt redis-certs/client.crt redis-certs/client.key ds-redis-certs/
           sudo chown "$(id -u)":"$(id -g)" ds-redis-certs/*
-          chmod 644 ds-redis-certs/ca.crt ds-redis-certs/client.crt ds-redis-certs/client.key
+          chmod 644 ds-redis-certs/ca.crt ds-redis-certs/client.crt
+          chmod 600 ds-redis-certs/client.key
 
       - name: REDIS_TLS Docker pull and run ONLYOFFICE Docs EE with TLS_MODE
         run: |
@@ -1111,7 +1112,8 @@ jobs:
           mkdir -p ds-rabbitmq-certs
           sudo cp rabbitmq-certs/ca.crt rabbitmq-certs/client.crt rabbitmq-certs/client.key ds-rabbitmq-certs/
           sudo chown "$(id -u)":"$(id -g)" ds-rabbitmq-certs/*
-          chmod 644 ds-rabbitmq-certs/ca.crt ds-rabbitmq-certs/client.crt ds-rabbitmq-certs/client.key
+          chmod 644 ds-rabbitmq-certs/ca.crt ds-rabbitmq-certs/client.crt
+          chmod 600 ds-rabbitmq-certs/client.key
 
       # EXPERIMENTAL: there is no confirmed precedent in this repo for RabbitMQ+TLS —
       # ActiveMQ cycles in dev-SERVER-checks.yml only use plain amqp://. This reuses the
