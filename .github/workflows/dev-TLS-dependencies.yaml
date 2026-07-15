@@ -1023,6 +1023,199 @@ jobs:
           docker stop onlyoffice redis-tls 2>/dev/null || true
           docker rm onlyoffice redis-tls 2>/dev/null || true
 
+      # ==================== RABBITMQ_TLS ====================
+
+      - name: RABBITMQ_TLS Generate TLS certificates (CA, server, client)
+        run: |
+          mkdir -p rabbitmq-certs
+          cd rabbitmq-certs
+
+          # Root CA
+          openssl req -new -x509 -days 3650 -nodes -subj "/CN=test-ca" \
+            -keyout ca.key -out ca.crt
+
+          # RabbitMQ server certificate, SAN must match AMQP host (container name: rabbitmq-tls)
+          openssl req -new -nodes -subj "/CN=rabbitmq-tls" \
+            -addext "subjectAltName=DNS:rabbitmq-tls" \
+            -keyout server.key -out server.csr
+          openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key \
+            -CAcreateserial -days 3650 -copy_extensions copy -out server.crt
+
+          # Client certificate for mTLS (ssl_options.verify = verify_peer, fail_if_no_peer_cert)
+          openssl req -new -nodes -subj "/CN=onlyoffice_client" \
+            -keyout client.key -out client.csr
+          openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key \
+            -CAcreateserial -days 3650 -out client.crt
+
+          chmod 644 *.crt *.key
+
+          # listeners.tcp = none closes the plaintext AMQP port entirely, forcing every
+          # connection through the TLS listener; fail_if_no_peer_cert enforces mTLS.
+          cat > rabbitmq.conf <<'EOF'
+          listeners.tcp = none
+          listeners.ssl.default = 5671
+          ssl_options.cacertfile = /certs/ca.crt
+          ssl_options.certfile = /certs/server.crt
+          ssl_options.keyfile = /certs/server.key
+          ssl_options.verify = verify_peer
+          ssl_options.fail_if_no_peer_cert = true
+          EOF
+
+          echo "-------------SAN check-------------"
+          openssl x509 -in server.crt -noout -text | grep -A1 "Subject Alternative Name"
+
+      - name: RABBITMQ_TLS Run RabbitMQ with TLS
+        run: |
+          docker run -d --name rabbitmq-tls --network tls-network \
+            -e RABBITMQ_DEFAULT_USER=onlyoffice \
+            -e RABBITMQ_DEFAULT_PASS=StrongPass123 \
+            -v "$(pwd)/rabbitmq-certs":/certs:ro \
+            -v "$(pwd)/rabbitmq-certs/rabbitmq.conf":/etc/rabbitmq/conf.d/20-tls.conf:ro \
+            rabbitmq:4-management
+
+      - name: RABBITMQ_TLS Wait for RabbitMQ to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if docker exec rabbitmq-tls rabbitmq-diagnostics -q ping >/dev/null 2>&1; then
+              echo "RabbitMQ is ready"
+              break
+            fi
+            echo "Attempt $i/30 — waiting for RabbitMQ..."
+            sleep 5
+          done
+          docker logs rabbitmq-tls --tail 30
+          docker exec rabbitmq-tls rabbitmqctl status | grep -A5 "Listeners"
+
+      - name: RABBITMQ_TLS Prepare DS client certificates
+        run: |
+          mkdir -p ds-rabbitmq-certs
+          sudo cp rabbitmq-certs/ca.crt rabbitmq-certs/client.crt rabbitmq-certs/client.key ds-rabbitmq-certs/
+          sudo chown "$(id -u)":"$(id -g)" ds-rabbitmq-certs/*
+          chmod 644 ds-rabbitmq-certs/ca.crt ds-rabbitmq-certs/client.crt ds-rabbitmq-certs/client.key
+
+      # EXPERIMENTAL: there is no confirmed precedent in this repo for RabbitMQ+TLS —
+      # ActiveMQ cycles in dev-SERVER-checks.yml only use plain amqp://. This reuses the
+      # generic TLS_MODE/TLS_CA_CERT/TLS_CERT/TLS_KEY vars (same as DB_TYPE/Redis cycles
+      # above) alongside AMQP_TYPE=rabbitmq; adjust based on what the run/logs show.
+      - name: RABBITMQ_TLS Docker pull and run ONLYOFFICE Docs EE with TLS_MODE
+        run: |
+          docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+
+          # No DB_TYPE/DB_HOST is set on purpose — DS falls back to its bundled local
+          # PostgreSQL, so this cycle isolates the TLS check to the RabbitMQ connection only.
+          docker run -d --name onlyoffice --network tls-network -p 80:80 \
+            -e AMQP_TYPE=rabbitmq \
+            -e AMQP_URI=amqps://onlyoffice:StrongPass123@rabbitmq-tls:5671 \
+            -e TLS_MODE=verify-full \
+            -e TLS_CA_CERT=/certs/ca.crt \
+            -e TLS_CERT=/certs/client.crt \
+            -e TLS_KEY=/certs/client.key \
+            -e WOPI_ENABLED=true \
+            -v "$(pwd)/ds-rabbitmq-certs":/certs:ro \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+
+      - name: RABBITMQ_TLS Wait for DS startup
+        run: sleep 240
+
+      - name: RABBITMQ_TLS INFO about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
+        run: |
+          sudo apt-get install jq -y
+
+          echo "-------------healthcheck-------------"
+          HEALTHCHECK_RABBITMQ=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          echo "Healthcheck: $HEALTHCHECK_RABBITMQ"
+          echo "HEALTHCHECK_RABBITMQ=$HEALTHCHECK_RABBITMQ" >> $GITHUB_ENV
+          echo "-------------DS services-------------"
+          docker exec onlyoffice supervisorctl status all || true
+          echo "---------Installed packages----------"
+          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType must be 1--------"
+          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------RabbitMQ TLS options-------------"
+          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json | jq '.rabbitmq'
+
+      - name: RABBITMQ_TLS Start ds-example
+        run: docker exec onlyoffice supervisorctl start ds:example
+
+      - name: RABBITMQ_TLS Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: RABBITMQ_TLS Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          jq --arg url "http://${RUNNER_IP}/example" '.testOptions.url = $url' ../config_chrome_linux.json > tmp.json
+          mv tmp.json ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: RABBITMQ_TLS Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          python3 run.py ../tests/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: RABBITMQ_TLS Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition RABBITMQ
+
+      - name: RABBITMQ_TLS Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: docker-local
+          container: onlyoffice
+
+      - name: RABBITMQ_TLS Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: docker-local
+          container: onlyoffice
+          env_var: DS_LOG_ERRORS_RABBITMQ
+
+      - name: RABBITMQ_TLS Check RabbitMQ sees TLS connection from DS
+        continue-on-error: true
+        run: |
+          echo "-------------rabbitmqctl list_connections (user, ssl, peer_cert_subject)-------------"
+          ROWS=$(docker exec rabbitmq-tls rabbitmqctl list_connections user ssl peer_cert_subject 2>&1)
+          echo "$ROWS"
+
+          if echo "$ROWS" | grep -q "onlyoffice" && echo "$ROWS" | grep -q "true" && echo "$ROWS" | grep -q "CN=onlyoffice_client"; then
+            echo "TLS_CONNECTION_RABBITMQ_OK=true" >> $GITHUB_ENV
+          else
+            echo "TLS_CONNECTION_RABBITMQ_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: RABBITMQ_TLS Check version
+        continue-on-error: true
+        run: |
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          VERSION_RABBITMQ_ACTUAL=$(docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice-documentserver-ee" | awk '{print $3}' | head -n 1)
+          echo "VERSION_RABBITMQ_ACTUAL=$VERSION_RABBITMQ_ACTUAL" >> "$GITHUB_ENV"
+          if [ "$VERSION_RABBITMQ_ACTUAL" = "$EXPECTED" ]; then
+            echo "VERSION_RABBITMQ_OK=true" >> "$GITHUB_ENV"
+          else
+            echo "VERSION_RABBITMQ_OK=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: RABBITMQ_TLS Cleanup containers
+        if: always()
+        run: |
+          docker stop onlyoffice rabbitmq-tls 2>/dev/null || true
+          docker rm onlyoffice rabbitmq-tls 2>/dev/null || true
+
       # ==================== FINAL ====================
 
       - name: Final check
@@ -1037,7 +1230,7 @@ jobs:
           declare -A TLS_ICON TLS_LABEL TLS_DETAIL
           declare -A DS_DETAIL
 
-          for CYCLE in POSTGRES MYSQL MARIADB MSSQL REDIS; do
+          for CYCLE in POSTGRES MYSQL MARIADB MSSQL REDIS RABBITMQ; do
             HC_VAR="HEALTHCHECK_${CYCLE}"
             if [ "${!HC_VAR}" = "true" ]; then
               HC_ICON[$CYCLE]="✅"; HC_LABEL[$CYCLE]="OK";     HC_DETAIL[$CYCLE]="${!HC_VAR}"
@@ -1085,6 +1278,7 @@ jobs:
             echo "| MariaDB    | ${HC_ICON[MARIADB]} ${HC_LABEL[MARIADB]} | ${VER_ICON[MARIADB]} \`${VER_DETAIL[MARIADB]}\` | ${TLS_ICON[MARIADB]} ${TLS_LABEL[MARIADB]} | ${PPT_ICON[MARIADB]} ${PPT_DETAIL[MARIADB]} | ${DS_DETAIL[MARIADB]} |"
             echo "| MSSQL      | ${HC_ICON[MSSQL]} ${HC_LABEL[MSSQL]}    | ${VER_ICON[MSSQL]} \`${VER_DETAIL[MSSQL]}\`    | ${TLS_ICON[MSSQL]} ${TLS_LABEL[MSSQL]}    | ${PPT_ICON[MSSQL]} ${PPT_DETAIL[MSSQL]}    | ${DS_DETAIL[MSSQL]} |"
             echo "| Redis      | ${HC_ICON[REDIS]} ${HC_LABEL[REDIS]}    | ${VER_ICON[REDIS]} \`${VER_DETAIL[REDIS]}\`    | ${TLS_ICON[REDIS]} ${TLS_LABEL[REDIS]}    | ${PPT_ICON[REDIS]} ${PPT_DETAIL[REDIS]}    | ${DS_DETAIL[REDIS]} |"
+            echo "| RabbitMQ   | ${HC_ICON[RABBITMQ]} ${HC_LABEL[RABBITMQ]} | ${VER_ICON[RABBITMQ]} \`${VER_DETAIL[RABBITMQ]}\` | ${TLS_ICON[RABBITMQ]} ${TLS_LABEL[RABBITMQ]} | ${PPT_ICON[RABBITMQ]} ${PPT_DETAIL[RABBITMQ]} | ${DS_DETAIL[RABBITMQ]} |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -1094,7 +1288,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           SEP="+------------+--------+--------------------------------------------+"
-          for CYCLE in POSTGRES MYSQL MARIADB MSSQL; do
+          for CYCLE in POSTGRES MYSQL MARIADB MSSQL REDIS RABBITMQ; do
             echo "$SEP"
             echo "$CYCLE"
             echo "$SEP"
@@ -1147,6 +1341,7 @@ jobs:
               "mariadb": cycle_data("MARIADB"),
               "mssql": cycle_data("MSSQL"),
               "redis": cycle_data("REDIS"),
+              "rabbitmq": cycle_data("RABBITMQ"),
               "conclusion": os.environ.get('FINAL_CONCLUSION', 'failure'),
           }
           path = '.github/workflow-results/dev-tls-dependencies.json'
