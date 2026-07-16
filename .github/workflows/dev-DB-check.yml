@@ -197,6 +197,7 @@ jobs:
       - name: ADD document, dummy_end_points and license for tests
         run: |
           docker exec onlyoffice wget -O /var/www/onlyoffice/documentserver/sample.zip https://nct2.onlyoffice.com/s/y-3qCyC7GkMcYv8
+          docker exec onlyoffice bash -c "apt-get update && apt-get install -y unzip"
           docker exec onlyoffice unzip /var/www/onlyoffice/documentserver/sample.zip -d /var/www/onlyoffice/documentserver/
           docker cp performance-test/local-production-linux.json onlyoffice:/etc/onlyoffice/documentserver/local-production-linux.json
           docker exec onlyoffice supervisorctl restart ds:docservice
