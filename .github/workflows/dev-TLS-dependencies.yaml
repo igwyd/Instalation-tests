@@ -1090,6 +1090,7 @@ jobs:
           docker run -d --name rabbitmq-tls --network tls-network \
             -e RABBITMQ_DEFAULT_USER=onlyoffice \
             -e RABBITMQ_DEFAULT_PASS=StrongPass123 \
+            -e RABBITMQ_ERLANG_COOKIE=TLSTestCookie123 \
             -v "$(pwd)/rabbitmq-certs":/certs:ro \
             -v "$(pwd)/rabbitmq-certs/rabbitmq.conf":/etc/rabbitmq/conf.d/20-tls.conf:ro \
             rabbitmq:4-management
