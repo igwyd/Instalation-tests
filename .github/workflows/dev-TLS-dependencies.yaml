@@ -1087,10 +1087,19 @@ jobs:
 
       - name: RABBITMQ_TLS Run RabbitMQ with TLS
         run: |
+          # Bind-mount a host dir instead of relying on the image's anonymous volume for
+          # /var/lib/rabbitmq — populating an anonymous volume from image content has been
+          # unreliable on recent Docker/kernel combos and leaves .erlang.cookie unreadable
+          # (eacces) for the rabbitmq user. A pre-created, world-writable bind mount avoids
+          # that populate-from-image step entirely.
+          mkdir -p rabbitmq-data
+          chmod 777 rabbitmq-data
+
           docker run -d --name rabbitmq-tls --network tls-network \
             -e RABBITMQ_DEFAULT_USER=onlyoffice \
             -e RABBITMQ_DEFAULT_PASS=StrongPass123 \
             -e RABBITMQ_ERLANG_COOKIE=TLSTestCookie123 \
+            -v "$(pwd)/rabbitmq-data":/var/lib/rabbitmq \
             -v "$(pwd)/rabbitmq-certs":/certs:ro \
             -v "$(pwd)/rabbitmq-certs/rabbitmq.conf":/etc/rabbitmq/conf.d/20-tls.conf:ro \
             rabbitmq:4-management
