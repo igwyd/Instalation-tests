@@ -1087,18 +1087,23 @@ jobs:
 
       - name: RABBITMQ_TLS Run RabbitMQ with TLS
         run: |
-          # Bind-mount a host dir instead of relying on the image's anonymous volume for
-          # /var/lib/rabbitmq — populating an anonymous volume from image content has been
-          # unreliable on recent Docker/kernel combos and leaves .erlang.cookie unreadable
-          # (eacces) for the rabbitmq user. A pre-created, world-writable bind mount avoids
-          # that populate-from-image step entirely.
+          # docker-entrypoint.sh in rabbitmq:4-management never reads RABBITMQ_ERLANG_COOKIE
+          # (confirmed against upstream docker-library/rabbitmq source) — the cookie file is
+          # always auto-generated on first boot by the rabbitmq user (uid/gid 999 in this
+          # image) after the entrypoint chowns /var/lib/rabbitmq. On a fresh bind mount that
+          # create-then-chown sequence has been unreliable on the runner and leaves the
+          # cookie file unreadable (eacces) for the rabbitmq user. Pre-seed the cookie file
+          # ourselves with the exact ownership/mode RabbitMQ expects so it never has to
+          # create one itself.
           mkdir -p rabbitmq-data
-          chmod 777 rabbitmq-data
+          printf '%s' "TLSTestCookie123" | sudo tee rabbitmq-data/.erlang.cookie > /dev/null
+          sudo chown 999:999 rabbitmq-data rabbitmq-data/.erlang.cookie
+          sudo chmod 700 rabbitmq-data
+          sudo chmod 400 rabbitmq-data/.erlang.cookie
 
           docker run -d --name rabbitmq-tls --network tls-network \
             -e RABBITMQ_DEFAULT_USER=onlyoffice \
             -e RABBITMQ_DEFAULT_PASS=StrongPass123 \
-            -e RABBITMQ_ERLANG_COOKIE=TLSTestCookie123 \
             -v "$(pwd)/rabbitmq-data":/var/lib/rabbitmq \
             -v "$(pwd)/rabbitmq-certs":/certs:ro \
             -v "$(pwd)/rabbitmq-certs/rabbitmq.conf":/etc/rabbitmq/conf.d/20-tls.conf:ro \
