@@ -8,14 +8,14 @@ Automated installation testing of ONLYOFFICE Docs packages via GitHub Actions.
 
 Pre-release builds from S3 dev repo.
 
-### Package installation (18 runners at the same time)
+### Package installation (19 runners at the same time)
 - Install from **helpcenter guide** and run all tests (Scheduled every Wednesday at 14:00 UTC+3)
 
 | Test | x64/arm64 |
 |------|-----------|
 | dev-DEB (Ubuntu 24.04) | [![dev-DEB-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DEB-x64-arm64.yml) |
 | dev-RPM (CentOS 9) | [![dev-RPM-x64-arm64](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-RPM-x64-arm64.yml) |
-| dev-OS (Ubuntu 26.04, Debian 12/13, CentOS 10, RHEL 8/9/10) | [![dev-OS](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-x64-arm64.yml) |
+| dev-OS (Ubuntu 26.04, Debian 12/13, CentOS 10, RHEL 7/8/9/10) | [![dev-OS](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-x64-arm64.yml) |
 
 
 ### Docker installation (4 runners at the same time)

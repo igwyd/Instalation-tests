@@ -25,13 +25,14 @@ DBS = [
 ]
 
 OS_ENTRIES = [
-    ("Ubuntu 26.04", "ubuntu2604"),
-    ("Debian 12",    "debian12"),
-    ("Debian 13",    "debian13"),
-    ("CentOS 10",    "centos10"),
-    ("RHEL 8",       "rhel8"),
-    ("RHEL 9",       "rhel9"),
-    ("RHEL 10",      "rhel10"),
+    ("Ubuntu 26.04", "ubuntu2604", ("x64", "arm64")),
+    ("Debian 12",    "debian12",   ("x64", "arm64")),
+    ("Debian 13",    "debian13",   ("x64", "arm64")),
+    ("CentOS 10",    "centos10",   ("x64", "arm64")),
+    ("RHEL 7",       "rhel7",      ("x64",)),
+    ("RHEL 8",       "rhel8",      ("x64", "arm64")),
+    ("RHEL 9",       "rhel9",      ("x64", "arm64")),
+    ("RHEL 10",      "rhel10",     ("x64", "arm64")),
 ]
 
 CSS = """
@@ -454,8 +455,8 @@ def generate_dev():
     # OS section body
     os_run_date = ""
     os_rows = []
-    for os_label, os_key in OS_ENTRIES:
-        for arch in ("x64", "arm64"):
+    for os_label, os_key, archs in OS_ENTRIES:
+        for arch in archs:
             tag = f"dev-{os_key}-{arch}"
             d = load(f"{tag}.json")
             if not os_run_date and d:

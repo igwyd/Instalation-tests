@@ -93,6 +93,16 @@ jobs:
             instance_type: t4g.medium
             tag: dev-centos10-arm64
 
+          # RHEL 7 (no official arm64 support)
+          - os_name: RHEL 7
+            os_type: rpm
+            ssh_user: ec2-user
+            device_name: /dev/sda1
+            arch: x64
+            ami: ami-0c76662758dc1db64
+            instance_type: t2.medium
+            tag: dev-rhel7-x64
+
           # RHEL 8
           - os_name: RHEL 8
             os_type: rpm
@@ -227,6 +237,8 @@ jobs:
                 exit 1
               fi
             done
+          elif [ "${{ matrix.os_name }}" = "RHEL 7" ]; then
+            sudo yum -y clean all && sudo yum -y update
           else
             sudo dnf -y clean all && sudo dnf -y update
           fi
@@ -408,6 +420,9 @@ jobs:
           if [ "${{ matrix.os_type }}" = "deb" ]; then
             echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_DEV_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
             sudo apt-get update
+          elif [ "${{ matrix.os_name }}" = "RHEL 7" ]; then
+            sudo yum install -y yum-utils
+            sudo yum-config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_DEV_VERSION }}.repo
           else
             sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_DEV_VERSION }}.repo
           fi
@@ -419,6 +434,8 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
           if [ "${{ matrix.os_type }}" = "deb" ]; then
             sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }} -y
+          elif [ "${{ matrix.os_name }}" = "RHEL 7" ]; then
+            sudo yum install onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
           else
             sudo dnf install onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
           fi
