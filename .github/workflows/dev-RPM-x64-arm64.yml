@@ -183,7 +183,7 @@ jobs:
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
           sudo sleep 10
-          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo curl -s http://${{ env.EC2_IP }}:8083/healthcheck; echo
           echo "-------------DS services-------------"
           sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
@@ -191,9 +191,9 @@ jobs:
           echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          sudo curl -s http://127.0.0.1:8083/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          sudo curl -s http://${{ env.EC2_IP }}:8083/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: Check DS default services EE
@@ -211,7 +211,7 @@ jobs:
       - name: Check healthcheck and version EE
         continue-on-error: true
         run: |
-          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          HC=$(curl -s "http://${{ env.EC2_IP }}:8083/healthcheck" || echo "error")
           echo "Healthcheck EE: $HC"
           echo "HEALTHCHECK_EE=$HC" >> $GITHUB_ENV
 
@@ -239,7 +239,7 @@ jobs:
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}:8083/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
@@ -304,7 +304,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
           sudo sleep 10
-          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo curl -s http://${{ env.EC2_IP }}:8083/healthcheck; echo
           echo "-------------DS services-------------"
           sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
@@ -312,9 +312,9 @@ jobs:
           echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          sudo curl -s http://127.0.0.1:8083/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          sudo curl -s http://${{ env.EC2_IP }}:8083/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: Check DS default services DE
@@ -332,7 +332,7 @@ jobs:
       - name: Check healthcheck and version DE
         continue-on-error: true
         run: |
-          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          HC=$(curl -s "http://${{ env.EC2_IP }}:8083/healthcheck" || echo "error")
           echo "Healthcheck DE: $HC"
           echo "HEALTHCHECK_DE=$HC" >> $GITHUB_ENV
 
@@ -424,7 +424,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
           echo "-------------healthcheck-------------"
           sudo sleep 10
-          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo curl -s http://${{ env.EC2_IP }}:8083/healthcheck; echo
           echo "-------------DS services-------------"
           sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
@@ -432,9 +432,9 @@ jobs:
           echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          sudo curl -s http://127.0.0.1:8083/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          sudo curl -s http://${{ env.EC2_IP }}:8083/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: Check DS default services CE
@@ -452,7 +452,7 @@ jobs:
       - name: Check healthcheck and version CE
         continue-on-error: true
         run: |
-          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          HC=$(curl -s "http://${{ env.EC2_IP }}:8083/healthcheck" || echo "error")
           echo "Healthcheck CE: $HC"
           echo "HEALTHCHECK_CE=$HC" >> $GITHUB_ENV
 
@@ -549,7 +549,7 @@ jobs:
           sudo jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
           echo "-------------healthcheck-------------"
           sudo sleep 10
-          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo curl -s http://${{ env.EC2_IP }}:8083/healthcheck; echo
           echo "-------------DS services-------------"
           sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
@@ -557,15 +557,15 @@ jobs:
           echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          sudo curl -s http://127.0.0.1:8083/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          sudo curl -s http://${{ env.EC2_IP }}:8083/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: Check healthcheck EE RELEASE and save JWT before upgrade
         continue-on-error: true
         run: |
-          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          HC=$(curl -s "http://${{ env.EC2_IP }}:8083/healthcheck" || echo "error")
           echo "Healthcheck EE RELEASE: $HC"
           echo "HEALTHCHECK_EE_RELEASE=$HC" >> $GITHUB_ENV
 
@@ -604,7 +604,7 @@ jobs:
           sudo jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
           echo "-------------healthcheck-------------"
           sudo sleep 10
-          sudo curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          sudo curl -s http://${{ env.EC2_IP }}:8083/healthcheck; echo
           echo "-------------DS services-------------"
           sudo systemctl list-unit-files --type=service | grep ds-
           echo "---------Installed packages----------"
@@ -612,15 +612,15 @@ jobs:
           echo "--------packageType--------"
           sudo curl -s http://127.0.0.1:8000/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
-          sudo curl -s http://127.0.0.1/hosting/discovery | tail -c 150; echo
+          sudo curl -s http://127.0.0.1:8083/hosting/discovery | tail -c 150; echo
           echo "------------WOPI external------------"
-          sudo curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          sudo curl -s http://${{ env.EC2_IP }}:8083/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: Check healthcheck, version and JWT after upgrade
         continue-on-error: true
         run: |
-          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          HC=$(curl -s "http://${{ env.EC2_IP }}:8083/healthcheck" || echo "error")
           echo "Healthcheck EE after upgrade: $HC"
           echo "HEALTHCHECK_EE_UPGRADE=$HC" >> $GITHUB_ENV
 
