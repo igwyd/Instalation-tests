@@ -523,8 +523,10 @@ jobs:
           echo "------------JWT settings-------------"
           sudo jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
           sudo jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
-          echo "-------------healthcheck-------------"
           sudo sleep 10
+          echo "---------healthcheck port 80---------"
+          sudo curl -s http://${{ env.EC2_IP }}:80/healthcheck; echo
+          echo "--------healthcheck port 8083--------"
           sudo curl -s http://${{ env.EC2_IP }}:8083/healthcheck; echo
           echo "-------------DS services-------------"
           sudo systemctl list-unit-files --type=service | grep ds-
@@ -579,8 +581,10 @@ jobs:
           echo "------------JWT settings-------------"
           sudo jq -r '.services.CoAuthoring.token' /etc/onlyoffice/documentserver/local.json
           sudo jq -r '.services.CoAuthoring.secret' /etc/onlyoffice/documentserver/local.json
-          echo "-------------healthcheck-------------"
           sudo sleep 10
+          echo "---------healthcheck port 80---------"
+          sudo curl -s http://${{ env.EC2_IP }}:80/healthcheck; echo
+          echo "--------healthcheck port 8083--------"
           sudo curl -s http://${{ env.EC2_IP }}:8083/healthcheck; echo
           echo "-------------DS services-------------"
           sudo systemctl list-unit-files --type=service | grep ds-
