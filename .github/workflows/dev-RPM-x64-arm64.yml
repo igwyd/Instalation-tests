@@ -171,6 +171,7 @@ jobs:
           printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
 
           sudo firewall-cmd --zone=public --add-port=80/tcp --permanent
+          sudo firewall-cmd --zone=public --add-port=8083/tcp --permanent
           sudo firewall-cmd --reload
           EOF
 
