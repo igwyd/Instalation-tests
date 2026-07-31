@@ -1265,6 +1265,315 @@ jobs:
           docker stop onlyoffice rabbitmq-tls 2>/dev/null || true
           docker rm onlyoffice rabbitmq-tls 2>/dev/null || true
 
+      # ==================== ALL_TLS ====================
+      # Combined cycle: PostgreSQL + Redis + RabbitMQ over TLS simultaneously.
+      # DS has a single set of TLS_CA_CERT/TLS_CERT/TLS_KEY paths shared by the
+      # DB, Redis and AMQP connections, so all three servers must present
+      # certificates signed by the same CA and DS uses one client certificate.
+
+      - name: ALL_TLS Generate shared TLS certificates (one CA, per-service server, one client)
+        run: |
+          mkdir -p all-certs
+          cd all-certs
+
+          # Shared root CA
+          openssl req -new -x509 -days 3650 -nodes -subj "/CN=test-ca" \
+            -keyout ca.key -out ca.crt
+
+          # Per-service server certificates, SAN must match the container name
+          for SVC in pg-tls redis-tls rabbitmq-tls; do
+            openssl req -new -nodes -subj "/CN=${SVC}" \
+              -addext "subjectAltName=DNS:${SVC}" \
+              -keyout ${SVC}-server.key -out ${SVC}-server.csr
+            openssl x509 -req -in ${SVC}-server.csr -CA ca.crt -CAkey ca.key \
+              -CAcreateserial -days 3650 -copy_extensions copy -out ${SVC}-server.crt
+          done
+
+          # Single client certificate shared by all DS connections
+          openssl req -new -nodes -subj "/CN=onlyoffice_client" \
+            -keyout client.key -out client.csr
+          openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key \
+            -CAcreateserial -days 3650 -out client.crt
+
+          chmod 644 *.crt *.key
+
+          echo "-------------SAN check-------------"
+          for SVC in pg-tls redis-tls rabbitmq-tls; do
+            openssl x509 -in ${SVC}-server.crt -noout -text | grep -A1 "Subject Alternative Name"
+          done
+
+      - name: ALL_TLS Prepare per-service certificate dirs
+        run: |
+          # PostgreSQL: postgres user (999) requires ownership and key mode 600
+          mkdir -p all-pg-certs
+          cp all-certs/ca.crt all-pg-certs/
+          cp all-certs/pg-tls-server.crt all-pg-certs/server.crt
+          cp all-certs/pg-tls-server.key all-pg-certs/server.key
+          cat > all-pg-certs/pg_hba.conf <<'EOF'
+          local   all all                                trust
+          host    all all 127.0.0.1/32                   trust
+          host    all all ::1/128                        trust
+          hostssl all all 0.0.0.0/0                       scram-sha-256
+          hostnossl all all 0.0.0.0/0                     reject
+          EOF
+          chmod 600 all-pg-certs/server.key
+          sudo chown 999:999 all-pg-certs/*
+
+          # Redis (bitnami, uid 1001): world-readable is fine for the test
+          mkdir -p all-redis-certs
+          cp all-certs/ca.crt all-redis-certs/
+          cp all-certs/redis-tls-server.crt all-redis-certs/server.crt
+          cp all-certs/redis-tls-server.key all-redis-certs/server.key
+          chmod 644 all-redis-certs/*
+
+          # RabbitMQ (uid 999)
+          mkdir -p all-rabbitmq-certs
+          cp all-certs/ca.crt all-rabbitmq-certs/
+          cp all-certs/rabbitmq-tls-server.crt all-rabbitmq-certs/server.crt
+          cp all-certs/rabbitmq-tls-server.key all-rabbitmq-certs/server.key
+          cat > all-rabbitmq-certs/rabbitmq.conf <<'EOF'
+          listeners.tcp = none
+          listeners.ssl.default = 5671
+          ssl_options.cacertfile = /certs/ca.crt
+          ssl_options.certfile = /certs/server.crt
+          ssl_options.keyfile = /certs/server.key
+          ssl_options.verify = verify_peer
+          ssl_options.fail_if_no_peer_cert = true
+          EOF
+          chmod 644 all-rabbitmq-certs/*
+
+          # DS: shared CA + client certificate for all three connections
+          mkdir -p ds-all-certs
+          cp all-certs/ca.crt all-certs/client.crt all-certs/client.key ds-all-certs/
+          chmod 644 ds-all-certs/ca.crt ds-all-certs/client.crt
+          chmod 600 ds-all-certs/client.key
+
+      - name: ALL_TLS Run PostgreSQL with TLS
+        run: |
+          docker run -d --name pg-tls --network tls-network \
+            -e POSTGRES_USER=onlyoffice \
+            -e POSTGRES_PASSWORD=StrongPass123 \
+            -e POSTGRES_DB=onlyoffice \
+            -v "$(pwd)/all-pg-certs":/var/lib/postgresql/certs:ro \
+            -v "$(pwd)/all-pg-certs/pg_hba.conf":/etc/postgresql/pg_hba.conf:ro \
+            postgres:16 \
+            -c ssl=on \
+            -c ssl_cert_file=/var/lib/postgresql/certs/server.crt \
+            -c ssl_key_file=/var/lib/postgresql/certs/server.key \
+            -c ssl_ca_file=/var/lib/postgresql/certs/ca.crt \
+            -c hba_file=/etc/postgresql/pg_hba.conf \
+            -c log_connections=on
+
+      - name: ALL_TLS Run Redis with TLS
+        run: |
+          docker run -d --name redis-tls --network tls-network \
+            -e REDIS_PASSWORD=StrongPass123 \
+            -e REDIS_PORT_NUMBER=0 \
+            -e REDIS_TLS_ENABLED=yes \
+            -e REDIS_TLS_PORT_NUMBER=6380 \
+            -e REDIS_TLS_CERT_FILE=/certs/server.crt \
+            -e REDIS_TLS_KEY_FILE=/certs/server.key \
+            -e REDIS_TLS_CA_FILE=/certs/ca.crt \
+            -e REDIS_TLS_AUTH_CLIENTS=yes \
+            -v "$(pwd)/all-redis-certs":/certs:ro \
+            bitnamilegacy/redis:7.4
+
+      - name: ALL_TLS Run RabbitMQ with TLS
+        run: |
+          # same pre-seeded erlang cookie workaround as the RABBITMQ_TLS cycle
+          mkdir -p rabbitmq-data-all
+          printf '%s' "TLSTestCookie123" | sudo tee rabbitmq-data-all/.erlang.cookie > /dev/null
+          sudo chown 999:999 rabbitmq-data-all rabbitmq-data-all/.erlang.cookie
+          sudo chmod 700 rabbitmq-data-all
+          sudo chmod 400 rabbitmq-data-all/.erlang.cookie
+
+          docker run -d --name rabbitmq-tls --network tls-network \
+            -e RABBITMQ_DEFAULT_USER=onlyoffice \
+            -e RABBITMQ_DEFAULT_PASS=StrongPass123 \
+            -v "$(pwd)/rabbitmq-data-all":/var/lib/rabbitmq \
+            -v "$(pwd)/all-rabbitmq-certs":/certs:ro \
+            -v "$(pwd)/all-rabbitmq-certs/rabbitmq.conf":/etc/rabbitmq/conf.d/20-tls.conf:ro \
+            rabbitmq:4-management
+
+      - name: ALL_TLS Wait for dependencies to be ready
+        run: |
+          for i in $(seq 1 15); do
+            if docker exec pg-tls pg_isready -U onlyoffice >/dev/null 2>&1; then
+              echo "PostgreSQL is ready"
+              break
+            fi
+            echo "Attempt $i/15 — waiting for PostgreSQL..."
+            sleep 4
+          done
+          docker exec pg-tls psql -U onlyoffice -c "SHOW ssl;"
+
+          for i in $(seq 1 15); do
+            if docker exec redis-tls redis-cli --tls --cert /certs/server.crt --key /certs/server.key --cacert /certs/ca.crt -p 6380 -a StrongPass123 --no-auth-warning ping 2>/dev/null | grep -q PONG; then
+              echo "Redis is ready"
+              break
+            fi
+            echo "Attempt $i/15 — waiting for Redis..."
+            sleep 4
+          done
+
+          for i in $(seq 1 30); do
+            if docker exec rabbitmq-tls rabbitmq-diagnostics -q ping >/dev/null 2>&1; then
+              echo "RabbitMQ is ready"
+              break
+            fi
+            echo "Attempt $i/30 — waiting for RabbitMQ..."
+            sleep 5
+          done
+          docker exec rabbitmq-tls rabbitmqctl status | grep -A5 "Listeners"
+
+      - name: ALL_TLS Docker pull and run ONLYOFFICE Docs EE with DB_TLS_MODE, REDIS_TLS_MODE and AMQP_TLS_MODE
+        run: |
+          docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          docker run -d --name onlyoffice --network tls-network -p 80:80 \
+            -e DB_TYPE=postgres \
+            -e DB_HOST=pg-tls \
+            -e DB_PORT=5432 \
+            -e DB_NAME=onlyoffice \
+            -e DB_USER=onlyoffice \
+            -e DB_PWD=StrongPass123 \
+            -e DB_TLS_MODE=verify-full \
+            -e REDIS_SERVER_HOST=redis-tls \
+            -e REDIS_SERVER_PORT=6380 \
+            -e REDIS_SERVER_PASS=StrongPass123 \
+            -e REDIS_TLS_MODE=verify-full \
+            -e AMQP_TYPE=rabbitmq \
+            -e AMQP_URI=amqps://onlyoffice:StrongPass123@rabbitmq-tls:5671 \
+            -e AMQP_TLS_MODE=verify-full \
+            -e TLS_CA_CERT=/certs/ca.crt \
+            -e TLS_CERT=/certs/client.crt \
+            -e TLS_KEY=/certs/client.key \
+            -e WOPI_ENABLED=true \
+            -v "$(pwd)/ds-all-certs":/certs:ro \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+
+      - name: ALL_TLS Wait for DS startup
+        run: sleep 240
+
+      - name: ALL_TLS INFO about installed Package, must be ONLYOFFICE-Docs EE
+        continue-on-error: true
+        run: |
+          sudo apt-get install jq -y
+
+          echo "-------------healthcheck-------------"
+          HEALTHCHECK_ALL=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          echo "Healthcheck: $HEALTHCHECK_ALL"
+          {
+            echo "HEALTHCHECK_ALL<<EOF_HC"
+            echo "$HEALTHCHECK_ALL"
+            echo "EOF_HC"
+          } >> "$GITHUB_ENV"
+          echo "-------------DS services-------------"
+          docker exec onlyoffice supervisorctl status all || true
+          echo "---------Installed packages----------"
+          docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice" || true
+          echo "--------packageType must be 1--------"
+          docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType || true
+          echo "-------------DB/Redis/AMQP TLS options-------------"
+          docker exec onlyoffice cat /etc/onlyoffice/documentserver/local.json
+
+      - name: ALL_TLS Start ds-example
+        run: docker exec onlyoffice supervisorctl start ds:example
+
+      - name: ALL_TLS Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: ALL_TLS Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          jq --arg url "http://${RUNNER_IP}/example" '.testOptions.url = $url' ../config_chrome_linux.json > tmp.json
+          mv tmp.json ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: ALL_TLS Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: ALL_TLS Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition ALL
+
+      - name: ALL_TLS Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: docker-local
+          container: onlyoffice
+
+      - name: ALL_TLS Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: docker-local
+          container: onlyoffice
+          env_var: DS_LOG_ERRORS_ALL
+
+      - name: ALL_TLS Check all dependencies see TLS connections from DS
+        continue-on-error: true
+        run: |
+          # server-side hardening (closed plain ports, no-cert rejection) is already
+          # covered by the standalone cycles — here only prove every connection is TLS
+          echo "-------------PostgreSQL pg_stat_ssl-------------"
+          PG_ROWS=$(docker exec pg-tls psql -U onlyoffice -t -A -F'|' -c \
+            "SELECT ssl, client_dn FROM pg_stat_ssl JOIN pg_stat_activity USING (pid) WHERE usename = 'onlyoffice';")
+          echo "$PG_ROWS"
+          if echo "$PG_ROWS" | grep -q '^t|/CN=onlyoffice_client$'; then PG_OK=true; else PG_OK=false; fi
+
+          echo "-------------Redis CLIENT LIST over mTLS-------------"
+          CLIENTS=$(docker exec redis-tls redis-cli --tls --cert /certs/server.crt --key /certs/server.key --cacert /certs/ca.crt -p 6380 -a StrongPass123 --no-auth-warning CLIENT LIST)
+          echo "$CLIENTS"
+          if [ "$(echo "$CLIENTS" | grep -c "addr=")" -gt 0 ]; then REDIS_OK=true; else REDIS_OK=false; fi
+
+          echo "-------------RabbitMQ list_connections-------------"
+          RMQ_ROWS=$(docker exec rabbitmq-tls rabbitmqctl list_connections user ssl peer_cert_subject 2>&1)
+          echo "$RMQ_ROWS"
+          if echo "$RMQ_ROWS" | grep -q "onlyoffice" && echo "$RMQ_ROWS" | grep -q "true" && echo "$RMQ_ROWS" | grep -q "CN=onlyoffice_client"; then RMQ_OK=true; else RMQ_OK=false; fi
+
+          echo "PostgreSQL: $PG_OK, Redis: $REDIS_OK, RabbitMQ: $RMQ_OK"
+          if [ "$PG_OK" = "true" ] && [ "$REDIS_OK" = "true" ] && [ "$RMQ_OK" = "true" ]; then
+            echo "TLS_CONNECTION_ALL_OK=true" >> $GITHUB_ENV
+          else
+            echo "TLS_CONNECTION_ALL_OK=false" >> $GITHUB_ENV
+          fi
+
+      - name: ALL_TLS Check version
+        continue-on-error: true
+        run: |
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          VERSION_ALL_ACTUAL=$(docker exec onlyoffice bash -c "dpkg -l | grep onlyoffice-documentserver-ee" | awk '{print $3}' | head -n 1)
+          echo "VERSION_ALL_ACTUAL=$VERSION_ALL_ACTUAL" >> "$GITHUB_ENV"
+          if [ "$VERSION_ALL_ACTUAL" = "$EXPECTED" ]; then
+            echo "VERSION_ALL_OK=true" >> "$GITHUB_ENV"
+          else
+            echo "VERSION_ALL_OK=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: ALL_TLS Cleanup containers
+        if: always()
+        run: |
+          docker stop onlyoffice pg-tls redis-tls rabbitmq-tls 2>/dev/null || true
+          docker rm onlyoffice pg-tls redis-tls rabbitmq-tls 2>/dev/null || true
+
       # ==================== FINAL ====================
 
       - name: Final check
@@ -1279,7 +1588,7 @@ jobs:
           declare -A TLS_ICON TLS_LABEL TLS_DETAIL
           declare -A DS_DETAIL
 
-          for CYCLE in POSTGRES MYSQL MARIADB MSSQL REDIS RABBITMQ; do
+          for CYCLE in POSTGRES MYSQL MARIADB MSSQL REDIS RABBITMQ ALL; do
             HC_VAR="HEALTHCHECK_${CYCLE}"
             if [ "${!HC_VAR}" = "true" ]; then
               HC_ICON[$CYCLE]="✅"; HC_LABEL[$CYCLE]="OK";     HC_DETAIL[$CYCLE]="${!HC_VAR}"
@@ -1328,6 +1637,7 @@ jobs:
             echo "| MSSQL      | ${HC_ICON[MSSQL]} ${HC_LABEL[MSSQL]}    | ${VER_ICON[MSSQL]} \`${VER_DETAIL[MSSQL]}\`    | ${TLS_ICON[MSSQL]} ${TLS_LABEL[MSSQL]}    | ${PPT_ICON[MSSQL]} ${PPT_DETAIL[MSSQL]}    | ${DS_DETAIL[MSSQL]} |"
             echo "| Redis      | ${HC_ICON[REDIS]} ${HC_LABEL[REDIS]}    | ${VER_ICON[REDIS]} \`${VER_DETAIL[REDIS]}\`    | ${TLS_ICON[REDIS]} ${TLS_LABEL[REDIS]}    | ${PPT_ICON[REDIS]} ${PPT_DETAIL[REDIS]}    | ${DS_DETAIL[REDIS]} |"
             echo "| RabbitMQ   | ${HC_ICON[RABBITMQ]} ${HC_LABEL[RABBITMQ]} | ${VER_ICON[RABBITMQ]} \`${VER_DETAIL[RABBITMQ]}\` | ${TLS_ICON[RABBITMQ]} ${TLS_LABEL[RABBITMQ]} | ${PPT_ICON[RABBITMQ]} ${PPT_DETAIL[RABBITMQ]} | ${DS_DETAIL[RABBITMQ]} |"
+            echo "| All (PG+Redis+RMQ) | ${HC_ICON[ALL]} ${HC_LABEL[ALL]} | ${VER_ICON[ALL]} \`${VER_DETAIL[ALL]}\` | ${TLS_ICON[ALL]} ${TLS_LABEL[ALL]} | ${PPT_ICON[ALL]} ${PPT_DETAIL[ALL]} | ${DS_DETAIL[ALL]} |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -1337,7 +1647,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           SEP="+------------+--------+--------------------------------------------+"
-          for CYCLE in POSTGRES MYSQL MARIADB MSSQL REDIS RABBITMQ; do
+          for CYCLE in POSTGRES MYSQL MARIADB MSSQL REDIS RABBITMQ ALL; do
             echo "$SEP"
             echo "$CYCLE"
             echo "$SEP"
@@ -1391,6 +1701,7 @@ jobs:
               "mssql": cycle_data("MSSQL"),
               "redis": cycle_data("REDIS"),
               "rabbitmq": cycle_data("RABBITMQ"),
+              "all": cycle_data("ALL"),
               "conclusion": os.environ.get('FINAL_CONCLUSION', 'failure'),
           }
           path = '.github/workflow-results/dev-tls-dependencies.json'
