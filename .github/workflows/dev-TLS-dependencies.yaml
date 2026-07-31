@@ -111,7 +111,7 @@ jobs:
           chmod 644 ds-certs/ca.crt ds-certs/client.crt
           chmod 600 ds-certs/client.key
 
-      - name: POSTGRES_TLS Docker pull and run ONLYOFFICE Docs EE with TLS_MODE
+      - name: POSTGRES_TLS Docker pull and run ONLYOFFICE Docs EE with DB_TLS_MODE
         run: |
           docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           docker run -d --name onlyoffice --network tls-network -p 80:80 \
@@ -121,7 +121,7 @@ jobs:
             -e DB_NAME=onlyoffice \
             -e DB_USER=onlyoffice \
             -e DB_PWD=StrongPass123 \
-            -e TLS_MODE=verify-full \
+            -e DB_TLS_MODE=verify-full \
             -e TLS_CA_CERT=/certs/ca.crt \
             -e TLS_CERT=/certs/client.crt \
             -e TLS_KEY=/certs/client.key \
@@ -313,7 +313,7 @@ jobs:
           chmod 644 ds-mysql-certs/ca.crt ds-mysql-certs/client.crt
           chmod 600 ds-mysql-certs/client.key
 
-      - name: MYSQL_TLS Docker pull and run ONLYOFFICE Docs EE with TLS_MODE
+      - name: MYSQL_TLS Docker pull and run ONLYOFFICE Docs EE with DB_TLS_MODE
         run: |
           docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           docker run -d --name onlyoffice --network tls-network -p 80:80 \
@@ -323,7 +323,7 @@ jobs:
             -e DB_NAME=onlyoffice \
             -e DB_USER=onlyoffice \
             -e DB_PWD=StrongPass123 \
-            -e TLS_MODE=verify-full \
+            -e DB_TLS_MODE=verify-full \
             -e TLS_CA_CERT=/certs/ca.crt \
             -e TLS_CERT=/certs/client.crt \
             -e TLS_KEY=/certs/client.key \
@@ -514,7 +514,7 @@ jobs:
           chmod 644 ds-mariadb-certs/ca.crt ds-mariadb-certs/client.crt
           chmod 600 ds-mariadb-certs/client.key
 
-      - name: MARIADB_TLS Docker pull and run ONLYOFFICE Docs EE with TLS_MODE
+      - name: MARIADB_TLS Docker pull and run ONLYOFFICE Docs EE with DB_TLS_MODE
         run: |
           docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           docker run -d --name onlyoffice --network tls-network -p 80:80 \
@@ -524,7 +524,7 @@ jobs:
             -e DB_NAME=onlyoffice \
             -e DB_USER=onlyoffice \
             -e DB_PWD=StrongPass123 \
-            -e TLS_MODE=verify-full \
+            -e DB_TLS_MODE=verify-full \
             -e TLS_CA_CERT=/certs/ca.crt \
             -e TLS_CERT=/certs/client.crt \
             -e TLS_KEY=/certs/client.key \
@@ -666,7 +666,7 @@ jobs:
 
       # SQL Server auth (SA login) has no client-certificate mechanism like
       # postgres/mysql, so there is no client cert here — only the server
-      # cert + forced encryption (DS connects with TLS_MODE=require, see below).
+      # cert + forced encryption (DS connects with DB_TLS_MODE=require, see below).
       - name: MSSQL_TLS Run MSSQL with TLS
         run: |
           docker run -d --name mssql-tls --network tls-network \
@@ -708,11 +708,11 @@ jobs:
           sudo chown "$(id -u)":"$(id -g)" ds-mssql-certs/*
           chmod 644 ds-mssql-certs/ca.crt
 
-      - name: MSSQL_TLS Docker pull and run ONLYOFFICE Docs EE with TLS_MODE
+      - name: MSSQL_TLS Docker pull and run ONLYOFFICE Docs EE with DB_TLS_MODE
         run: |
           docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
 
-          # ONLYOFFICE docs: TLS_MODE is one of disable/require/verify-ca/verify-full,
+          # ONLYOFFICE docs: DB_TLS_MODE is one of disable/require/verify-ca/verify-full,
           # where "require" encrypts without certificate verification. DS runs its
           # own sqlcmd (msodbcsql18) internally to set up the mssql schema on first
           # start, and that call has no supported way to trust a custom CA (unlike
@@ -727,7 +727,7 @@ jobs:
             -e DB_NAME=onlyoffice \
             -e DB_USER=onlyoffice \
             -e DB_PWD=StrongPass123 \
-            -e TLS_MODE=require \
+            -e DB_TLS_MODE=require \
             -e TLS_CA_CERT=/certs/ca.crt \
             -e WOPI_ENABLED=true \
             -v "$(pwd)/ds-mssql-certs":/certs:ro \
@@ -910,7 +910,7 @@ jobs:
           chmod 644 ds-redis-certs/ca.crt ds-redis-certs/client.crt
           chmod 600 ds-redis-certs/client.key
 
-      - name: REDIS_TLS Docker pull and run ONLYOFFICE Docs EE with TLS_MODE
+      - name: REDIS_TLS Docker pull and run ONLYOFFICE Docs EE with REDIS_TLS_MODE
         run: |
           docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
 
@@ -920,7 +920,7 @@ jobs:
             -e REDIS_SERVER_HOST=redis-tls \
             -e REDIS_SERVER_PORT=6380 \
             -e REDIS_SERVER_PASS=StrongPass123 \
-            -e TLS_MODE=verify-full \
+            -e REDIS_TLS_MODE=verify-full \
             -e TLS_CA_CERT=/certs/ca.crt \
             -e TLS_CERT=/certs/client.crt \
             -e TLS_KEY=/certs/client.key \
@@ -1140,11 +1140,7 @@ jobs:
           chmod 644 ds-rabbitmq-certs/ca.crt ds-rabbitmq-certs/client.crt
           chmod 600 ds-rabbitmq-certs/client.key
 
-      # EXPERIMENTAL: there is no confirmed precedent in this repo for RabbitMQ+TLS —
-      # ActiveMQ cycles in dev-SERVER-checks.yml only use plain amqp://. This reuses the
-      # generic TLS_MODE/TLS_CA_CERT/TLS_CERT/TLS_KEY vars (same as DB_TYPE/Redis cycles
-      # above) alongside AMQP_TYPE=rabbitmq; adjust based on what the run/logs show.
-      - name: RABBITMQ_TLS Docker pull and run ONLYOFFICE Docs EE with TLS_MODE
+      - name: RABBITMQ_TLS Docker pull and run ONLYOFFICE Docs EE with AMQP_TLS_MODE
         run: |
           docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
 
@@ -1153,7 +1149,7 @@ jobs:
           docker run -d --name onlyoffice --network tls-network -p 80:80 \
             -e AMQP_TYPE=rabbitmq \
             -e AMQP_URI=amqps://onlyoffice:StrongPass123@rabbitmq-tls:5671 \
-            -e TLS_MODE=verify-full \
+            -e AMQP_TLS_MODE=verify-full \
             -e TLS_CA_CERT=/certs/ca.crt \
             -e TLS_CERT=/certs/client.crt \
             -e TLS_KEY=/certs/client.key \
