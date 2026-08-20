@@ -58,7 +58,7 @@ jobs:
       - name: Update EC2 Instance
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
-            "sudo apt-get update && sudo apt-get upgrade -y"
+            "sudo apt-get -o DPkg::Lock::Timeout=600 update && sudo apt-get -o DPkg::Lock::Timeout=600 upgrade -y"
 
       - name: Reboot EC2 Instance
         run: |
