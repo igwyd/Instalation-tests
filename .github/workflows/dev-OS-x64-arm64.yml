@@ -251,21 +251,26 @@ jobs:
         run: sleep 180
 
       # ==================== Docker install (printf "y") ====================
-      - name: Download install script
+      - name: Download OneClickInstall-Docs repo for Docker install
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
-          curl -O https://download.onlyoffice.com/docs/docs-enterprise-install.sh
-          sudo chmod +x docs-enterprise-install.sh
+          rm -rf OneClickInstall-Docs && mkdir OneClickInstall-Docs
+          curl -fsSL https://github.com/ONLYOFFICE/OneClickInstall-Docs/archive/refs/heads/${{ vars.ONLYOFFICE_ONECLICK_BRANCH }}.tar.gz \
+            | tar xz --strip-components=1 -C OneClickInstall-Docs
+          ls OneClickInstall-Docs
           EOF
 
       - name: Install ONLYOFFICE Docs in Docker
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
-          printf "y\n" | sudo bash docs-enterprise-install.sh --documentimage onlyoffice/4testing-documentserver-ee \
+          cd OneClickInstall-Docs
+          printf "y\n" | sudo bash docs-install.sh --installationtype ENTERPRISE \
+            --documentimage onlyoffice/4testing-documentserver-ee \
             --documentversion ${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }} \
             --skiphardwarecheck true \
-            --wopienabled true
+            --wopienabled true \
+            --localscripts true
           EOF
 
       - name: TEMP Workaround for Docker install issues
@@ -382,11 +387,21 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} 'sudo docker ps -a'
 
       # ==================== Native install (printf "n") ====================
+      - name: Download OneClickInstall-Docs repo for native install
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
+          rm -rf OneClickInstall-Docs && mkdir OneClickInstall-Docs
+          curl -fsSL https://github.com/ONLYOFFICE/OneClickInstall-Docs/archive/refs/heads/${{ vars.ONLYOFFICE_ONECLICK_BRANCH }}.tar.gz \
+            | tar xz --strip-components=1 -C OneClickInstall-Docs
+          ls OneClickInstall-Docs
+          EOF
+
       - name: Install ONLYOFFICE Docs natively RELEASE version
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
-          printf "n\n" | sudo bash docs-enterprise-install.sh --skiphardwarecheck true --wopienabled true
+          cd OneClickInstall-Docs
+          printf "n\n" | sudo bash docs-install.sh --installationtype ENTERPRISE --skiphardwarecheck true --wopienabled true --localscripts true
           EOF
 
       - name: INFO native install RELEASE
