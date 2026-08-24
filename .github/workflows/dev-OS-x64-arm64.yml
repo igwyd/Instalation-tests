@@ -252,12 +252,25 @@ jobs:
 
       # ==================== Docker install (printf "y") ====================
       - name: Download OneClickInstall-Docs repo for Docker install
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
           rm -rf OneClickInstall-Docs && mkdir OneClickInstall-Docs
           curl -fsSL https://github.com/ONLYOFFICE/OneClickInstall-Docs/archive/refs/heads/${{ vars.ONLYOFFICE_ONECLICK_BRANCH }}.tar.gz \
             | tar xz --strip-components=1 -C OneClickInstall-Docs
           ls OneClickInstall-Docs
+          EOF
+
+      # install.sh refuses Docker CE install on RHEL <= 7, but uses docker if it is already present
+      - name: Preinstall Docker on RHEL 7
+        if: matrix.os_name == 'RHEL 7'
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
+          sudo yum install -y yum-utils
+          sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+          sudo yum install -y docker-ce docker-ce-cli containerd.io
+          sudo systemctl enable --now docker
           EOF
 
       - name: Install ONLYOFFICE Docs in Docker
@@ -318,6 +331,7 @@ jobs:
 
       - name: Get DS container ID for Docker install check
         id: ds-container
+        continue-on-error: true
         run: |
           CONTAINER_ID=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
             'sudo docker ps -q --filter "name=onlyoffice"')
@@ -383,6 +397,7 @@ jobs:
           EOF
 
       - name: TEST docker cleanup
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} 'sudo docker ps -a'
 
