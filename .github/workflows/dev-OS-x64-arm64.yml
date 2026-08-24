@@ -240,7 +240,7 @@ jobs:
           elif [ "${{ matrix.os_name }}" = "RHEL 7" ]; then
             sudo yum -y clean all && sudo yum -y update
           else
-            sudo dnf -y clean all && sudo dnf -y update
+            sudo dnf -y clean all && sudo dnf -y update --nobest --skip-broken
           fi
           EOF
 
