@@ -440,9 +440,9 @@ jobs:
           if [ "${{ matrix.os_type }}" = "deb" ]; then
             apt-get download onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}
           elif [ "${{ matrix.os_name }}" = "RHEL 7" ]; then
-            sudo yumdownloader --destdir "\$HOME" onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7
+            sudo yumdownloader --destdir "\$HOME" onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7.\$(uname -m)
           else
-            sudo dnf download --destdir "\$HOME" onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7
+            sudo dnf download --destdir "\$HOME" onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7.\$(uname -m)
           fi
           PKG=\$(ls "\$HOME"/onlyoffice-documentserver-ee*)
           echo "Downloaded package: \$PKG"
