@@ -268,6 +268,8 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
           sudo yum install -y yum-utils
+          # container-selinux, slirp4netns, fuse-overlayfs live in the RHUI extras repo (disabled by default)
+          sudo yum-config-manager --enable '*extras*'
           sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
           sudo yum install -y docker-ce docker-ce-cli containerd.io
           sudo systemctl enable --now docker
@@ -411,38 +413,10 @@ jobs:
           ls OneClickInstall-Docs
           EOF
 
-      - name: Install ONLYOFFICE Docs natively RELEASE version
-        continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
-          cd OneClickInstall-Docs
-          printf "n\n" | sudo bash docs-install.sh --installationtype ENTERPRISE --skiphardwarecheck true --wopienabled true --localscripts true
-          EOF
-
-      - name: INFO native install RELEASE
-        continue-on-error: true
-        run: |
-          echo "----------Healthcheck----------"
-          RESULT=$(curl -s http://${{ env.EC2_IP }}/healthcheck)
-          echo "Healthcheck result: $RESULT"
-          if [ "$RESULT" = "true" ]; then
-            echo "NATIVE_HEALTHY=true" >> $GITHUB_ENV
-          else
-            echo "NATIVE_HEALTHY=false" >> $GITHUB_ENV
-          fi
-
-          echo "---------Installed packages----------"
-          if [ "${{ matrix.os_type }}" = "deb" ]; then
-            ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-              'dpkg-query -l | grep onlyoffice-documentserver'
-          else
-            ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-              'rpm -qa | grep onlyoffice-documentserver'
-          fi
-
-          echo "---------Services started----------"
-          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} 'sudo systemctl list-unit-files --type=service | grep ds-'
-
+      # The dev repo is only used to download the exact dev build (VERSION-BUILD from vars),
+      # which is then handed to docs-install.sh via --packagepath — clean install of the
+      # pinned dev version, no release install/upgrade. On RHEL 7 the install script
+      # refuses to run without --packagepath at all.
       - name: Add dev repo
         continue-on-error: true
         run: |
@@ -458,17 +432,22 @@ jobs:
           fi
           EOF
 
-      - name: Install ONLYOFFICE Docs EE dev version
+      - name: Install ONLYOFFICE Docs natively DEV version
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
+          rm -f "\$HOME"/onlyoffice-documentserver-ee*
           if [ "${{ matrix.os_type }}" = "deb" ]; then
-            sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }} -y
+            apt-get download onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}
           elif [ "${{ matrix.os_name }}" = "RHEL 7" ]; then
-            sudo yum install onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
+            sudo yumdownloader --destdir "\$HOME" onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7
           else
-            sudo dnf install onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
+            sudo dnf download --destdir "\$HOME" onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7
           fi
+          PKG=\$(ls "\$HOME"/onlyoffice-documentserver-ee*)
+          echo "Downloaded package: \$PKG"
+          cd OneClickInstall-Docs
+          printf "n\n" | sudo bash docs-install.sh --installationtype ENTERPRISE --skiphardwarecheck true --wopienabled true --localscripts true --packagepath "\$PKG"
           EOF
 
       - name: Wait for native install to start
