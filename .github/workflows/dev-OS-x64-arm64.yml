@@ -427,6 +427,10 @@ jobs:
           elif [ "${{ matrix.os_name }}" = "RHEL 7" ]; then
             sudo yum install -y yum-utils
             sudo yum-config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_DEV_VERSION }}.repo
+            # EPEL 7 is EOL: install-preq.sh's "yum install epel-release-latest-7 || true" now 404s silently,
+            # leaving redis unavailable and killing the script at "systemctl enable --now redis".
+            # The archived epel-release still resolves mirrors via metalink, so preinstall it here.
+            sudo yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/e/epel-release-7-14.noarch.rpm
           else
             sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_DEV_VERSION }}.repo
           fi
