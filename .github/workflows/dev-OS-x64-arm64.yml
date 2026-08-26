@@ -276,6 +276,17 @@ jobs:
           sudo systemctl enable --now docker
           EOF
 
+      # Minimal RHEL 10 AMIs lack the netfilter kernel modules for the running kernel,
+      # so dnf satisfies docker's kmod deps with kernel-debug-modules* (a kernel we are
+      # not booted into) and dockerd fails to start. Preinstall the real modules.
+      - name: Preinstall kernel netfilter modules on RHEL 10
+        if: matrix.os_name == 'RHEL 10'
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
+          sudo dnf install -y kernel-modules-"$(uname -r)" kernel-modules-extra-"$(uname -r)"
+          EOF
+
       - name: Install ONLYOFFICE Docs in Docker
         continue-on-error: true
         run: |
