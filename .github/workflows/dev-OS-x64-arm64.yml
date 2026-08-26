@@ -224,6 +224,7 @@ jobs:
           ssh-add ~/.ssh/id_rsa
 
       - name: Upgrade packages
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
           if command -v apt-get &>/dev/null; then
@@ -369,6 +370,7 @@ jobs:
 
       - name: Parse puppeteer results Docker
         if: always()
+        continue-on-error: true
         run: python3 .github/scripts/parse-puppeteer-results.py --edition DOCKER
 
       - name: LOGS Documentserver Docker install
@@ -392,6 +394,7 @@ jobs:
           label: Docker
 
       - name: Remove Docker containers
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
           sudo docker rm -f $(sudo docker ps -aq) 2>/dev/null || true
@@ -405,9 +408,10 @@ jobs:
 
       # ==================== Native install (printf "n") ====================
       - name: Download OneClickInstall-Docs repo for native install
+        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
-          rm -rf OneClickInstall-Docs && mkdir OneClickInstall-Docs
+          sudo rm -rf OneClickInstall-Docs && mkdir OneClickInstall-Docs
           curl -fsSL https://github.com/ONLYOFFICE/OneClickInstall-Docs/archive/refs/heads/${{ vars.ONLYOFFICE_ONECLICK_BRANCH }}.tar.gz \
             | tar xz --strip-components=1 -C OneClickInstall-Docs
           ls OneClickInstall-Docs
@@ -528,6 +532,7 @@ jobs:
 
       - name: Parse puppeteer results Native
         if: always()
+        continue-on-error: true
         run: python3 .github/scripts/parse-puppeteer-results.py --edition NATIVE
 
       - name: LOGS Documentserver native install
