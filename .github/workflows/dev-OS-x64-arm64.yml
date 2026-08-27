@@ -93,16 +93,6 @@ jobs:
             instance_type: t4g.medium
             tag: dev-centos10-arm64
 
-          # RHEL 7 (no official arm64 support)
-          - os_name: RHEL 7
-            os_type: rpm
-            ssh_user: ec2-user
-            device_name: /dev/sda1
-            arch: x64
-            ami: ami-0c76662758dc1db64
-            instance_type: t2.medium
-            tag: dev-rhel7-x64
-
           # RHEL 8
           - os_name: RHEL 8
             os_type: rpm
@@ -238,8 +228,6 @@ jobs:
                 exit 1
               fi
             done
-          elif [ "${{ matrix.os_name }}" = "RHEL 7" ]; then
-            sudo yum -y clean all && sudo yum -y update
           else
             sudo dnf -y clean all && sudo dnf -y update --nobest --skip-broken
           fi
@@ -260,20 +248,6 @@ jobs:
           curl -fsSL https://github.com/ONLYOFFICE/OneClickInstall-Docs/archive/refs/heads/${{ vars.ONLYOFFICE_ONECLICK_BRANCH }}.tar.gz \
             | tar xz --strip-components=1 -C OneClickInstall-Docs
           ls OneClickInstall-Docs
-          EOF
-
-      # install.sh refuses Docker CE install on RHEL <= 7, but uses docker if it is already present
-      - name: Preinstall Docker on RHEL 7
-        if: matrix.os_name == 'RHEL 7'
-        continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
-          sudo yum install -y yum-utils
-          # container-selinux, slirp4netns, fuse-overlayfs live in the RHUI extras repo (disabled by default)
-          sudo yum-config-manager --enable '*extras*'
-          sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-          sudo yum install -y docker-ce docker-ce-cli containerd.io
-          sudo systemctl enable --now docker
           EOF
 
       # Minimal RHEL 10 AMIs lack the netfilter kernel modules for the running kernel,
@@ -430,8 +404,7 @@ jobs:
 
       # The dev repo is only used to download the exact dev build (VERSION-BUILD from vars),
       # which is then handed to docs-install.sh via --packagepath — clean install of the
-      # pinned dev version, no release install/upgrade. On RHEL 7 the install script
-      # refuses to run without --packagepath at all.
+      # pinned dev version, no release install/upgrade.
       - name: Add dev repo
         continue-on-error: true
         run: |
@@ -439,13 +412,6 @@ jobs:
           if [ "${{ matrix.os_type }}" = "deb" ]; then
             echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_DEV_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
             sudo apt-get update
-          elif [ "${{ matrix.os_name }}" = "RHEL 7" ]; then
-            sudo yum install -y yum-utils
-            sudo yum-config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_DEV_VERSION }}.repo
-            # EPEL 7 is EOL: install-preq.sh's "yum install epel-release-latest-7 || true" now 404s silently,
-            # leaving redis unavailable and killing the script at "systemctl enable --now redis".
-            # The archived epel-release still resolves mirrors via metalink, so preinstall it here.
-            sudo yum install -y https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/e/epel-release-7-14.noarch.rpm
           else
             sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_DEV_VERSION }}.repo
           fi
@@ -458,8 +424,6 @@ jobs:
           rm -f "\$HOME"/onlyoffice-documentserver-ee*
           if [ "${{ matrix.os_type }}" = "deb" ]; then
             apt-get download onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}
-          elif [ "${{ matrix.os_name }}" = "RHEL 7" ]; then
-            sudo yumdownloader --destdir "\$HOME" onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7.\$(uname -m)
           else
             sudo dnf download --destdir "\$HOME" onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7.\$(uname -m)
           fi

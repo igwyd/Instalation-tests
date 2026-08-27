@@ -29,7 +29,6 @@ OS_ENTRIES = [
     ("Debian 12",    "debian12",   ("x64", "arm64")),
     ("Debian 13",    "debian13",   ("x64", "arm64")),
     ("CentOS 10",    "centos10",   ("x64", "arm64")),
-    ("RHEL 7",       "rhel7",      ("x64",)),
     ("RHEL 8",       "rhel8",      ("x64", "arm64")),
     ("RHEL 9",       "rhel9",      ("x64", "arm64")),
     ("RHEL 10",      "rhel10",     ("x64", "arm64")),
