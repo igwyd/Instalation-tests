@@ -1444,7 +1444,20 @@ jobs:
       - name: REDIS_REDIS Configure unix.sock
         continue-on-error: true
         run: |
-          scp -o StrictHostKeyChecking=no redis/redis-unix-sock/local-production-linux.json \
+          # Install now generates a random redis password in local.json; pull it and inject
+          # it into our socket config (redis driver reads options.password) and into ping.
+          REDIS_PASS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local.json | jq -r '.services.CoAuthoring.redis.options.password // empty'")
+          echo "REDIS_PASS_REDIS_REDIS=$REDIS_PASS" >> $GITHUB_ENV
+          echo "Redis password from local.json: '$REDIS_PASS'"
+          AUTH=""; [ -n "$REDIS_PASS" ] && AUTH="-a $REDIS_PASS"
+          if [ -n "$REDIS_PASS" ]; then
+            jq --arg p "$REDIS_PASS" '.services.CoAuthoring.redis.options.password = $p' \
+              redis/redis-unix-sock/local-production-linux.json > /tmp/lp.json
+          else
+            cp redis/redis-unix-sock/local-production-linux.json /tmp/lp.json
+          fi
+          scp -o StrictHostKeyChecking=no /tmp/lp.json \
             ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           echo "------------ STOP DS services -------------"
@@ -1455,7 +1468,7 @@ jobs:
           echo "------------ START REDIS server -------------"
           sudo docker exec ds-ee-dev service redis-server start
           echo "------------ Redis ping -------------"
-          sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping
+          sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock $AUTH ping
           echo "------------ Redis port 6379 must be closed -------------"
           sudo docker exec ds-ee-dev netstat -tulpn
           echo "------------ Copy DS local-production-linux.json config -------------"
@@ -1490,8 +1503,9 @@ jobs:
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_REDIS_REDIS=$HC" >> $GITHUB_ENV
 
+          AUTH=""; [ -n "$REDIS_PASS_REDIS_REDIS" ] && AUTH="-a $REDIS_PASS_REDIS_REDIS"
           PING=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
-            "sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping 2>/dev/null || echo 'error'")
+            "sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock $AUTH ping 2>/dev/null || echo 'error'")
           echo "Redis socket ping: $PING"
           if [ "$PING" = "PONG" ]; then
             echo "REDIS_SOCK_OK_REDIS_REDIS=true" >> $GITHUB_ENV
@@ -1609,7 +1623,20 @@ jobs:
       - name: REDIS_IOREDIS Configure unix.sock
         continue-on-error: true
         run: |
-          scp -o StrictHostKeyChecking=no redis/ioredis-unix-sock/local-production-linux.json \
+          # Install now generates a random redis password in local.json; pull it and inject
+          # it into our socket config (ioredis driver reads iooptions.password) and into ping.
+          REDIS_PASS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local.json | jq -r '.services.CoAuthoring.redis.options.password // empty'")
+          echo "REDIS_PASS_REDIS_IOREDIS=$REDIS_PASS" >> $GITHUB_ENV
+          echo "Redis password from local.json: '$REDIS_PASS'"
+          AUTH=""; [ -n "$REDIS_PASS" ] && AUTH="-a $REDIS_PASS"
+          if [ -n "$REDIS_PASS" ]; then
+            jq --arg p "$REDIS_PASS" '.services.CoAuthoring.redis.iooptions.password = $p' \
+              redis/ioredis-unix-sock/local-production-linux.json > /tmp/lp.json
+          else
+            cp redis/ioredis-unix-sock/local-production-linux.json /tmp/lp.json
+          fi
+          scp -o StrictHostKeyChecking=no /tmp/lp.json \
             ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           echo "------------ STOP DS services -------------"
@@ -1620,7 +1647,7 @@ jobs:
           echo "------------ START REDIS server -------------"
           sudo docker exec ds-ee-dev service redis-server start
           echo "------------ Redis ping -------------"
-          sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping
+          sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock $AUTH ping
           echo "------------ Redis port 6379 must be closed -------------"
           sudo docker exec ds-ee-dev netstat -tulpn
           echo "------------ Copy DS local-production-linux.json config -------------"
@@ -1655,8 +1682,9 @@ jobs:
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_REDIS_IOREDIS=$HC" >> $GITHUB_ENV
 
+          AUTH=""; [ -n "$REDIS_PASS_REDIS_IOREDIS" ] && AUTH="-a $REDIS_PASS_REDIS_IOREDIS"
           PING=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
-            "sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock ping 2>/dev/null || echo 'error'")
+            "sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock $AUTH ping 2>/dev/null || echo 'error'")
           echo "Redis socket ping: $PING"
           if [ "$PING" = "PONG" ]; then
             echo "REDIS_SOCK_OK_REDIS_IOREDIS=true" >> $GITHUB_ENV
