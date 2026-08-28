@@ -91,8 +91,10 @@ jobs:
 
       - name: POSTGRES_TLS Wait for PostgreSQL to be ready
         run: |
+          # pg_isready reports ready during postgres bootstrap (temp server) before the
+          # onlyoffice DB exists — query the DB directly so we wait for the real server.
           for i in $(seq 1 15); do
-            if docker exec pg-tls pg_isready -U onlyoffice >/dev/null 2>&1; then
+            if docker exec pg-tls psql -U onlyoffice -d onlyoffice -c "SELECT 1" >/dev/null 2>&1; then
               echo "PostgreSQL is ready"
               break
             fi
@@ -100,8 +102,8 @@ jobs:
             sleep 4
           done
           docker logs pg-tls --tail 30
-          docker exec pg-tls psql -U onlyoffice -c "SHOW ssl;"
-          docker exec pg-tls psql -U onlyoffice -c "SHOW hba_file;"
+          docker exec pg-tls psql -U onlyoffice -d onlyoffice -c "SHOW ssl;"
+          docker exec pg-tls psql -U onlyoffice -d onlyoffice -c "SHOW hba_file;"
 
       - name: POSTGRES_TLS Prepare DS client certificates
         run: |
@@ -1397,15 +1399,17 @@ jobs:
 
       - name: ALL_TLS Wait for dependencies to be ready
         run: |
+          # pg_isready reports ready during postgres bootstrap (temp server) before the
+          # onlyoffice DB exists — query the DB directly so we wait for the real server.
           for i in $(seq 1 15); do
-            if docker exec pg-tls pg_isready -U onlyoffice >/dev/null 2>&1; then
+            if docker exec pg-tls psql -U onlyoffice -d onlyoffice -c "SELECT 1" >/dev/null 2>&1; then
               echo "PostgreSQL is ready"
               break
             fi
             echo "Attempt $i/15 — waiting for PostgreSQL..."
             sleep 4
           done
-          docker exec pg-tls psql -U onlyoffice -c "SHOW ssl;"
+          docker exec pg-tls psql -U onlyoffice -d onlyoffice -c "SHOW ssl;"
 
           for i in $(seq 1 15); do
             if docker exec redis-tls redis-cli --tls --cert /certs/server.crt --key /certs/server.key --cacert /certs/ca.crt -p 6380 -a StrongPass123 --no-auth-warning ping 2>/dev/null | grep -q PONG; then
