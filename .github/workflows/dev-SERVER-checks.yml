@@ -98,6 +98,14 @@ jobs:
       - name: Wait for DS startup 240
         run: sleep 240
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+
       - name: AWS_S3_FALSE Enable nginx config
         continue-on-error: true
         run: |
@@ -235,6 +243,14 @@ jobs:
       - name: Wait for DS startup 240
         run: sleep 240
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+
       - name: AWS_S3_TRUE Enable nginx config
         continue-on-error: true
         run: |
@@ -371,6 +387,14 @@ jobs:
       - name: Wait for DS startup 240
         run: sleep 240
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+
       - name: AWS_S3_PATH-STYLE Enable nginx config
         continue-on-error: true
         run: |
@@ -506,6 +530,14 @@ jobs:
 
       - name: Wait for DS startup 240
         run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
 
       - name: AWS_S3_KMS Enable nginx config
         continue-on-error: true
@@ -644,6 +676,14 @@ jobs:
       - name: Wait for DS startup 240
         run: sleep 240
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+
       - name: AZURE_STORAGE_DIRECTURL_FALSE Enable nginx config
         continue-on-error: true
         run: |
@@ -779,6 +819,14 @@ jobs:
       - name: Wait for DS startup 240
         run: sleep 240
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+
       - name: AZURE_STORAGE_DIRECTURL_TRUE Enable nginx config
         continue-on-error: true
         run: |
@@ -913,6 +961,14 @@ jobs:
 
       - name: Wait for DS startup 240
         run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
 
       - name: AZURE_STORAGE_ENCRYPTION_SCOPE Enable nginx config
         continue-on-error: true
@@ -1050,6 +1106,14 @@ jobs:
       - name: Wait for DS startup 240
         run: sleep 240
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+
       - name: DS-VPATH Enable nginx config
         continue-on-error: true
         run: |
@@ -1182,6 +1246,14 @@ jobs:
       - name: Wait for DS startup 240
         run: sleep 240
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+
       - name: AMQP_ARTEMIS Enable nginx config
         continue-on-error: true
         run: |
@@ -1312,6 +1384,14 @@ jobs:
       - name: Wait for DS startup 240
         run: sleep 240
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+
       - name: AMQP_CLASSIC Enable nginx config
         continue-on-error: true
         run: |
@@ -1432,6 +1512,14 @@ jobs:
 
       - name: Wait for DS startup 240
         run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
 
       - name: REDIS_REDIS Enable nginx config
         continue-on-error: true
@@ -1611,6 +1699,14 @@ jobs:
 
       - name: Wait for DS startup 240
         run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
 
       - name: REDIS_IOREDIS Enable nginx config
         continue-on-error: true

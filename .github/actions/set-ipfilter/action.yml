@@ -1,0 +1,39 @@
+name: 'Set DS ipfilter'
+description: 'Add allowed host(s) to the DS ipfilter allow-list inside the container (required for WOPI puppeteer tests)'
+
+inputs:
+  ssh_host:
+    description: 'SSH host IP or domain'
+    required: true
+  ssh_user:
+    description: 'SSH user'
+    required: false
+    default: 'ubuntu'
+  container:
+    description: 'Docker container name or ID'
+    required: true
+  allow_hosts:
+    description: 'Space-separated host(s)/IP(s) to add to the ipfilter allow-list (the host running the test example / integrator)'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Add host(s) to DS ipfilter
+      shell: bash
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+        set -e
+        sudo apt-get install -y jq >/dev/null 2>&1 || true
+        HOSTS="${{ inputs.allow_hosts }}"
+        # ipfilter lives in local.json (JWT/redis secrets live here too — merge, never overwrite).
+        # local-production-linux.json (storage config) doesn't touch ipfilter, so it survives the cycle.
+        sudo docker exec ${{ inputs.container }} cat /etc/onlyoffice/documentserver/local.json > /tmp/ipf.json 2>/dev/null || echo '{}' > /tmp/ipf.json
+        jq --arg hosts "$HOSTS" '.services.CoAuthoring.ipfilter = {rules: (($hosts | split(" ") | map(select(length > 0) | {address: ., allowed: true})) + [{address: "*", allowed: true}]), useforrequest: false, errorcode: 403}' /tmp/ipf.json > /tmp/ipf.new
+        sudo docker cp /tmp/ipf.new ${{ inputs.container }}:/etc/onlyoffice/documentserver/local.json
+        rm -f /tmp/ipf.json /tmp/ipf.new
+        sudo docker exec ${{ inputs.container }} supervisorctl restart ds:converter ds:docservice
+        sleep 15
+        echo "------------ ipfilter now -------------"
+        sudo docker exec ${{ inputs.container }} cat /etc/onlyoffice/documentserver/local.json | jq '.services.CoAuthoring.ipfilter'
+        EOF
