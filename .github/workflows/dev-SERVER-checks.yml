@@ -1901,44 +1901,45 @@ jobs:
           def n(v): return int(os.environ.get(v, '0') or '0')
           def s(v): return os.environ.get(v, 'not set')
 
-          def ok5(ppt): return ppt == 0
+          # puppeteer passes only when nothing failed AND something actually ran
+          def ppt_ok(failed, total): return failed == 0 and total > 0
 
           s3f_ppt      = n('PUPPETEER_AWS_S3_FALSE_FAILED')
-          s3f_api_ppt  = n('PUPPETEER_AWS_S3_FALSE_API_FAILED')
-          s3f_wopi_ppt = n('PUPPETEER_AWS_S3_FALSE_WOPI_FAILED')
+          s3f_ok       = n('PUPPETEER_AWS_S3_FALSE_OK')
+          s3f_total    = n('PUPPETEER_AWS_S3_FALSE_TOTAL')
           s3t_ppt      = n('PUPPETEER_AWS_S3_TRUE_FAILED')
-          s3t_api_ppt  = n('PUPPETEER_AWS_S3_TRUE_API_FAILED')
-          s3t_wopi_ppt = n('PUPPETEER_AWS_S3_TRUE_WOPI_FAILED')
+          s3t_ok       = n('PUPPETEER_AWS_S3_TRUE_OK')
+          s3t_total    = n('PUPPETEER_AWS_S3_TRUE_TOTAL')
           sp_ppt       = n('PUPPETEER_AWS_S3_PATH_STYLE_FAILED')
-          sp_api_ppt   = n('PUPPETEER_AWS_S3_PATH_STYLE_API_FAILED')
-          sp_wopi_ppt  = n('PUPPETEER_AWS_S3_PATH_STYLE_WOPI_FAILED')
+          sp_ok        = n('PUPPETEER_AWS_S3_PATH_STYLE_OK')
+          sp_total     = n('PUPPETEER_AWS_S3_PATH_STYLE_TOTAL')
           kms_ppt      = n('PUPPETEER_AWS_S3_KMS_FAILED')
-          kms_api_ppt  = n('PUPPETEER_AWS_S3_KMS_API_FAILED')
-          kms_wopi_ppt = n('PUPPETEER_AWS_S3_KMS_WOPI_FAILED')
+          kms_ok       = n('PUPPETEER_AWS_S3_KMS_OK')
+          kms_total    = n('PUPPETEER_AWS_S3_KMS_TOTAL')
           azf_ppt      = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_FALSE_FAILED')
-          azf_api_ppt  = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_FALSE_API_FAILED')
-          azf_wopi_ppt = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_FALSE_WOPI_FAILED')
+          azf_ok       = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_FALSE_OK')
+          azf_total    = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_FALSE_TOTAL')
           azt_ppt      = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_TRUE_FAILED')
-          azt_api_ppt  = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_TRUE_API_FAILED')
-          azt_wopi_ppt = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_TRUE_WOPI_FAILED')
+          azt_ok       = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_TRUE_OK')
+          azt_total    = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_TRUE_TOTAL')
           aze_ppt      = n('PUPPETEER_AZURE_STORAGE_ENCRYPTION_SCOPE_FAILED')
-          aze_api_ppt  = n('PUPPETEER_AZURE_STORAGE_ENCRYPTION_SCOPE_API_FAILED')
-          aze_wopi_ppt = n('PUPPETEER_AZURE_STORAGE_ENCRYPTION_SCOPE_WOPI_FAILED')
+          aze_ok       = n('PUPPETEER_AZURE_STORAGE_ENCRYPTION_SCOPE_OK')
+          aze_total    = n('PUPPETEER_AZURE_STORAGE_ENCRYPTION_SCOPE_TOTAL')
           vp_ppt       = n('PUPPETEER_DS_VPATH_FAILED')
-          vp_api_ppt   = n('PUPPETEER_DS_VPATH_API_FAILED')
-          vp_wopi_ppt  = n('PUPPETEER_DS_VPATH_WOPI_FAILED')
+          vp_ok        = n('PUPPETEER_DS_VPATH_OK')
+          vp_total     = n('PUPPETEER_DS_VPATH_TOTAL')
           art_ppt      = n('PUPPETEER_AMQP_ARTEMIS_FAILED')
-          art_api_ppt  = n('PUPPETEER_AMQP_ARTEMIS_API_FAILED')
-          art_wopi_ppt = n('PUPPETEER_AMQP_ARTEMIS_WOPI_FAILED')
+          art_ok       = n('PUPPETEER_AMQP_ARTEMIS_OK')
+          art_total    = n('PUPPETEER_AMQP_ARTEMIS_TOTAL')
           cls_ppt      = n('PUPPETEER_AMQP_CLASSIC_FAILED')
-          cls_api_ppt  = n('PUPPETEER_AMQP_CLASSIC_API_FAILED')
-          cls_wopi_ppt = n('PUPPETEER_AMQP_CLASSIC_WOPI_FAILED')
+          cls_ok       = n('PUPPETEER_AMQP_CLASSIC_OK')
+          cls_total    = n('PUPPETEER_AMQP_CLASSIC_TOTAL')
           rr_ppt       = n('PUPPETEER_REDIS_REDIS_FAILED')
-          rr_api_ppt   = n('PUPPETEER_REDIS_REDIS_API_FAILED')
-          rr_wopi_ppt  = n('PUPPETEER_REDIS_REDIS_WOPI_FAILED')
+          rr_ok        = n('PUPPETEER_REDIS_REDIS_OK')
+          rr_total     = n('PUPPETEER_REDIS_REDIS_TOTAL')
           ri_ppt       = n('PUPPETEER_REDIS_IOREDIS_FAILED')
-          ri_api_ppt   = n('PUPPETEER_REDIS_IOREDIS_API_FAILED')
-          ri_wopi_ppt  = n('PUPPETEER_REDIS_IOREDIS_WOPI_FAILED')
+          ri_ok        = n('PUPPETEER_REDIS_IOREDIS_OK')
+          ri_total     = n('PUPPETEER_REDIS_IOREDIS_TOTAL')
           s3f_ds  = n('DS_LOG_ERRORS_AWS_S3_FALSE')
           s3t_ds  = n('DS_LOG_ERRORS_AWS_S3_TRUE')
           sp_ds   = n('DS_LOG_ERRORS_AWS_S3_PATH_STYLE')
@@ -1959,100 +1960,100 @@ jobs:
                   'version_ok':            b('VERSION_AWS_S3_FALSE_OK'),
                   'version_actual':        s('VERSION_AWS_S3_FALSE_ACTUAL'),
                   'puppeteer_failed':      s3f_ppt,
-                  'puppeteer_api_failed':  s3f_api_ppt,
-                  'puppeteer_wopi_failed': s3f_wopi_ppt,
+                  'puppeteer_ok':          s3f_ok,
+                  'puppeteer_total':       s3f_total,
                   'ds_log_errors':         s3f_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_FALSE') and b('VERSION_AWS_S3_FALSE_OK') and ok5(s3f_ppt) and s3f_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_FALSE') and b('VERSION_AWS_S3_FALSE_OK') and ppt_ok(s3f_ppt, s3f_total) and s3f_ds == 0) else 'failure',
               },
               's3_true': {
                   'healthy':               b('HEALTHCHECK_AWS_S3_TRUE'),
                   'version_ok':            b('VERSION_AWS_S3_TRUE_OK'),
                   'version_actual':        s('VERSION_AWS_S3_TRUE_ACTUAL'),
                   'puppeteer_failed':      s3t_ppt,
-                  'puppeteer_api_failed':  s3t_api_ppt,
-                  'puppeteer_wopi_failed': s3t_wopi_ppt,
+                  'puppeteer_ok':          s3t_ok,
+                  'puppeteer_total':       s3t_total,
                   'ds_log_errors':         s3t_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_TRUE') and b('VERSION_AWS_S3_TRUE_OK') and ok5(s3t_ppt) and s3t_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_TRUE') and b('VERSION_AWS_S3_TRUE_OK') and ppt_ok(s3t_ppt, s3t_total) and s3t_ds == 0) else 'failure',
               },
               's3_path_style': {
                   'healthy':               b('HEALTHCHECK_AWS_S3_PATH_STYLE'),
                   'version_ok':            b('VERSION_AWS_S3_PATH_STYLE_OK'),
                   'version_actual':        s('VERSION_AWS_S3_PATH_STYLE_ACTUAL'),
                   'puppeteer_failed':      sp_ppt,
-                  'puppeteer_api_failed':  sp_api_ppt,
-                  'puppeteer_wopi_failed': sp_wopi_ppt,
+                  'puppeteer_ok':          sp_ok,
+                  'puppeteer_total':       sp_total,
                   'ds_log_errors':         sp_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_PATH_STYLE') and b('VERSION_AWS_S3_PATH_STYLE_OK') and ok5(sp_ppt) and sp_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_PATH_STYLE') and b('VERSION_AWS_S3_PATH_STYLE_OK') and ppt_ok(sp_ppt, sp_total) and sp_ds == 0) else 'failure',
               },
               's3_kms': {
                   'healthy':               b('HEALTHCHECK_AWS_S3_KMS'),
                   'version_ok':            b('VERSION_AWS_S3_KMS_OK'),
                   'version_actual':        s('VERSION_AWS_S3_KMS_ACTUAL'),
                   'puppeteer_failed':      kms_ppt,
-                  'puppeteer_api_failed':  kms_api_ppt,
-                  'puppeteer_wopi_failed': kms_wopi_ppt,
+                  'puppeteer_ok':          kms_ok,
+                  'puppeteer_total':       kms_total,
                   'ds_log_errors':         kms_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_KMS') and b('VERSION_AWS_S3_KMS_OK') and ok5(kms_ppt) and kms_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_KMS') and b('VERSION_AWS_S3_KMS_OK') and ppt_ok(kms_ppt, kms_total) and kms_ds == 0) else 'failure',
               },
               'az_false': {
                   'healthy':               b('HEALTHCHECK_AZURE_STORAGE_DIRECTURL_FALSE'),
                   'version_ok':            b('VERSION_AZURE_STORAGE_DIRECTURL_FALSE_OK'),
                   'version_actual':        s('VERSION_AZURE_STORAGE_DIRECTURL_FALSE_ACTUAL'),
                   'puppeteer_failed':      azf_ppt,
-                  'puppeteer_api_failed':  azf_api_ppt,
-                  'puppeteer_wopi_failed': azf_wopi_ppt,
+                  'puppeteer_ok':          azf_ok,
+                  'puppeteer_total':       azf_total,
                   'ds_log_errors':         azf_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_AZURE_STORAGE_DIRECTURL_FALSE') and b('VERSION_AZURE_STORAGE_DIRECTURL_FALSE_OK') and ok5(azf_ppt) and azf_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_AZURE_STORAGE_DIRECTURL_FALSE') and b('VERSION_AZURE_STORAGE_DIRECTURL_FALSE_OK') and ppt_ok(azf_ppt, azf_total) and azf_ds == 0) else 'failure',
               },
               'az_true': {
                   'healthy':               b('HEALTHCHECK_AZURE_STORAGE_DIRECTURL_TRUE'),
                   'version_ok':            b('VERSION_AZURE_STORAGE_DIRECTURL_TRUE_OK'),
                   'version_actual':        s('VERSION_AZURE_STORAGE_DIRECTURL_TRUE_ACTUAL'),
                   'puppeteer_failed':      azt_ppt,
-                  'puppeteer_api_failed':  azt_api_ppt,
-                  'puppeteer_wopi_failed': azt_wopi_ppt,
+                  'puppeteer_ok':          azt_ok,
+                  'puppeteer_total':       azt_total,
                   'ds_log_errors':         azt_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_AZURE_STORAGE_DIRECTURL_TRUE') and b('VERSION_AZURE_STORAGE_DIRECTURL_TRUE_OK') and ok5(azt_ppt) and azt_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_AZURE_STORAGE_DIRECTURL_TRUE') and b('VERSION_AZURE_STORAGE_DIRECTURL_TRUE_OK') and ppt_ok(azt_ppt, azt_total) and azt_ds == 0) else 'failure',
               },
               'az_encryption_scope': {
                   'healthy':               b('HEALTHCHECK_AZURE_STORAGE_ENCRYPTION_SCOPE'),
                   'version_ok':            b('VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_OK'),
                   'version_actual':        s('VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_ACTUAL'),
                   'puppeteer_failed':      aze_ppt,
-                  'puppeteer_api_failed':  aze_api_ppt,
-                  'puppeteer_wopi_failed': aze_wopi_ppt,
+                  'puppeteer_ok':          aze_ok,
+                  'puppeteer_total':       aze_total,
                   'ds_log_errors':         aze_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_AZURE_STORAGE_ENCRYPTION_SCOPE') and b('VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_OK') and ok5(aze_ppt) and aze_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_AZURE_STORAGE_ENCRYPTION_SCOPE') and b('VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_OK') and ppt_ok(aze_ppt, aze_total) and aze_ds == 0) else 'failure',
               },
               'vpath': {
                   'healthy':               b('HEALTHCHECK_DS_VPATH'),
                   'version_ok':            b('VERSION_DS_VPATH_OK'),
                   'version_actual':        s('VERSION_DS_VPATH_ACTUAL'),
                   'puppeteer_failed':      vp_ppt,
-                  'puppeteer_api_failed':  vp_api_ppt,
-                  'puppeteer_wopi_failed': vp_wopi_ppt,
+                  'puppeteer_ok':          vp_ok,
+                  'puppeteer_total':       vp_total,
                   'ds_log_errors':         vp_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_DS_VPATH') and b('VERSION_DS_VPATH_OK') and ok5(vp_ppt) and vp_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_DS_VPATH') and b('VERSION_DS_VPATH_OK') and ppt_ok(vp_ppt, vp_total) and vp_ds == 0) else 'failure',
               },
               'amqp_artemis': {
                   'healthy':               b('HEALTHCHECK_AMQP_ARTEMIS'),
                   'version_ok':            b('VERSION_AMQP_ARTEMIS_OK'),
                   'version_actual':        s('VERSION_AMQP_ARTEMIS_ACTUAL'),
                   'puppeteer_failed':      art_ppt,
-                  'puppeteer_api_failed':  art_api_ppt,
-                  'puppeteer_wopi_failed': art_wopi_ppt,
+                  'puppeteer_ok':          art_ok,
+                  'puppeteer_total':       art_total,
                   'ds_log_errors':         art_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_AMQP_ARTEMIS') and b('VERSION_AMQP_ARTEMIS_OK') and ok5(art_ppt) and art_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_AMQP_ARTEMIS') and b('VERSION_AMQP_ARTEMIS_OK') and ppt_ok(art_ppt, art_total) and art_ds == 0) else 'failure',
               },
               'amqp_classic': {
                   'healthy':               b('HEALTHCHECK_AMQP_CLASSIC'),
                   'version_ok':            b('VERSION_AMQP_CLASSIC_OK'),
                   'version_actual':        s('VERSION_AMQP_CLASSIC_ACTUAL'),
                   'puppeteer_failed':      cls_ppt,
-                  'puppeteer_api_failed':  cls_api_ppt,
-                  'puppeteer_wopi_failed': cls_wopi_ppt,
+                  'puppeteer_ok':          cls_ok,
+                  'puppeteer_total':       cls_total,
                   'ds_log_errors':         cls_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_AMQP_CLASSIC') and b('VERSION_AMQP_CLASSIC_OK') and ok5(cls_ppt) and cls_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_AMQP_CLASSIC') and b('VERSION_AMQP_CLASSIC_OK') and ppt_ok(cls_ppt, cls_total) and cls_ds == 0) else 'failure',
               },
               'redis_redis': {
                   'healthy':               b('HEALTHCHECK_REDIS_REDIS'),
@@ -2061,10 +2062,10 @@ jobs:
                   'redis_sock_ok':         b('REDIS_SOCK_OK_REDIS_REDIS'),
                   'port_6379_closed':      b('PORT_6379_CLOSED_REDIS_REDIS'),
                   'puppeteer_failed':      rr_ppt,
-                  'puppeteer_api_failed':  rr_api_ppt,
-                  'puppeteer_wopi_failed': rr_wopi_ppt,
+                  'puppeteer_ok':          rr_ok,
+                  'puppeteer_total':       rr_total,
                   'ds_log_errors':         rr_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_REDIS') and b('VERSION_REDIS_REDIS_OK') and b('REDIS_SOCK_OK_REDIS_REDIS') and b('PORT_6379_CLOSED_REDIS_REDIS') and ok5(rr_ppt) and rr_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_REDIS') and b('VERSION_REDIS_REDIS_OK') and b('REDIS_SOCK_OK_REDIS_REDIS') and b('PORT_6379_CLOSED_REDIS_REDIS') and ppt_ok(rr_ppt, rr_total) and rr_ds == 0) else 'failure',
               },
               'redis_ioredis': {
                   'healthy':               b('HEALTHCHECK_REDIS_IOREDIS'),
@@ -2073,10 +2074,10 @@ jobs:
                   'redis_sock_ok':         b('REDIS_SOCK_OK_REDIS_IOREDIS'),
                   'port_6379_closed':      b('PORT_6379_CLOSED_REDIS_IOREDIS'),
                   'puppeteer_failed':      ri_ppt,
-                  'puppeteer_api_failed':  ri_api_ppt,
-                  'puppeteer_wopi_failed': ri_wopi_ppt,
+                  'puppeteer_ok':          ri_ok,
+                  'puppeteer_total':       ri_total,
                   'ds_log_errors':         ri_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_IOREDIS') and b('VERSION_REDIS_IOREDIS_OK') and b('REDIS_SOCK_OK_REDIS_IOREDIS') and b('PORT_6379_CLOSED_REDIS_IOREDIS') and ok5(ri_ppt) and ri_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_IOREDIS') and b('VERSION_REDIS_IOREDIS_OK') and b('REDIS_SOCK_OK_REDIS_IOREDIS') and b('PORT_6379_CLOSED_REDIS_IOREDIS') and ppt_ok(ri_ppt, ri_total) and ri_ds == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
           }

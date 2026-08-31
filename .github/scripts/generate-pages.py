@@ -131,10 +131,18 @@ def td_ppt_simple(failed, threshold=5):
 def td_ppt_breakdown(data, threshold=5):
     if data is None:
         return '<td class="na">—</td>'
-    total = data.get("puppeteer_total_failed", data.get("puppeteer_failed", 0))
-    is_ok = total <= threshold
+    failed = data.get("puppeteer_total_failed", data.get("puppeteer_failed", 0))
+    # puppeteer_total present only on newer results; fall back to failed-only display
+    total = data.get("puppeteer_total")
+    if total is None:
+        is_ok = failed <= threshold
+        icon  = "✅" if is_ok else "❌"
+        return f'<td class="{status(is_ok)}">{icon} {failed}</td>'
+    passed = data.get("puppeteer_ok", total - failed)
+    # green only when nothing failed (within threshold) AND something actually ran
+    is_ok = failed <= threshold and total > 0
     icon  = "✅" if is_ok else "❌"
-    return f'<td class="{status(is_ok)}">{icon} {total}</td>'
+    return f'<td class="{status(is_ok)}">{icon} {passed}/{total}</td>'
 
 
 def td_ds_errors(data):
@@ -566,7 +574,7 @@ def generate_dev():
                 f'<td>{label}</td>'
                 + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
                 + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
-                + td_ppt_breakdown(d)
+                + td_ppt_breakdown(d, threshold=0)
                 + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
                 + '</tr>'
             )
@@ -589,7 +597,7 @@ def generate_dev():
                 + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
                 + f'<td class="{status(sock)}">{"✅ OK" if sock else "❌ FAILED"}</td>'
                 + f'<td class="{status(port)}">{"✅ OK" if port else "❌ FAILED"}</td>'
-                + td_ppt_breakdown(d)
+                + td_ppt_breakdown(d, threshold=0)
                 + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
                 + '</tr>'
             )
