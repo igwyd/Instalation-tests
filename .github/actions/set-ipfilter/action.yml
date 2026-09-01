@@ -1,17 +1,23 @@
 name: 'Set DS ipfilter'
-description: 'Add allowed host(s) to the DS ipfilter allow-list inside the container (required for WOPI puppeteer tests)'
+description: 'Add allowed host(s) to the DS ipfilter allow-list (required for WOPI puppeteer tests)'
 
 inputs:
+  mode:
+    description: 'Execution mode: ssh-native | ssh-docker | docker-local'
+    required: false
+    default: 'ssh-docker'
   ssh_host:
-    description: 'SSH host IP or domain'
-    required: true
+    description: 'SSH host IP or domain (ssh-* modes)'
+    required: false
+    default: ''
   ssh_user:
-    description: 'SSH user'
+    description: 'SSH user (ssh-* modes)'
     required: false
     default: 'ubuntu'
   container:
-    description: 'Docker container name or ID'
-    required: true
+    description: 'Docker container name or ID (docker modes)'
+    required: false
+    default: ''
   allow_hosts:
     description: 'Space-separated host(s)/IP(s) to add to the ipfilter allow-list (the host running the test example / integrator)'
     required: true
@@ -19,12 +25,31 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Add host(s) to DS ipfilter
+    - name: Add host(s) to DS ipfilter (native)
+      if: inputs.mode == 'ssh-native'
       shell: bash
       run: |
         ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
         set -e
-        sudo apt-get install -y jq >/dev/null 2>&1 || true
+        command -v jq >/dev/null 2>&1 || sudo apt-get install -y jq 2>/dev/null || sudo yum install -y jq 2>/dev/null || sudo dnf install -y jq 2>/dev/null || true
+        HOSTS="${{ inputs.allow_hosts }}"
+        # ipfilter lives in local.json (JWT/redis secrets live here too — merge, never overwrite).
+        sudo cat /etc/onlyoffice/documentserver/local.json > /tmp/ipf.json 2>/dev/null || echo '{}' > /tmp/ipf.json
+        jq --arg hosts "$HOSTS" '.services.CoAuthoring.ipfilter = {rules: (($hosts | split(" ") | map(select(length > 0) | {address: ., allowed: true})) + [{address: "*", allowed: true}]), useforrequest: false, errorcode: 403}' /tmp/ipf.json | sudo tee /etc/onlyoffice/documentserver/local.json > /dev/null
+        rm -f /tmp/ipf.json
+        sudo systemctl restart ds-converter ds-docservice
+        sleep 15
+        echo "------------ ipfilter now -------------"
+        sudo cat /etc/onlyoffice/documentserver/local.json | jq '.services.CoAuthoring.ipfilter'
+        EOF
+
+    - name: Add host(s) to DS ipfilter (ssh-docker)
+      if: inputs.mode == 'ssh-docker'
+      shell: bash
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} << 'EOF'
+        set -e
+        command -v jq >/dev/null 2>&1 || sudo apt-get install -y jq 2>/dev/null || sudo yum install -y jq 2>/dev/null || sudo dnf install -y jq 2>/dev/null || true
         HOSTS="${{ inputs.allow_hosts }}"
         # ipfilter lives in local.json (JWT/redis secrets live here too — merge, never overwrite).
         # local-production-linux.json (storage config) doesn't touch ipfilter, so it survives the cycle.
@@ -37,3 +62,19 @@ runs:
         echo "------------ ipfilter now -------------"
         sudo docker exec ${{ inputs.container }} cat /etc/onlyoffice/documentserver/local.json | jq '.services.CoAuthoring.ipfilter'
         EOF
+
+    - name: Add host(s) to DS ipfilter (docker-local)
+      if: inputs.mode == 'docker-local'
+      shell: bash
+      run: |
+        set -e
+        command -v jq >/dev/null 2>&1 || sudo apt-get install -y jq
+        HOSTS="${{ inputs.allow_hosts }}"
+        docker exec ${{ inputs.container }} cat /etc/onlyoffice/documentserver/local.json > /tmp/ipf.json 2>/dev/null || echo '{}' > /tmp/ipf.json
+        jq --arg hosts "$HOSTS" '.services.CoAuthoring.ipfilter = {rules: (($hosts | split(" ") | map(select(length > 0) | {address: ., allowed: true})) + [{address: "*", allowed: true}]), useforrequest: false, errorcode: 403}' /tmp/ipf.json > /tmp/ipf.new
+        docker cp /tmp/ipf.new ${{ inputs.container }}:/etc/onlyoffice/documentserver/local.json
+        rm -f /tmp/ipf.json /tmp/ipf.new
+        docker exec ${{ inputs.container }} supervisorctl restart ds:converter ds:docservice
+        sleep 15
+        echo "------------ ipfilter now -------------"
+        docker exec ${{ inputs.container }} cat /etc/onlyoffice/documentserver/local.json | jq '.services.CoAuthoring.ipfilter'

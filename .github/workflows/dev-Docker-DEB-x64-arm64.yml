@@ -116,6 +116,15 @@ jobs:
       - name: Wait for DS startup 240
         run: sleep 240
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ubuntu
+          container: ds-ee-dev
+          allow_hosts: ${{ env.EC2_IP }}
+
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
@@ -231,6 +240,15 @@ jobs:
       - name: Wait for DS startup 240
         run: sleep 240
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ubuntu
+          container: ds-de-dev
+          allow_hosts: ${{ env.EC2_IP }}
+
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
         continue-on-error: true
         run: |
@@ -343,6 +361,15 @@ jobs:
 
       - name: Wait for DS startup 240
         run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ubuntu
+          container: ds-dev
+          allow_hosts: ${{ env.EC2_IP }}
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
         continue-on-error: true

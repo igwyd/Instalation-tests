@@ -149,6 +149,24 @@ jobs:
       - name: Wait for DS Docker startup
         run: sleep 300
 
+      - name: Get DS container ID for Docker install
+        id: ds-container
+        continue-on-error: true
+        run: |
+          CONTAINER_ID=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo docker ps -q --filter "name=onlyoffice"')
+          echo "id=$CONTAINER_ID" >> $GITHUB_OUTPUT
+
+      - name: Add example host to DS ipfilter Docker install
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ${{ matrix.ssh_user }}
+          container: ${{ steps.ds-container.outputs.id }}
+          allow_hosts: ${{ env.EC2_IP }}
+
       - name: Info Docker install
         continue-on-error: true
         run: |
@@ -246,6 +264,15 @@ jobs:
 
       - name: Wait for native install to start
         run: sleep 30
+
+      - name: Add example host to DS ipfilter native install
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          ssh_user: ${{ matrix.ssh_user }}
+          allow_hosts: ${{ env.EC2_IP }}
 
       - name: Info Native install
         continue-on-error: true

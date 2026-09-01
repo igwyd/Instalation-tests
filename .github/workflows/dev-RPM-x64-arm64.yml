@@ -227,6 +227,15 @@ jobs:
           fi
           echo "VERSION_EE_ACTUAL=$VERSION" >> $GITHUB_ENV
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          mode: ssh-native
+          ssh_user: ec2-user
+          ssh_host: ${{ env.EC2_IP }}
+          allow_hosts: ${{ env.EC2_IP }}
+
       - name: Start ds-example EE
         continue-on-error: true
         run: |
@@ -348,6 +357,15 @@ jobs:
           fi
           echo "VERSION_DE_ACTUAL=$VERSION" >> $GITHUB_ENV
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          mode: ssh-native
+          ssh_user: ec2-user
+          ssh_host: ${{ env.EC2_IP }}
+          allow_hosts: ${{ env.EC2_IP }}
+
       - name: Start ds-example DE
         continue-on-error: true
         run: |
@@ -467,6 +485,15 @@ jobs:
             echo "VERSION_CE_OK=false" >> $GITHUB_ENV
           fi
           echo "VERSION_CE_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          mode: ssh-native
+          ssh_user: ec2-user
+          ssh_host: ${{ env.EC2_IP }}
+          allow_hosts: ${{ env.EC2_IP }}
 
       - name: Start ds-example CE
         continue-on-error: true
@@ -653,6 +680,15 @@ jobs:
             echo "JWT settings changed after upgrade!"
             echo "JWT_MATCH=false" >> $GITHUB_ENV
           fi
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          mode: ssh-native
+          ssh_user: ec2-user
+          ssh_host: ${{ env.EC2_IP }}
+          allow_hosts: ${{ env.EC2_IP }}
 
       - name: Start ds-example EE after upgrade
         continue-on-error: true

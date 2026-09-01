@@ -168,6 +168,14 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "sudo systemctl start ds-example"
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          allow_hosts: ${{ env.EC2_IP }}
+
       - name: Clear puppeteer output before EE tests
         run: rm -rf Dep.Tests/puppeteer/out
 
@@ -292,6 +300,14 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "sudo systemctl start ds-example"
 
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          allow_hosts: ${{ env.EC2_IP }}
+
       - name: Clear puppeteer output before DE tests
         run: rm -rf Dep.Tests/puppeteer/out
 
@@ -414,6 +430,14 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "sudo systemctl start ds-example"
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          mode: ssh-native
+          ssh_host: ${{ env.EC2_IP }}
+          allow_hosts: ${{ env.EC2_IP }}
 
       - name: Clear puppeteer output before CE tests
         run: rm -rf Dep.Tests/puppeteer/out
