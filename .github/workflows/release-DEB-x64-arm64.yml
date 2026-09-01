@@ -68,7 +68,7 @@ jobs:
 
       - name: Upgrade DEB packages
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ubuntu@${{ env.EC2_IP }} << EOF
           sudo apt-get update
           sudo apt-get upgrade -y
           EOF
@@ -82,7 +82,7 @@ jobs:
       - name: Install ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ubuntu@${{ env.EC2_IP }} << EOF
           sudo apt-get install postgresql -y
           sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';"
           sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;"
@@ -235,7 +235,7 @@ jobs:
 
       - name: Install ONLYOFFICE-Docs DE
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ubuntu@${{ env.EC2_IP }} << EOF
           echo onlyoffice-documentserver-de onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
           echo onlyoffice-documentserver-de onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
           printf "n/n" | sudo apt-get install onlyoffice-documentserver-de -y
@@ -366,7 +366,7 @@ jobs:
 
       - name: Install ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ubuntu@${{ env.EC2_IP }} << EOF
           echo onlyoffice-documentserver onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
           echo onlyoffice-documentserver onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
           printf "n/n" | sudo apt-get install onlyoffice-documentserver -y

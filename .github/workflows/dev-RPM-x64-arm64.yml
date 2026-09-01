@@ -111,7 +111,7 @@ jobs:
 
       - name: Upgrade RPM packages
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf -y clean all
           sudo dnf -y update
           sudo dnf install wget -y
@@ -127,12 +127,12 @@ jobs:
         continue-on-error: true
         run: |
           scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.repo ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.repo
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
           sudo cp /home/ec2-user/nginx.repo /etc/yum.repos.d/nginx.repo
           sudo yum install nginx -y
           EOF
           scp -o StrictHostKeyChecking=no rpm-check-configs/nginx.conf ec2-user@${{ env.EC2_IP }}:/home/ec2-user/nginx.conf
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
           sudo cp /home/ec2-user/nginx.conf /etc/nginx/nginx.conf
           sudo yum install epel-release -y
 
@@ -301,7 +301,7 @@ jobs:
 
       - name: Install ONLYOFFICE-Docs DE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf install onlyoffice-documentserver-de-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
           sudo service nginx start
           sudo systemctl enable nginx
@@ -430,7 +430,7 @@ jobs:
 
       - name: Install ONLYOFFICE-Docs CE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf install onlyoffice-documentserver-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
           sudo service nginx start
           sudo systemctl enable nginx
@@ -559,7 +559,7 @@ jobs:
 
       - name: Install ONLYOFFICE-Docs EE RELEASE for testing UPGRADE
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
           sudo rm -rf /etc/yum.repos.d/onlyoffice-dev-*.repo
           sudo yum install https://download.onlyoffice.com/repo/centos/main/noarch/onlyoffice-repo.noarch.rpm -y
           sudo dnf install onlyoffice-documentserver-ee -y
@@ -621,7 +621,7 @@ jobs:
 
       - name: Update ONLYOFFICE-EE to the DEV
         run: |
-          ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} << EOF
+          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_DEV_VERSION }}.repo
           sudo yum upgrade onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
           EOF
