@@ -1,0 +1,17 @@
+{
+  "storage": {
+    "name": "storage-s3",
+    "region": "test",
+    "endpoint": "http://${AWS_DEV_SERVER_EC2_IP}:9000",
+    "bucketName": "ds-http-minio",
+    "storageFolderName": "files",
+    "cacheFolderName": "data",
+    "urlExpires": 604800,
+    "accessKeyId": "minioadmin",
+    "secretAccessKey": "minioadmin",
+    "sslEnabled": false,
+    "s3ForcePathStyle": false,
+    "externalHost": "",
+    "useDirectStorageUrls": false
+  }
+}

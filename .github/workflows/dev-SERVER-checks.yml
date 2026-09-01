@@ -668,6 +668,470 @@ jobs:
           env_var: DS_LOG_ERRORS_AWS_S3_KMS
           label: AWS_S3_KMS
 
+      # ============================ MinIO HTTP cycles ============================
+      # MinIO runs in a container on the same EC2, published on :9000. Endpoint is
+      # the EC2 public IP so the puppeteer browser (on the GitHub runner) can reach
+      # presigned URLs directly when useDirectStorageUrls=true. The DS container
+      # cannot reach the EC2's own public IP (AWS has no hairpin NAT), so an iptables
+      # DNAT rule on the host redirects <EC2_IP>:9000 -> 172.17.0.1:9000 (host MinIO).
+      # MinIO + the DNAT rule + the bucket are set up once and reused by all 3 cycles.
+
+      - name: MINIO_HTTP_FALSE Docker reInstall
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker stop ds-ee-dev || true
+          sudo docker rm ds-ee-dev || true
+          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+
+      - name: MINIO_HTTP_FALSE Start MinIO server
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker rm -f minio 2>/dev/null || true
+          sudo rm -rf /opt/minio/data && sudo mkdir -p /opt/minio/data
+          sudo docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            -v /opt/minio/data:/data minio/minio server /data
+          sleep 15
+          sudo docker run --rm --network host --entrypoint /bin/sh minio/mc \
+            -c "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/ds-http-minio"
+          # hairpin workaround: DS container -> EC2 public IP:9000 -> host MinIO
+          sudo iptables -t nat -C PREROUTING -p tcp -d ${{ vars.AWS_DEV_SERVER_EC2_IP }} --dport 9000 -j DNAT --to-destination 172.17.0.1:9000 2>/dev/null || \
+            sudo iptables -t nat -A PREROUTING -p tcp -d ${{ vars.AWS_DEV_SERVER_EC2_IP }} --dport 9000 -j DNAT --to-destination 172.17.0.1:9000
+          EOF
+
+      - name: MINIO_HTTP_FALSE Enable nginx config
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo rm -f /etc/nginx/sites-enabled/* && \
+             sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
+             sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: MINIO_HTTP_FALSE Configure
+        continue-on-error: true
+        env:
+          AWS_DEV_SERVER_EC2_IP: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+        run: |
+          envsubst '${AWS_DEV_SERVER_EC2_IP}' \
+            < dev-SERVER-checks/minio-http/useDirectStorageUrls-false/local-production-linux.json \
+            > /tmp/local-production-linux.json
+          scp -o StrictHostKeyChecking=no /tmp/local-production-linux.json \
+            ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo rm ~/local-production-linux.json
+          sudo docker exec ds-ee-dev supervisorctl restart ds:converter ds:docservice
+          sleep 30
+          EOF
+
+      - name: MINIO_HTTP_FALSE Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: MINIO_HTTP_FALSE Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_MINIO_HTTP_FALSE=$HC" >> $GITHUB_ENV
+
+      - name: MINIO_HTTP_FALSE Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_MINIO_HTTP_FALSE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_MINIO_HTTP_FALSE_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_MINIO_HTTP_FALSE_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: MINIO_HTTP_FALSE Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: MINIO_HTTP_FALSE Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: MINIO_HTTP_FALSE Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: MINIO_HTTP_FALSE Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition MINIO_HTTP_FALSE
+
+      - name: MINIO_HTTP_FALSE Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+
+      - name: MINIO_HTTP_FALSE Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_MINIO_HTTP_FALSE
+          label: MINIO_HTTP_FALSE
+
+      - name: MINIO_HTTP_TRUE Docker reInstall
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker stop ds-ee-dev || true
+          sudo docker rm ds-ee-dev || true
+          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+
+      - name: MINIO_HTTP_TRUE Enable nginx config
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo rm -f /etc/nginx/sites-enabled/* && \
+             sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
+             sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: MINIO_HTTP_TRUE Configure
+        continue-on-error: true
+        env:
+          AWS_DEV_SERVER_EC2_IP: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+        run: |
+          envsubst '${AWS_DEV_SERVER_EC2_IP}' \
+            < dev-SERVER-checks/minio-http/useDirectStorageUrls-true/local-production-linux.json \
+            > /tmp/local-production-linux.json
+          scp -o StrictHostKeyChecking=no /tmp/local-production-linux.json \
+            ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo rm ~/local-production-linux.json
+          sudo docker exec ds-ee-dev supervisorctl restart ds:converter ds:docservice
+          sleep 30
+          EOF
+
+      - name: MINIO_HTTP_TRUE Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: MINIO_HTTP_TRUE Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_MINIO_HTTP_TRUE=$HC" >> $GITHUB_ENV
+
+      - name: MINIO_HTTP_TRUE Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_MINIO_HTTP_TRUE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_MINIO_HTTP_TRUE_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_MINIO_HTTP_TRUE_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: MINIO_HTTP_TRUE Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: MINIO_HTTP_TRUE Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: MINIO_HTTP_TRUE Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: MINIO_HTTP_TRUE Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition MINIO_HTTP_TRUE
+
+      - name: MINIO_HTTP_TRUE Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+
+      - name: MINIO_HTTP_TRUE Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_MINIO_HTTP_TRUE
+          label: MINIO_HTTP_TRUE
+
+      - name: MINIO_HTTP_PATH-STYLE Docker reInstall
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker stop ds-ee-dev || true
+          sudo docker rm ds-ee-dev || true
+          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+
+      - name: MINIO_HTTP_PATH-STYLE Enable nginx config
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo rm -f /etc/nginx/sites-enabled/* && \
+             sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
+             sudo nginx -t && sudo systemctl reload nginx"
+
+      - name: MINIO_HTTP_PATH-STYLE Configure
+        continue-on-error: true
+        env:
+          AWS_DEV_SERVER_EC2_IP: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+        run: |
+          envsubst '${AWS_DEV_SERVER_EC2_IP}' \
+            < dev-SERVER-checks/minio-http/s3ForcePathStyle-true/local-production-linux.json \
+            > /tmp/local-production-linux.json
+          scp -o StrictHostKeyChecking=no /tmp/local-production-linux.json \
+            ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo rm ~/local-production-linux.json
+          sudo docker exec ds-ee-dev supervisorctl restart ds:converter ds:docservice
+          sleep 30
+          EOF
+
+      - name: MINIO_HTTP_PATH-STYLE Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: MINIO_HTTP_PATH-STYLE Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_MINIO_HTTP_PATH_STYLE=$HC" >> $GITHUB_ENV
+
+      - name: MINIO_HTTP_PATH-STYLE Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_MINIO_HTTP_PATH_STYLE_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_MINIO_HTTP_PATH_STYLE_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_MINIO_HTTP_PATH_STYLE_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: MINIO_HTTP_PATH-STYLE Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: MINIO_HTTP_PATH-STYLE Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: MINIO_HTTP_PATH-STYLE Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: MINIO_HTTP_PATH-STYLE Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition MINIO_HTTP_PATH_STYLE
+
+      - name: MINIO_HTTP_PATH-STYLE Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+
+      - name: MINIO_HTTP_PATH-STYLE Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ vars.AWS_DEV_SERVER_EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_MINIO_HTTP_PATH_STYLE
+          label: MINIO_HTTP_PATH-STYLE
+
+      - name: MinIO cleanup
+        if: always()
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
+          sudo iptables -t nat -D PREROUTING -p tcp -d ${{ vars.AWS_DEV_SERVER_EC2_IP }} --dport 9000 -j DNAT --to-destination 172.17.0.1:9000 2>/dev/null || true
+          sudo docker rm -f minio 2>/dev/null || true
+          sudo rm -rf /opt/minio/data
+          EOF
+
       - name: AZURE_STORAGE_DIRECTURL_FALSE Docker reInstall
         continue-on-error: true
         run: |
@@ -1916,6 +2380,15 @@ jobs:
           kms_ppt      = n('PUPPETEER_AWS_S3_KMS_FAILED')
           kms_ok       = n('PUPPETEER_AWS_S3_KMS_OK')
           kms_total    = n('PUPPETEER_AWS_S3_KMS_TOTAL')
+          mnf_ppt      = n('PUPPETEER_MINIO_HTTP_FALSE_FAILED')
+          mnf_ok       = n('PUPPETEER_MINIO_HTTP_FALSE_OK')
+          mnf_total    = n('PUPPETEER_MINIO_HTTP_FALSE_TOTAL')
+          mnt_ppt      = n('PUPPETEER_MINIO_HTTP_TRUE_FAILED')
+          mnt_ok       = n('PUPPETEER_MINIO_HTTP_TRUE_OK')
+          mnt_total    = n('PUPPETEER_MINIO_HTTP_TRUE_TOTAL')
+          mnp_ppt      = n('PUPPETEER_MINIO_HTTP_PATH_STYLE_FAILED')
+          mnp_ok       = n('PUPPETEER_MINIO_HTTP_PATH_STYLE_OK')
+          mnp_total    = n('PUPPETEER_MINIO_HTTP_PATH_STYLE_TOTAL')
           azf_ppt      = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_FALSE_FAILED')
           azf_ok       = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_FALSE_OK')
           azf_total    = n('PUPPETEER_AZURE_STORAGE_DIRECTURL_FALSE_TOTAL')
@@ -1944,6 +2417,9 @@ jobs:
           s3t_ds  = n('DS_LOG_ERRORS_AWS_S3_TRUE')
           sp_ds   = n('DS_LOG_ERRORS_AWS_S3_PATH_STYLE')
           kms_ds  = n('DS_LOG_ERRORS_AWS_S3_KMS')
+          mnf_ds  = n('DS_LOG_ERRORS_MINIO_HTTP_FALSE')
+          mnt_ds  = n('DS_LOG_ERRORS_MINIO_HTTP_TRUE')
+          mnp_ds  = n('DS_LOG_ERRORS_MINIO_HTTP_PATH_STYLE')
           azf_ds  = n('DS_LOG_ERRORS_AZURE_STORAGE_DIRECTURL_FALSE')
           azt_ds  = n('DS_LOG_ERRORS_AZURE_STORAGE_DIRECTURL_TRUE')
           aze_ds  = n('DS_LOG_ERRORS_AZURE_STORAGE_ENCRYPTION_SCOPE')
@@ -1994,6 +2470,36 @@ jobs:
                   'puppeteer_total':       kms_total,
                   'ds_log_errors':         kms_ds,
                   'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_KMS') and b('VERSION_AWS_S3_KMS_OK') and ppt_ok(kms_ppt, kms_total) and kms_ds == 0) else 'failure',
+              },
+              'minio_http_false': {
+                  'healthy':               b('HEALTHCHECK_MINIO_HTTP_FALSE'),
+                  'version_ok':            b('VERSION_MINIO_HTTP_FALSE_OK'),
+                  'version_actual':        s('VERSION_MINIO_HTTP_FALSE_ACTUAL'),
+                  'puppeteer_failed':      mnf_ppt,
+                  'puppeteer_ok':          mnf_ok,
+                  'puppeteer_total':       mnf_total,
+                  'ds_log_errors':         mnf_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_MINIO_HTTP_FALSE') and b('VERSION_MINIO_HTTP_FALSE_OK') and ppt_ok(mnf_ppt, mnf_total) and mnf_ds == 0) else 'failure',
+              },
+              'minio_http_true': {
+                  'healthy':               b('HEALTHCHECK_MINIO_HTTP_TRUE'),
+                  'version_ok':            b('VERSION_MINIO_HTTP_TRUE_OK'),
+                  'version_actual':        s('VERSION_MINIO_HTTP_TRUE_ACTUAL'),
+                  'puppeteer_failed':      mnt_ppt,
+                  'puppeteer_ok':          mnt_ok,
+                  'puppeteer_total':       mnt_total,
+                  'ds_log_errors':         mnt_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_MINIO_HTTP_TRUE') and b('VERSION_MINIO_HTTP_TRUE_OK') and ppt_ok(mnt_ppt, mnt_total) and mnt_ds == 0) else 'failure',
+              },
+              'minio_http_path_style': {
+                  'healthy':               b('HEALTHCHECK_MINIO_HTTP_PATH_STYLE'),
+                  'version_ok':            b('VERSION_MINIO_HTTP_PATH_STYLE_OK'),
+                  'version_actual':        s('VERSION_MINIO_HTTP_PATH_STYLE_ACTUAL'),
+                  'puppeteer_failed':      mnp_ppt,
+                  'puppeteer_ok':          mnp_ok,
+                  'puppeteer_total':       mnp_total,
+                  'ds_log_errors':         mnp_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_MINIO_HTTP_PATH_STYLE') and b('VERSION_MINIO_HTTP_PATH_STYLE_OK') and ppt_ok(mnp_ppt, mnp_total) and mnp_ds == 0) else 'failure',
               },
               'az_false': {
                   'healthy':               b('HEALTHCHECK_AZURE_STORAGE_DIRECTURL_FALSE'),

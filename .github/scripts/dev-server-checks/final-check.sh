@@ -108,6 +108,84 @@ DS9="${DS_LOG_ERRORS_AWS_S3_KMS:-0}"
 DS9_DETAIL="${DS9} errors"
 if [ "$DS9" -gt 0 ]; then DS9_ICON="❌"; DS9_LABEL="FAILED"; else DS9_ICON="✅"; DS9_LABEL="OK"; fi
 
+# --- MINIO_HTTP_FALSE ---
+if [ "${HEALTHCHECK_MINIO_HTTP_FALSE}" = "true" ]; then
+  HC13_ICON="✅"; HC13_LABEL="OK";     HC13_DETAIL="${HEALTHCHECK_MINIO_HTTP_FALSE}"
+else
+  HC13_ICON="❌"; HC13_LABEL="FAILED"; HC13_DETAIL="${HEALTHCHECK_MINIO_HTTP_FALSE:-not set}"; FAILED=1
+fi
+
+if [ "${VERSION_MINIO_HTTP_FALSE_OK}" = "true" ]; then
+  VER13_ICON="✅"; VER13_LABEL="OK"
+else
+  VER13_ICON="❌"; VER13_LABEL="FAILED"; FAILED=1
+fi
+VER13_DETAIL="exp: ${EXPECTED}, act: ${VERSION_MINIO_HTTP_FALSE_ACTUAL:-not set}"
+
+PPT13_F="${PUPPETEER_MINIO_HTTP_FALSE_FAILED:-0}"; PPT13_O="${PUPPETEER_MINIO_HTTP_FALSE_OK:-0}"; PPT13_T="${PUPPETEER_MINIO_HTTP_FALSE_TOTAL:-0}"
+PPT13_DETAIL="${PPT13_O}/${PPT13_T} passed, ${PPT13_F} failed"
+if [ "$PPT13_F" -gt 0 ] || [ "$PPT13_T" -eq 0 ]; then
+  PPT13_ICON="❌"; PPT13_LABEL="FAILED"; FAILED=1
+else
+  PPT13_ICON="✅"; PPT13_LABEL="OK"
+fi
+
+DS13="${DS_LOG_ERRORS_MINIO_HTTP_FALSE:-0}"
+DS13_DETAIL="${DS13} errors"
+if [ "$DS13" -gt 0 ]; then DS13_ICON="❌"; DS13_LABEL="FAILED"; else DS13_ICON="✅"; DS13_LABEL="OK"; fi
+
+# --- MINIO_HTTP_TRUE ---
+if [ "${HEALTHCHECK_MINIO_HTTP_TRUE}" = "true" ]; then
+  HC14_ICON="✅"; HC14_LABEL="OK";     HC14_DETAIL="${HEALTHCHECK_MINIO_HTTP_TRUE}"
+else
+  HC14_ICON="❌"; HC14_LABEL="FAILED"; HC14_DETAIL="${HEALTHCHECK_MINIO_HTTP_TRUE:-not set}"; FAILED=1
+fi
+
+if [ "${VERSION_MINIO_HTTP_TRUE_OK}" = "true" ]; then
+  VER14_ICON="✅"; VER14_LABEL="OK"
+else
+  VER14_ICON="❌"; VER14_LABEL="FAILED"; FAILED=1
+fi
+VER14_DETAIL="exp: ${EXPECTED}, act: ${VERSION_MINIO_HTTP_TRUE_ACTUAL:-not set}"
+
+PPT14_F="${PUPPETEER_MINIO_HTTP_TRUE_FAILED:-0}"; PPT14_O="${PUPPETEER_MINIO_HTTP_TRUE_OK:-0}"; PPT14_T="${PUPPETEER_MINIO_HTTP_TRUE_TOTAL:-0}"
+PPT14_DETAIL="${PPT14_O}/${PPT14_T} passed, ${PPT14_F} failed"
+if [ "$PPT14_F" -gt 0 ] || [ "$PPT14_T" -eq 0 ]; then
+  PPT14_ICON="❌"; PPT14_LABEL="FAILED"; FAILED=1
+else
+  PPT14_ICON="✅"; PPT14_LABEL="OK"
+fi
+
+DS14="${DS_LOG_ERRORS_MINIO_HTTP_TRUE:-0}"
+DS14_DETAIL="${DS14} errors"
+if [ "$DS14" -gt 0 ]; then DS14_ICON="❌"; DS14_LABEL="FAILED"; else DS14_ICON="✅"; DS14_LABEL="OK"; fi
+
+# --- MINIO_HTTP_PATH_STYLE ---
+if [ "${HEALTHCHECK_MINIO_HTTP_PATH_STYLE}" = "true" ]; then
+  HC15_ICON="✅"; HC15_LABEL="OK";     HC15_DETAIL="${HEALTHCHECK_MINIO_HTTP_PATH_STYLE}"
+else
+  HC15_ICON="❌"; HC15_LABEL="FAILED"; HC15_DETAIL="${HEALTHCHECK_MINIO_HTTP_PATH_STYLE:-not set}"; FAILED=1
+fi
+
+if [ "${VERSION_MINIO_HTTP_PATH_STYLE_OK}" = "true" ]; then
+  VER15_ICON="✅"; VER15_LABEL="OK"
+else
+  VER15_ICON="❌"; VER15_LABEL="FAILED"; FAILED=1
+fi
+VER15_DETAIL="exp: ${EXPECTED}, act: ${VERSION_MINIO_HTTP_PATH_STYLE_ACTUAL:-not set}"
+
+PPT15_F="${PUPPETEER_MINIO_HTTP_PATH_STYLE_FAILED:-0}"; PPT15_O="${PUPPETEER_MINIO_HTTP_PATH_STYLE_OK:-0}"; PPT15_T="${PUPPETEER_MINIO_HTTP_PATH_STYLE_TOTAL:-0}"
+PPT15_DETAIL="${PPT15_O}/${PPT15_T} passed, ${PPT15_F} failed"
+if [ "$PPT15_F" -gt 0 ] || [ "$PPT15_T" -eq 0 ]; then
+  PPT15_ICON="❌"; PPT15_LABEL="FAILED"; FAILED=1
+else
+  PPT15_ICON="✅"; PPT15_LABEL="OK"
+fi
+
+DS15="${DS_LOG_ERRORS_MINIO_HTTP_PATH_STYLE:-0}"
+DS15_DETAIL="${DS15} errors"
+if [ "$DS15" -gt 0 ]; then DS15_ICON="❌"; DS15_LABEL="FAILED"; else DS15_ICON="✅"; DS15_LABEL="OK"; fi
+
 # --- AZURE_STORAGE_DIRECTURL_FALSE ---
 if [ "${HEALTHCHECK_AZURE_STORAGE_DIRECTURL_FALSE}" = "true" ]; then
   HC10_ICON="✅"; HC10_LABEL="OK";     HC10_DETAIL="${HEALTHCHECK_AZURE_STORAGE_DIRECTURL_FALSE}"
@@ -384,6 +462,33 @@ if [ "$DS7" -gt 0 ]; then DS7_ICON="❌"; DS7_LABEL="FAILED"; else DS7_ICON="✅
   echo "| Puppeteer     | ${PPT9_ICON} ${PPT9_LABEL} | ${PPT9_DETAIL} |"
   echo "| DS Log Errors | ${DS9_DETAIL} | |"
   echo ""
+  echo "### MinIO HTTP useDirectStorageUrls=false"
+  echo ""
+  echo "| Check | Result | Details |"
+  echo "|-------|--------|---------|"
+  echo "| Healthcheck   | ${HC13_ICON} ${HC13_LABEL}  | ${HC13_DETAIL} |"
+  echo "| Version       | ${VER13_ICON} ${VER13_LABEL} | \`${VERSION_MINIO_HTTP_FALSE_ACTUAL:-not set}\` |"
+  echo "| Puppeteer     | ${PPT13_ICON} ${PPT13_LABEL} | ${PPT13_DETAIL} |"
+  echo "| DS Log Errors | ${DS13_DETAIL} | |"
+  echo ""
+  echo "### MinIO HTTP useDirectStorageUrls=true"
+  echo ""
+  echo "| Check | Result | Details |"
+  echo "|-------|--------|---------|"
+  echo "| Healthcheck   | ${HC14_ICON} ${HC14_LABEL}  | ${HC14_DETAIL} |"
+  echo "| Version       | ${VER14_ICON} ${VER14_LABEL} | \`${VERSION_MINIO_HTTP_TRUE_ACTUAL:-not set}\` |"
+  echo "| Puppeteer     | ${PPT14_ICON} ${PPT14_LABEL} | ${PPT14_DETAIL} |"
+  echo "| DS Log Errors | ${DS14_DETAIL} | |"
+  echo ""
+  echo "### MinIO HTTP s3ForcePathStyle=true"
+  echo ""
+  echo "| Check | Result | Details |"
+  echo "|-------|--------|---------|"
+  echo "| Healthcheck   | ${HC15_ICON} ${HC15_LABEL}  | ${HC15_DETAIL} |"
+  echo "| Version       | ${VER15_ICON} ${VER15_LABEL} | \`${VERSION_MINIO_HTTP_PATH_STYLE_ACTUAL:-not set}\` |"
+  echo "| Puppeteer     | ${PPT15_ICON} ${PPT15_LABEL} | ${PPT15_DETAIL} |"
+  echo "| DS Log Errors | ${DS15_DETAIL} | |"
+  echo ""
   echo "### Azure Blob Storage useDirectStorageUrls=false"
   echo ""
   echo "| Check | Result | Details |"
@@ -507,6 +612,36 @@ printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC9_LABEL}"  "${HC9_DETAI
 printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER9_LABEL}" "${VER9_DETAIL}"
 printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT9_LABEL}" "${PPT9_DETAIL}"
 printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS9_DETAIL}"
+echo "$SEP"
+echo ""
+echo "=== MinIO HTTP useDirectStorageUrls=false ==="
+echo "$SEP"
+printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+echo "$SEP"
+printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC13_LABEL}"  "${HC13_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER13_LABEL}" "${VER13_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT13_LABEL}" "${PPT13_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS13_DETAIL}"
+echo "$SEP"
+echo ""
+echo "=== MinIO HTTP useDirectStorageUrls=true ==="
+echo "$SEP"
+printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+echo "$SEP"
+printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC14_LABEL}"  "${HC14_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER14_LABEL}" "${VER14_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT14_LABEL}" "${PPT14_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS14_DETAIL}"
+echo "$SEP"
+echo ""
+echo "=== MinIO HTTP s3ForcePathStyle=true ==="
+echo "$SEP"
+printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+echo "$SEP"
+printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"   "${HC15_LABEL}"  "${HC15_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER15_LABEL}" "${VER15_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT15_LABEL}" "${PPT15_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS15_DETAIL}"
 echo "$SEP"
 echo ""
 echo "=== Azure Blob Storage useDirectStorageUrls=false ==="
