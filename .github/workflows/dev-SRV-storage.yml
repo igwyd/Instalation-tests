@@ -702,8 +702,13 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker rm -f minio 2>/dev/null || true
           sudo rm -rf /opt/minio/data && sudo mkdir -p /opt/minio/data
+          # Browser talks to MinIO directly (different origin from the DS domain) when
+          # useDirectStorageUrls=true, so those requests need CORS or the browser blocks them.
+          # Per-bucket CORS (mc cors set) is an AIStor/enterprise-only feature — community MinIO
+          # only supports cluster-wide CORS via this env var.
           sudo docker run -d --name minio -p 9000:9000 \
             -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            -e "MINIO_API_CORS_ALLOW_ORIGIN=*" \
             -v /opt/minio/data:/data minio/minio server /data
           sleep 15
           sudo docker run --rm --network host --entrypoint /bin/sh minio/mc \
