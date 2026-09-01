@@ -543,7 +543,8 @@ jobs:
       - name: Check healthcheck EE RELEASE and save JWT before upgrade
         continue-on-error: true
         run: |
-          HC=$(curl -s "http://${{ env.EC2_IP }}:8083/healthcheck" || echo "error")
+          # Release (pre-10.0.0) defaults to port 80, not 8083 (that default started in 10.0.0)
+          HC=$(curl -s "http://${{ env.EC2_IP }}:80/healthcheck" || echo "error")
           echo "Healthcheck EE RELEASE: $HC"
           echo "HEALTHCHECK_EE_RELEASE=$HC" >> $GITHUB_ENV
 
@@ -601,7 +602,8 @@ jobs:
       - name: Check healthcheck, version and JWT after upgrade
         continue-on-error: true
         run: |
-          HC=$(curl -s "http://${{ env.EC2_IP }}:8083/healthcheck" || echo "error")
+          # Upgrade preserves the port that was already configured (80, from the release install)
+          HC=$(curl -s "http://${{ env.EC2_IP }}:80/healthcheck" || echo "error")
           echo "Healthcheck EE after upgrade: $HC"
           echo "HEALTHCHECK_EE_UPGRADE=$HC" >> $GITHUB_ENV
 
@@ -641,6 +643,8 @@ jobs:
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
+          # Upgrade kept the release's port (80) — repatch from the :8083 URL set for the earlier fresh installs
+          sed -i -E "s#\"url\": \"http://[^:]+:[0-9]+/example\"#\"url\": \"http://${{ env.EC2_IP }}:80/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
