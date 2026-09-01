@@ -27,12 +27,13 @@ Pre-release builds from S3 dev repo.
 | dev-Docker-RPM (CentOS 9) | [![dev-Docker-RPM](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-RPM-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-RPM-x64-arm64.yml) |
 
 
-### Server checks (2 runners at the same time)
+### Server checks (3 runners at the same time)
 - dev Docker image with server tests (Scheduled every Wednesday at 16:00 UTC+3)
 
 | Test | Status |
 |------|--------|
-| dev-SERVER-checks | [![dev-SERVER-checks](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-SERVER-checks.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-SERVER-checks.yml) |
+| dev-SRV-storage (S3, MinIO, Azure) | [![dev-SRV-storage](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-SRV-storage.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-SRV-storage.yml) |
+| dev-SRV-dependances (Virtual Path, ActiveMQ, Redis) | [![dev-SRV-dependances](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-SRV-dependances.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-SRV-dependances.yml) |
 | dev-TLS-dependencies | [![dev-TLS-dependencies](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-TLS-dependencies.yaml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-TLS-dependencies.yaml) |
 
 

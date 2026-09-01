@@ -1,0 +1,974 @@
+name: dev SRV dependances
+
+on:
+  schedule:
+    - cron: '0 13 * * 3'  # Wednesday 16:00 Moscow time (UTC+3)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-dependances:
+    runs-on: ubuntu-24.04
+    name: dev SRV dependances x64
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Puppeteer
+        uses: ./.github/actions/setup-puppeteer
+        with:
+          git_ssh_private_key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
+
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-east-1
+
+      - name: Create EC2 Instance
+        run: |
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id ami-0b6c6ebed2801a5cb \
+            --instance-type t2.medium \
+            --key-name demin \
+            --security-groups AllPortsOpened \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_dev-srv-dependances}]' \
+            --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":50,"VolumeType":"gp3"}}]' \
+            --query "Instances[0].InstanceId" --output text)
+
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+          echo "Waiting for instance to start..."
+          aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+
+      - name: Get EC2 Public IP
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ env.INSTANCE_ID }} \
+            --query "Reservations[].Instances[].PublicIpAddress" --output text)
+          echo "EC2 Public IP: $IP"
+          echo "EC2_IP=$IP" >> $GITHUB_ENV
+
+      - name: Wait for SSH to be Ready
+        run: sleep 120
+
+      - name: Add SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
+
+      - name: Upgrade packages
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          for i in 1 2 3; do
+            sudo apt-get update && sudo apt-get upgrade -y && break
+            if [ $i -lt 3 ]; then
+              echo "Attempt $i failed, retrying in 30s..."
+              sleep 30
+            else
+              echo "All attempts failed"
+              exit 1
+            fi
+          done
+          EOF
+
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Wait for instance to reboot after upgrade
+        run: sleep 180
+
+      - name: Install Docker on EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates curl
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+          echo "deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \$(. /etc/os-release && echo "\$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+          sudo systemctl start docker
+          EOF
+
+      - name: DS-VPATH Docker reInstall
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker network rm ds-network 2>/dev/null || true
+          sudo docker network create ds-network
+          sudo docker pull onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo docker run -itd --network ds-network --name ds-ee-dev -e WOPI_ENABLED=true onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ env.EC2_IP }}
+
+      - name: DS-VPATH Start nginx container
+        continue-on-error: true
+        run: |
+          scp -o StrictHostKeyChecking=no dev-SRV-dependances/nginx-vpath.conf \
+            ubuntu@${{ env.EC2_IP }}:~/nginx-vpath.conf
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker rm -f ds-vpath-nginx 2>/dev/null || true
+          sudo docker run -d --network ds-network -p 80:80 --name ds-vpath-nginx \
+            -v ~/nginx-vpath.conf:/etc/nginx/conf.d/default.conf:ro nginx:latest
+          EOF
+
+      - name: DS-VPATH Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s http://${{ env.EC2_IP }}/ds-vpath/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s http://${{ env.EC2_IP }}/ds-vpath/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: DS-VPATH Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/ds-vpath/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_DS_VPATH=$HC" >> $GITHUB_ENV
+
+      - name: DS-VPATH Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_DS_VPATH_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_DS_VPATH_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_DS_VPATH_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: DS-VPATH Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: DS-VPATH Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: DS-VPATH Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i -E "s#\"url\": \"https?://[^\"]*/example\"#\"url\": \"http://${{ env.EC2_IP }}/ds-vpath/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: DS-VPATH Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: DS-VPATH Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition DS_VPATH
+
+      - name: DS-VPATH Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+
+      - name: DS-VPATH Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_DS_VPATH
+          label: DS_VPATH
+
+      - name: DS-VPATH Remove nginx container
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker rm -f ds-vpath-nginx || true"
+
+      - name: AMQP_ARTEMIS Docker reInstall
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true
+          sudo docker rm \$(sudo docker ps -aq) 2>/dev/null || true
+          sudo docker network rm ds-network 2>/dev/null || true
+          sudo docker network create ds-network
+          sudo docker run -d --network ds-network \
+            --name onlyoffice-mq \
+            -e ARTEMIS_USER=artemis \
+            -e ARTEMIS_PASSWORD=artemis \
+            apache/activemq-artemis:2.40.0-alpine
+          sudo docker run -itd --network ds-network -p 80:80 \
+            --name ds-ee-dev \
+            -e AMQP_TYPE=activemq \
+            -e AMQP_URI=amqp://artemis:artemis@onlyoffice-mq \
+            -e JWT_ENABLED=true \
+            -e JWT_SECRET=MYSECRET \
+            -e WOPI_ENABLED=true \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ env.EC2_IP }}
+
+      - name: AMQP_ARTEMIS Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: AMQP_ARTEMIS Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_AMQP_ARTEMIS=$HC" >> $GITHUB_ENV
+
+      - name: AMQP_ARTEMIS Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_AMQP_ARTEMIS_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_AMQP_ARTEMIS_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_AMQP_ARTEMIS_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: AMQP_ARTEMIS Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: AMQP_ARTEMIS Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: AMQP_ARTEMIS Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i -E "s#\"url\": \"[^\"]+/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: AMQP_ARTEMIS Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: AMQP_ARTEMIS Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition AMQP_ARTEMIS
+
+      - name: AMQP_ARTEMIS Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+
+      - name: AMQP_ARTEMIS Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_AMQP_ARTEMIS
+          label: AMQP_ARTEMIS
+
+      - name: AMQP_CLASSIC Docker reInstall
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker stop ds-ee-dev onlyoffice-mq || true
+          sudo docker rm ds-ee-dev onlyoffice-mq || true
+          sudo docker run -d --network ds-network \
+            --name onlyoffice-mq \
+            -e ACTIVEMQ_USERNAME=admin \
+            -e ACTIVEMQ_PASSWORD=admin \
+            apache/activemq-classic:latest
+          sudo docker run -itd --network ds-network -p 80:80 \
+            --name ds-ee-dev \
+            -e AMQP_TYPE=activemq \
+            -e AMQP_URI=amqp://admin:admin@onlyoffice-mq \
+            -e JWT_ENABLED=true \
+            -e JWT_SECRET=MYSECRET \
+            -e WOPI_ENABLED=true \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ env.EC2_IP }}
+
+      - name: AMQP_CLASSIC Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: AMQP_CLASSIC Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_AMQP_CLASSIC=$HC" >> $GITHUB_ENV
+
+      - name: AMQP_CLASSIC Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_AMQP_CLASSIC_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_AMQP_CLASSIC_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_AMQP_CLASSIC_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: AMQP_CLASSIC Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: AMQP_CLASSIC Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: AMQP_CLASSIC Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: AMQP_CLASSIC Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: AMQP_CLASSIC Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition AMQP_CLASSIC
+
+      - name: AMQP_CLASSIC Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+
+      - name: AMQP_CLASSIC Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_AMQP_CLASSIC
+          label: AMQP_CLASSIC
+
+      - name: REDIS_REDIS Docker reInstall
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true
+          sudo docker rm \$(sudo docker ps -aq) 2>/dev/null || true
+          sudo docker network rm ds-network 2>/dev/null || true
+          sudo docker run -itd -p 80:80 \
+            --name ds-ee-dev \
+            -e WOPI_ENABLED=true \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ env.EC2_IP }}
+
+      - name: REDIS_REDIS Configure unix.sock
+        continue-on-error: true
+        run: |
+          # Install now generates a random redis password in local.json; pull it and inject
+          # it into our socket config (redis driver reads options.password) and into ping.
+          REDIS_PASS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local.json | jq -r '.services.CoAuthoring.redis.options.password // empty'")
+          echo "REDIS_PASS_REDIS_REDIS=$REDIS_PASS" >> $GITHUB_ENV
+          echo "Redis password from local.json: '$REDIS_PASS'"
+          AUTH=""; [ -n "$REDIS_PASS" ] && AUTH="-a $REDIS_PASS"
+          if [ -n "$REDIS_PASS" ]; then
+            jq --arg p "$REDIS_PASS" '.services.CoAuthoring.redis.options.password = $p' \
+              redis/redis-unix-sock/local-production-linux.json > /tmp/lp.json
+          else
+            cp redis/redis-unix-sock/local-production-linux.json /tmp/lp.json
+          fi
+          scp -o StrictHostKeyChecking=no /tmp/lp.json \
+            ubuntu@${{ env.EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          echo "------------ STOP DS services -------------"
+          sudo docker exec ds-ee-dev supervisorctl stop ds:converter ds:docservice ds:adminpanel
+          echo "------------ Setup unix.sock and STOP redis server -------------"
+          sudo docker exec ds-ee-dev bash -c "sed -i 's/^port .*/port 0/' /etc/redis/redis.conf && echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf && echo 'unixsocketperm 777' >> /etc/redis/redis.conf && pkill -f redis-server"
+          sleep 10
+          echo "------------ START REDIS server -------------"
+          sudo docker exec ds-ee-dev service redis-server start
+          echo "------------ Redis ping -------------"
+          sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock $AUTH ping
+          echo "------------ Redis port 6379 must be closed -------------"
+          sudo docker exec ds-ee-dev netstat -tulpn
+          echo "------------ Copy DS local-production-linux.json config -------------"
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo rm ~/local-production-linux.json
+          sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
+          echo "------------ START DS services -------------"
+          sudo docker exec ds-ee-dev supervisorctl start ds:converter ds:docservice ds:adminpanel
+          sleep 10
+          EOF
+
+      - name: REDIS_REDIS Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          echo "-------------healthcheck-------------"
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: REDIS_REDIS Check healthcheck and socket
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_REDIS_REDIS=$HC" >> $GITHUB_ENV
+
+          AUTH=""; [ -n "$REDIS_PASS_REDIS_REDIS" ] && AUTH="-a $REDIS_PASS_REDIS_REDIS"
+          PING=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock $AUTH ping 2>/dev/null || echo 'error'")
+          echo "Redis socket ping: $PING"
+          if [ "$PING" = "PONG" ]; then
+            echo "REDIS_SOCK_OK_REDIS_REDIS=true" >> $GITHUB_ENV
+          else
+            echo "REDIS_SOCK_OK_REDIS_REDIS=false" >> $GITHUB_ENV
+          fi
+
+          PORT_CHECK=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev netstat -tulpn 2>/dev/null | grep ':6379' || echo ''")
+          echo "Port 6379 check: '${PORT_CHECK}'"
+          if [ -z "$PORT_CHECK" ]; then
+            echo "PORT_6379_CLOSED_REDIS_REDIS=true" >> $GITHUB_ENV
+          else
+            echo "PORT_6379_CLOSED_REDIS_REDIS=false" >> $GITHUB_ENV
+          fi
+
+      - name: REDIS_REDIS Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_REDIS_REDIS_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_REDIS_REDIS_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_REDIS_REDIS_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: REDIS_REDIS Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: REDIS_REDIS Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: REDIS_REDIS Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          sed -i -E "s#\"url\": \"[^\"]+/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: REDIS_REDIS Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: REDIS_REDIS Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition REDIS_REDIS
+
+      - name: REDIS_REDIS Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+
+      - name: REDIS_REDIS Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_REDIS_REDIS
+          label: REDIS_REDIS
+
+      - name: REDIS_IOREDIS Docker reInstall
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true
+          sudo docker rm \$(sudo docker ps -aq) 2>/dev/null || true
+          sudo docker network rm ds-network 2>/dev/null || true
+          sudo docker run -itd -p 80:80 \
+            --name ds-ee-dev \
+            -e WOPI_ENABLED=true \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ env.EC2_IP }}
+
+      - name: REDIS_IOREDIS Configure unix.sock
+        continue-on-error: true
+        run: |
+          # Install now generates a random redis password in local.json; pull it and inject
+          # it into our socket config (ioredis driver reads iooptions.password) and into ping.
+          REDIS_PASS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local.json | jq -r '.services.CoAuthoring.redis.options.password // empty'")
+          echo "REDIS_PASS_REDIS_IOREDIS=$REDIS_PASS" >> $GITHUB_ENV
+          echo "Redis password from local.json: '$REDIS_PASS'"
+          AUTH=""; [ -n "$REDIS_PASS" ] && AUTH="-a $REDIS_PASS"
+          if [ -n "$REDIS_PASS" ]; then
+            jq --arg p "$REDIS_PASS" '.services.CoAuthoring.redis.iooptions.password = $p' \
+              redis/ioredis-unix-sock/local-production-linux.json > /tmp/lp.json
+          else
+            cp redis/ioredis-unix-sock/local-production-linux.json /tmp/lp.json
+          fi
+          scp -o StrictHostKeyChecking=no /tmp/lp.json \
+            ubuntu@${{ env.EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          echo "------------ STOP DS services -------------"
+          sudo docker exec ds-ee-dev supervisorctl stop ds:converter ds:docservice ds:adminpanel
+          echo "------------ Setup unix.sock and STOP redis server -------------"
+          sudo docker exec ds-ee-dev bash -c "sed -i 's/^port .*/port 0/' /etc/redis/redis.conf && echo 'unixsocket /run/redis/redis-server.sock' >> /etc/redis/redis.conf && echo 'unixsocketperm 777' >> /etc/redis/redis.conf && pkill -f redis-server"
+          sleep 10
+          echo "------------ START REDIS server -------------"
+          sudo docker exec ds-ee-dev service redis-server start
+          echo "------------ Redis ping -------------"
+          sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock $AUTH ping
+          echo "------------ Redis port 6379 must be closed -------------"
+          sudo docker exec ds-ee-dev netstat -tulpn
+          echo "------------ Copy DS local-production-linux.json config -------------"
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          sudo rm ~/local-production-linux.json
+          sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
+          echo "------------ START DS services -------------"
+          sudo docker exec ds-ee-dev supervisorctl start ds:converter ds:docservice ds:adminpanel
+          sleep 10
+          EOF
+
+      - name: REDIS_IOREDIS Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          echo "-------------healthcheck-------------"
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: REDIS_IOREDIS Check healthcheck and socket
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_REDIS_IOREDIS=$HC" >> $GITHUB_ENV
+
+          AUTH=""; [ -n "$REDIS_PASS_REDIS_IOREDIS" ] && AUTH="-a $REDIS_PASS_REDIS_IOREDIS"
+          PING=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev redis-cli -s /run/redis/redis-server.sock $AUTH ping 2>/dev/null || echo 'error'")
+          echo "Redis socket ping: $PING"
+          if [ "$PING" = "PONG" ]; then
+            echo "REDIS_SOCK_OK_REDIS_IOREDIS=true" >> $GITHUB_ENV
+          else
+            echo "REDIS_SOCK_OK_REDIS_IOREDIS=false" >> $GITHUB_ENV
+          fi
+
+          PORT_CHECK=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev netstat -tulpn 2>/dev/null | grep ':6379' || echo ''")
+          echo "Port 6379 check: '${PORT_CHECK}'"
+          if [ -z "$PORT_CHECK" ]; then
+            echo "PORT_6379_CLOSED_REDIS_IOREDIS=true" >> $GITHUB_ENV
+          else
+            echo "PORT_6379_CLOSED_REDIS_IOREDIS=false" >> $GITHUB_ENV
+          fi
+
+      - name: REDIS_IOREDIS Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_REDIS_IOREDIS_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_REDIS_IOREDIS_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_REDIS_IOREDIS_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: REDIS_IOREDIS Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: REDIS_IOREDIS Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: REDIS_IOREDIS Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: REDIS_IOREDIS Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: REDIS_IOREDIS Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition REDIS_IOREDIS
+
+      - name: REDIS_IOREDIS Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+
+      - name: REDIS_IOREDIS Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_REDIS_IOREDIS
+          label: REDIS_IOREDIS
+
+      - name: Final check
+        if: always()
+        env:
+          EXPECTED_VERSION: "${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+        run: bash .github/scripts/dev-srv-dependances/final-check.sh
+
+      - name: Save results
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p .github/workflow-results
+          python3 - << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+
+          def b(v): return os.environ.get(v, 'false') == 'true'
+          def n(v): return int(os.environ.get(v, '0') or '0')
+          def s(v): return os.environ.get(v, 'not set')
+
+          # puppeteer passes only when nothing failed AND something actually ran
+          def ppt_ok(failed, total): return failed == 0 and total > 0
+
+          vp_ppt       = n('PUPPETEER_DS_VPATH_FAILED')
+          vp_ok        = n('PUPPETEER_DS_VPATH_OK')
+          vp_total     = n('PUPPETEER_DS_VPATH_TOTAL')
+          art_ppt      = n('PUPPETEER_AMQP_ARTEMIS_FAILED')
+          art_ok       = n('PUPPETEER_AMQP_ARTEMIS_OK')
+          art_total    = n('PUPPETEER_AMQP_ARTEMIS_TOTAL')
+          cls_ppt      = n('PUPPETEER_AMQP_CLASSIC_FAILED')
+          cls_ok       = n('PUPPETEER_AMQP_CLASSIC_OK')
+          cls_total    = n('PUPPETEER_AMQP_CLASSIC_TOTAL')
+          rr_ppt       = n('PUPPETEER_REDIS_REDIS_FAILED')
+          rr_ok        = n('PUPPETEER_REDIS_REDIS_OK')
+          rr_total     = n('PUPPETEER_REDIS_REDIS_TOTAL')
+          ri_ppt       = n('PUPPETEER_REDIS_IOREDIS_FAILED')
+          ri_ok        = n('PUPPETEER_REDIS_IOREDIS_OK')
+          ri_total     = n('PUPPETEER_REDIS_IOREDIS_TOTAL')
+          vp_ds   = n('DS_LOG_ERRORS_DS_VPATH')
+          art_ds  = n('DS_LOG_ERRORS_AMQP_ARTEMIS')
+          cls_ds  = n('DS_LOG_ERRORS_AMQP_CLASSIC')
+          rr_ds   = n('DS_LOG_ERRORS_REDIS_REDIS')
+          ri_ds   = n('DS_LOG_ERRORS_REDIS_IOREDIS')
+
+          data = {
+              'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              'vpath': {
+                  'healthy':               b('HEALTHCHECK_DS_VPATH'),
+                  'version_ok':            b('VERSION_DS_VPATH_OK'),
+                  'version_actual':        s('VERSION_DS_VPATH_ACTUAL'),
+                  'puppeteer_failed':      vp_ppt,
+                  'puppeteer_ok':          vp_ok,
+                  'puppeteer_total':       vp_total,
+                  'ds_log_errors':         vp_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_DS_VPATH') and b('VERSION_DS_VPATH_OK') and ppt_ok(vp_ppt, vp_total) and vp_ds == 0) else 'failure',
+              },
+              'amqp_artemis': {
+                  'healthy':               b('HEALTHCHECK_AMQP_ARTEMIS'),
+                  'version_ok':            b('VERSION_AMQP_ARTEMIS_OK'),
+                  'version_actual':        s('VERSION_AMQP_ARTEMIS_ACTUAL'),
+                  'puppeteer_failed':      art_ppt,
+                  'puppeteer_ok':          art_ok,
+                  'puppeteer_total':       art_total,
+                  'ds_log_errors':         art_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_AMQP_ARTEMIS') and b('VERSION_AMQP_ARTEMIS_OK') and ppt_ok(art_ppt, art_total) and art_ds == 0) else 'failure',
+              },
+              'amqp_classic': {
+                  'healthy':               b('HEALTHCHECK_AMQP_CLASSIC'),
+                  'version_ok':            b('VERSION_AMQP_CLASSIC_OK'),
+                  'version_actual':        s('VERSION_AMQP_CLASSIC_ACTUAL'),
+                  'puppeteer_failed':      cls_ppt,
+                  'puppeteer_ok':          cls_ok,
+                  'puppeteer_total':       cls_total,
+                  'ds_log_errors':         cls_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_AMQP_CLASSIC') and b('VERSION_AMQP_CLASSIC_OK') and ppt_ok(cls_ppt, cls_total) and cls_ds == 0) else 'failure',
+              },
+              'redis_redis': {
+                  'healthy':               b('HEALTHCHECK_REDIS_REDIS'),
+                  'version_ok':            b('VERSION_REDIS_REDIS_OK'),
+                  'version_actual':        s('VERSION_REDIS_REDIS_ACTUAL'),
+                  'redis_sock_ok':         b('REDIS_SOCK_OK_REDIS_REDIS'),
+                  'port_6379_closed':      b('PORT_6379_CLOSED_REDIS_REDIS'),
+                  'puppeteer_failed':      rr_ppt,
+                  'puppeteer_ok':          rr_ok,
+                  'puppeteer_total':       rr_total,
+                  'ds_log_errors':         rr_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_REDIS') and b('VERSION_REDIS_REDIS_OK') and b('REDIS_SOCK_OK_REDIS_REDIS') and b('PORT_6379_CLOSED_REDIS_REDIS') and ppt_ok(rr_ppt, rr_total) and rr_ds == 0) else 'failure',
+              },
+              'redis_ioredis': {
+                  'healthy':               b('HEALTHCHECK_REDIS_IOREDIS'),
+                  'version_ok':            b('VERSION_REDIS_IOREDIS_OK'),
+                  'version_actual':        s('VERSION_REDIS_IOREDIS_ACTUAL'),
+                  'redis_sock_ok':         b('REDIS_SOCK_OK_REDIS_IOREDIS'),
+                  'port_6379_closed':      b('PORT_6379_CLOSED_REDIS_IOREDIS'),
+                  'puppeteer_failed':      ri_ppt,
+                  'puppeteer_ok':          ri_ok,
+                  'puppeteer_total':       ri_total,
+                  'ds_log_errors':         ri_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_IOREDIS') and b('VERSION_REDIS_IOREDIS_OK') and b('REDIS_SOCK_OK_REDIS_IOREDIS') and b('PORT_6379_CLOSED_REDIS_IOREDIS') and ppt_ok(ri_ppt, ri_total) and ri_ds == 0) else 'failure',
+              },
+              'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
+          }
+          path = '.github/workflow-results/dev-srv-dependances.json'
+          with open(path, 'w') as f:
+              json.dump(data, f, indent=2)
+          print(f'Saved: {path}')
+          PYEOF
+
+          aws s3 cp .github/workflow-results/dev-srv-dependances.json \
+            s3://${{ vars.DASHBOARD_BUCKET_NAME }}/results/dev-srv-dependances.json \
+            --region ${{ vars.DASHBOARD_BUCKET_REGION }}
+
+      - name: Delete EC2 Instance
+        if: always()
+        run: |
+          aws ec2 terminate-instances --instance-ids ${{ env.INSTANCE_ID }}
+          aws ec2 wait instance-terminated --instance-ids ${{ env.INSTANCE_ID }}

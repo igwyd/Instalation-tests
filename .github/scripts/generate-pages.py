@@ -438,7 +438,7 @@ def generate_main():
         '<a class="card card-dev" href="dev.html">\n'
         '  <div class="card-label">Pre-release builds</div>\n'
         '  <div class="card-title">DEV</div>\n'
-        '  <div class="card-desc">DEB, RPM, Docker, OS (OneClickInstall),<br>Database, ActiveMQ, Redis, SERVER checks</div>\n'
+        '  <div class="card-desc">DEB, RPM, Docker, OS (OneClickInstall),<br>Database, SRV Storage, SRV Dependances</div>\n'
         '  <div class="card-arrow">Open →</div>\n'
         '</a>\n'
         '<a class="card card-release" href="release.html">\n'
@@ -522,7 +522,8 @@ def generate_dev():
     docker_rpm_x64   = load("dev-docker-rpm-x64.json")
     docker_rpm_arm64 = load("dev-docker-rpm-arm64.json")
     db_data        = {key: load(f"dev-db-{key}.json") for _, key in DBS}
-    server_checks  = load("dev-server-checks.json")
+    server_checks  = load("dev-srv-storage.json")
+    dep_checks     = load("dev-srv-dependances.json")
     tls_deps       = load("dev-tls-dependencies.json")
 
     deb_body        = pkg_table(deb_x64, "x64") + pkg_table(deb_arm64, "arm64")
@@ -555,11 +556,11 @@ def generate_dev():
                + '</tbody></table>\n'
                + k6_section(db_data))
 
-    # SERVER checks section body
+    # SRV storage section body
     server_run_date = (server_checks or {}).get("run_date", "")
     server_date_part = f' <span class="date">· {escape(server_run_date)}</span>' if server_run_date else ""
     server_rows = []
-    for label, key in [("S3 useDirectStorageUrls=false", "s3_false"), ("S3 useDirectStorageUrls=true", "s3_true"), ("S3 s3ForcePathStyle=true", "s3_path_style"), ("S3 AWS KMS", "s3_kms"), ("MinIO HTTP useDirectStorageUrls=false", "minio_http_false"), ("MinIO HTTP useDirectStorageUrls=true", "minio_http_true"), ("MinIO HTTP s3ForcePathStyle=true", "minio_http_path_style"), ("Azure Blob Storage useDirectStorageUrls=false", "az_false"), ("Azure Blob Storage useDirectStorageUrls=true", "az_true"), ("Azure Blob Storage encryptionScope", "az_encryption_scope"), ("Virtual Path", "vpath"), ("ActiveMQ Artemis", "amqp_artemis"), ("ActiveMQ Classic", "amqp_classic")]:
+    for label, key in [("S3 useDirectStorageUrls=false", "s3_false"), ("S3 useDirectStorageUrls=true", "s3_true"), ("S3 s3ForcePathStyle=true", "s3_path_style"), ("S3 AWS KMS", "s3_kms"), ("MinIO HTTP useDirectStorageUrls=false", "minio_http_false"), ("MinIO HTTP useDirectStorageUrls=true", "minio_http_true"), ("MinIO HTTP s3ForcePathStyle=true", "minio_http_path_style"), ("Azure Blob Storage useDirectStorageUrls=false", "az_false"), ("Azure Blob Storage useDirectStorageUrls=true", "az_true"), ("Azure Blob Storage encryptionScope", "az_encryption_scope")]:
         d = (server_checks or {}).get(key)
         if d is None:
             server_rows.append(f'<tr><td>{label}</td>'
@@ -578,11 +579,44 @@ def generate_dev():
                 + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
                 + '</tr>'
             )
-    redis_server_rows = []
-    for label, key in [("redis", "redis_redis"), ("ioredis", "redis_ioredis")]:
-        d = (server_checks or {}).get(key)
+    server_body = (
+        f'<h3>EE{server_date_part}</h3>\n'
+        '<table><thead><tr>'
+        '<th>Cycle</th><th>Healthcheck</th><th>Version</th>'
+        '<th>Puppeteer (=0)</th><th>DS Log Errors</th>'
+        '</tr></thead><tbody>'
+        + '\n'.join(server_rows)
+        + '</tbody></table>\n'
+    )
+
+    # SRV dependances section body
+    dep_run_date = (dep_checks or {}).get("run_date", "")
+    dep_date_part = f' <span class="date">· {escape(dep_run_date)}</span>' if dep_run_date else ""
+    dep_rows = []
+    for label, key in [("Virtual Path", "vpath"), ("ActiveMQ Artemis", "amqp_artemis"), ("ActiveMQ Classic", "amqp_classic")]:
+        d = (dep_checks or {}).get(key)
         if d is None:
-            redis_server_rows.append(f'<tr><td>{label}</td>' + '<td class="na">—</td>' * 6 + '</tr>')
+            dep_rows.append(f'<tr><td>{label}</td>'
+                            + '<td class="na">—</td>' * 4 + '</tr>')
+        else:
+            hc     = d.get("healthy", False)
+            ver_ok = d.get("version_ok", False)
+            ver    = d.get("version_actual", "?") or "?"
+            ds_err = d.get("ds_log_errors", 0)
+            dep_rows.append(
+                f'<tr>'
+                f'<td>{label}</td>'
+                + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
+                + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
+                + td_ppt_breakdown(d, threshold=0)
+                + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
+                + '</tr>'
+            )
+    redis_dep_rows = []
+    for label, key in [("redis", "redis_redis"), ("ioredis", "redis_ioredis")]:
+        d = (dep_checks or {}).get(key)
+        if d is None:
+            redis_dep_rows.append(f'<tr><td>{label}</td>' + '<td class="na">—</td>' * 6 + '</tr>')
         else:
             hc     = d.get("healthy", False)
             ver_ok = d.get("version_ok", False)
@@ -590,7 +624,7 @@ def generate_dev():
             sock   = d.get("redis_sock_ok", False)
             port   = d.get("port_6379_closed", False)
             ds_err = d.get("ds_log_errors", 0)
-            redis_server_rows.append(
+            redis_dep_rows.append(
                 f'<tr>'
                 f'<td>{label}</td>'
                 + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
@@ -602,13 +636,13 @@ def generate_dev():
                 + '</tr>'
             )
 
-    server_body = (
-        f'<h3>EE{server_date_part}</h3>\n'
+    dep_body = (
+        f'<h3>EE{dep_date_part}</h3>\n'
         '<table><thead><tr>'
         '<th>Cycle</th><th>Healthcheck</th><th>Version</th>'
         '<th>Puppeteer (=0)</th><th>DS Log Errors</th>'
         '</tr></thead><tbody>'
-        + '\n'.join(server_rows)
+        + '\n'.join(dep_rows)
         + '</tbody></table>\n'
         + '<h3>EE — Redis unix.sock</h3>\n'
         '<table><thead><tr>'
@@ -616,7 +650,7 @@ def generate_dev():
         '<th>Redis sock ping</th><th>Port 6379 closed</th>'
         '<th>Puppeteer (=0)</th><th>DS Log Errors</th>'
         '</tr></thead><tbody>'
-        + '\n'.join(redis_server_rows)
+        + '\n'.join(redis_dep_rows)
         + '</tbody></table>\n'
     )
 
@@ -627,7 +661,8 @@ def generate_dev():
         + section("Docker RPM (CentOS 9)", "dev-Docker-RPM-x64-arm64.yml", "dev-Docker-RPM-x64-arm64", docker_rpm_body)
         + section("OS Tests (OneClickInstall)", "dev-OS-x64-arm64.yml", "dev-OS-x64-arm64", os_body, os_run_date)
         + section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body, db_run_date)
-        + section("SERVER Checks (AWS S3)", "dev-SERVER-checks.yml", "dev SERVER checks", server_body)
+        + section("SRV Storage (S3, MinIO, Azure)", "dev-SRV-storage.yml", "dev SRV storage", server_body)
+        + section("SRV Dependances (Virtual Path, ActiveMQ, Redis)", "dev-SRV-dependances.yml", "dev SRV dependances", dep_body)
         + section("TLS Dependencies", "dev-TLS-dependencies.yaml", "dev TLS dependencies", tls_body(tls_deps))
     )
     write("dev.html", page_html("DEV — ONLYOFFICE Docs Test Results", body, breadcrumb("DEV")))
