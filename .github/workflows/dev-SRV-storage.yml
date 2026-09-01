@@ -861,14 +861,6 @@ jobs:
           container: ds-ee-dev
           allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
 
-      - name: MINIO_HTTP_TRUE Enable nginx config
-        continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
-            "sudo rm -f /etc/nginx/sites-enabled/* && \
-             sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
-             sudo nginx -t && sudo systemctl reload nginx"
-
       - name: MINIO_HTTP_TRUE Configure
         continue-on-error: true
         env:
@@ -892,7 +884,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -900,13 +892,15 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI--------------"
-          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: MINIO_HTTP_TRUE Check healthcheck
         continue-on-error: true
         run: |
-          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          # No HTTPS here on purpose — DS served plain HTTP/IP so the browser doesn't hit
+          # mixed-content blocking when it fetches presigned URLs directly from MinIO (also HTTP).
+          HC=$(curl -s "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || echo "error")
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_MINIO_HTTP_TRUE=$HC" >> $GITHUB_ENV
 
@@ -937,6 +931,9 @@ jobs:
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
+          # Switch off the HTTPS domain to plain HTTP/IP — avoids mixed-content blocking when
+          # the browser fetches presigned URLs directly from MinIO (also plain HTTP)
+          sed -i -E "s#\"url\": \"https?://[^\"]*/example\"#\"url\": \"http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
@@ -1004,14 +1001,6 @@ jobs:
           container: ds-ee-dev
           allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
 
-      - name: MINIO_HTTP_PATH-STYLE Enable nginx config
-        continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
-            "sudo rm -f /etc/nginx/sites-enabled/* && \
-             sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
-             sudo nginx -t && sudo systemctl reload nginx"
-
       - name: MINIO_HTTP_PATH-STYLE Configure
         continue-on-error: true
         env:
@@ -1035,7 +1024,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck; echo
+          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -1043,13 +1032,14 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI--------------"
-          curl -s https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/hosting/discovery | tail -c 150; echo
+          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: MINIO_HTTP_PATH-STYLE Check healthcheck
         continue-on-error: true
         run: |
-          HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          # No HTTPS here on purpose — see MINIO_HTTP_TRUE Check healthcheck for why
+          HC=$(curl -s "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || echo "error")
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_MINIO_HTTP_PATH_STYLE=$HC" >> $GITHUB_ENV
 
@@ -1234,6 +1224,9 @@ jobs:
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
+          # Switch back to the HTTPS domain — MinIO cycles before this one patched the URL to
+          # plain HTTP/IP to dodge mixed-content blocking; Azure Blob Storage is genuinely HTTPS.
+          sed -i -E "s#\"url\": \"http://[^\"]*/example\"#\"url\": \"https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
