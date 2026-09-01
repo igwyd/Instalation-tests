@@ -270,8 +270,9 @@ jobs:
             PODS_ICON="❌"; PODS_LABEL="FAILED"; FAILED=1
           fi
 
-          PPT="${PUPPETEER_DE_FAILED:-0}"
-          if [ "${PPT}" -gt 5 ]; then
+          PPT="${PUPPETEER_DE_FAILED:-0}"; PPT_O="${PUPPETEER_DE_OK:-0}"; PPT_T="${PUPPETEER_DE_TOTAL:-0}"
+          PPT_DETAIL="${PPT_O}/${PPT_T} passed, ${PPT} failed"
+          if [ "${PPT}" -gt 0 ] || [ "${PPT_T}" -eq 0 ]; then
             PPT_ICON="❌"; PPT_LABEL="FAILED"; FAILED=1
           else
             PPT_ICON="✅"; PPT_LABEL="OK"
@@ -294,7 +295,7 @@ jobs:
             echo "| Healthcheck | ${HC_ICON} ${HC_LABEL} |"
             echo "| Version | ${VER_ICON} \`${VERSION_ACTUAL:-?}\` |"
             echo "| Pods | ${PODS_ICON} ${PODS_LABEL} |"
-            echo "| Puppeteer (≤5 errors) | ${PPT_ICON} ${PPT_LABEL} (${PPT}) |"
+            echo "| Puppeteer (=0) | ${PPT_ICON} ${PPT_LABEL} (${PPT_DETAIL}) |"
             echo "| DS Log Errors | ${DS_ICON} ${DS_LABEL} (${DS_ERR}) |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
@@ -311,7 +312,7 @@ jobs:
           printf "| %-26s | %-16s |\n" "Healthcheck" "${HC_LABEL}"
           printf "| %-26s | %-16s |\n" "Version (${VERSION_ACTUAL:-?})" "${VER_LABEL}"
           printf "| %-26s | %-16s |\n" "Pods" "${PODS_LABEL}"
-          printf "| %-26s | %-16s |\n" "Puppeteer (${PPT} errors)" "${PPT_LABEL}"
+          printf "| %-26s | %-16s |\n" "Puppeteer (${PPT_DETAIL})" "${PPT_LABEL}"
           printf "| %-26s | %-16s |\n" "DS Log Errors (${DS_ERR})" "${DS_LABEL}"
           echo "$SEP"
 
@@ -334,7 +335,7 @@ jobs:
           def b(v):   return os.environ.get(v, 'false') == 'true'
           def n(v):   return int(os.environ.get(v, '0') or '0')
           def s(v):   return os.environ.get(v, 'not set')
-          def ok5(v): return n(v) <= 5
+          def ppt_ok(failed, total): return failed == 0 and total > 0
 
           data = {
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
@@ -346,8 +347,10 @@ jobs:
                   'puppeteer_failed':      n('PUPPETEER_DE_FAILED'),
                   'puppeteer_api_failed':  n('PUPPETEER_DE_API_FAILED'),
                   'puppeteer_wopi_failed': n('PUPPETEER_DE_WOPI_FAILED'),
+                  'puppeteer_ok':          n('PUPPETEER_DE_OK'),
+                  'puppeteer_total':       n('PUPPETEER_DE_TOTAL'),
                   'ds_log_errors':         n('DS_LOG_ERRORS'),
-                  'conclusion': 'success' if (b('HEALTHCHECK') and b('VERSION_OK') and b('PODS_OK') and ok5('PUPPETEER_DE_FAILED') and n('DS_LOG_ERRORS') == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK') and b('VERSION_OK') and b('PODS_OK') and ppt_ok(n('PUPPETEER_DE_FAILED'), n('PUPPETEER_DE_TOTAL')) and n('DS_LOG_ERRORS') == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
           }

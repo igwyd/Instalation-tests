@@ -65,7 +65,6 @@ jobs:
         run: |
           echo "DOCKER_HEALTHY=false" >> $GITHUB_ENV
           echo "NATIVE_HEALTHY=false" >> $GITHUB_ENV
-          echo "PUPPETEER_TOTAL_FAILED=0" >> $GITHUB_ENV
 
       - name: Configure AWS CLI
         run: |
@@ -391,14 +390,22 @@ jobs:
           echo "Native version: ${NATIVE_VERSION:-not detected}"
 
           echo "=== Puppeteer results ==="
-          echo "Puppeteer Docker  failed: ${PUPPETEER_DOCKER_FAILED:-0}"
-          echo "Puppeteer Native  failed: ${PUPPETEER_NATIVE_FAILED:-0}"
-          echo "Puppeteer total   failed: ${PUPPETEER_TOTAL_FAILED:-0}"
-          if [ "${PUPPETEER_TOTAL_FAILED:-0}" -gt 5 ]; then
-            echo "Too many puppeteer failures: ${PUPPETEER_TOTAL_FAILED} (threshold: 5)"
+          D_P="${PUPPETEER_DOCKER_FAILED:-0}"; D_O="${PUPPETEER_DOCKER_OK:-0}"; D_T="${PUPPETEER_DOCKER_TOTAL:-0}"
+          echo "Puppeteer Docker: ${D_O}/${D_T} passed, ${D_P} failed"
+          if [ "${D_P}" -gt 0 ] || [ "${D_T}" -eq 0 ]; then
+            echo "Docker puppeteer FAILED"
             FAILED=1
           else
-            echo "Puppeteer tests OK: ${PUPPETEER_TOTAL_FAILED:-0} failures (threshold: 5)"
+            echo "Docker puppeteer OK"
+          fi
+
+          N_P="${PUPPETEER_NATIVE_FAILED:-0}"; N_O="${PUPPETEER_NATIVE_OK:-0}"; N_T="${PUPPETEER_NATIVE_TOTAL:-0}"
+          echo "Puppeteer Native: ${N_O}/${N_T} passed, ${N_P} failed"
+          if [ "${N_P}" -gt 0 ] || [ "${N_T}" -eq 0 ]; then
+            echo "Native puppeteer FAILED"
+            FAILED=1
+          else
+            echo "Native puppeteer OK"
           fi
 
           if [ "$FAILED" -eq 1 ]; then

@@ -121,14 +121,14 @@ def td_version(data):
     return f'<td class="{status(v_ok)}">{icon} {escape(actual)}</td>'
 
 
-def td_ppt_simple(failed, threshold=5):
+def td_ppt_simple(failed, threshold=0):
     is_ok = failed <= threshold
     icon = "✅" if is_ok else "❌"
     label = "OK" if is_ok else "FAILED"
     return f'<td class="{status(is_ok)}">{icon} {label} ({failed})</td>'
 
 
-def td_ppt_breakdown(data, threshold=5):
+def td_ppt_breakdown(data, threshold=0):
     if data is None:
         return '<td class="na">—</td>'
     failed = data.get("puppeteer_total_failed", data.get("puppeteer_failed", 0))
@@ -210,7 +210,7 @@ def pkg_table(data, arch_label):
 
     thead = ('<thead><tr>'
              '<th>Edition</th><th>Healthcheck</th><th>Version</th>'
-             '<th>SVC/JWT</th><th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
+             '<th>SVC/JWT</th><th>Puppeteer (=0)</th><th>DS Log Errors</th>'
              '</tr></thead>')
     return (f'<h3>{arch_label}{date_part}</h3>\n'
             f'<table>{thead}<tbody>' + '\n'.join(rows) + '</tbody></table>\n')
@@ -243,7 +243,7 @@ def docker_table(data, arch_label):
 
     thead = ('<thead><tr>'
              '<th>Edition</th><th>Healthcheck</th><th>Version</th>'
-             '<th>SVC</th><th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
+             '<th>SVC</th><th>Puppeteer (=0)</th><th>DS Log Errors</th>'
              '</tr></thead>')
     return (f'<h3>{arch_label}{date_part}</h3>\n'
             f'<table>{thead}<tbody>' + '\n'.join(rows) + '</tbody></table>\n')
@@ -479,13 +479,9 @@ def generate_dev():
                 d_hc   = (docker or {}).get("healthy", False)
                 d_ver  = (docker or {}).get("version_actual", "?") or "?"
                 d_vok  = (docker or {}).get("version_ok", False)
-                d_ppt  = (docker or {}).get("puppeteer_failed", 0)
-                d_pok  = d_ppt <= 5
                 n_hc   = (native or {}).get("healthy", False)
                 n_ver  = (native or {}).get("version_actual", "?") or "?"
                 n_vok  = (native or {}).get("version_ok", False)
-                n_ppt  = (native or {}).get("puppeteer_failed", 0)
-                n_pok  = n_ppt <= 5
                 d_err  = (docker or {}).get("ds_log_errors", 0)
                 n_err  = (native or {}).get("ds_log_errors", 0)
                 err_ok = (d_err + n_err) == 0
@@ -497,8 +493,8 @@ def generate_dev():
                     + f'<td class="{status(d_vok)}">{"✅" if d_vok else "❌"} {escape(d_ver)}</td>'
                     + f'<td class="{status(n_hc)}">{"✅ OK" if n_hc else "❌ FAILED"}</td>'
                     + f'<td class="{status(n_vok)}">{"✅" if n_vok else "❌"} {escape(n_ver)}</td>'
-                    + f'<td class="{status(d_pok)}">{"✅" if d_pok else "❌"} {d_ppt}</td>'
-                    + f'<td class="{status(n_pok)}">{"✅" if n_pok else "❌"} {n_ppt}</td>'
+                    + td_ppt_breakdown(docker, threshold=0)
+                    + td_ppt_breakdown(native, threshold=0)
                     + f'<td class="{status(err_ok)}">{"✅" if err_ok else "❌"} {d_err + n_err}</td>'
                     + '</tr>'
                 )
@@ -507,7 +503,7 @@ def generate_dev():
         '<th>OS</th><th>Arch</th>'
         '<th>Docker HC</th><th>Docker Ver</th>'
         '<th>Native HC</th><th>Native Ver</th>'
-        '<th>Docker Puppeteer (≤5)</th><th>Native Puppeteer (≤5)</th><th>DS Log Errors</th>'
+        '<th>Docker Puppeteer (=0)</th><th>Native Puppeteer (=0)</th><th>DS Log Errors</th>'
         '</tr></thead><tbody>'
         + '\n'.join(os_rows)
         + '</tbody></table>\n'
@@ -550,7 +546,7 @@ def generate_dev():
             )
     db_body = ('<table><thead><tr>'
                '<th>Database</th><th>Healthcheck</th><th>Version</th>'
-               '<th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
+               '<th>Puppeteer (=0)</th><th>DS Log Errors</th>'
                '</tr></thead><tbody>'
                + '\n'.join(db_rows)
                + '</tbody></table>\n'
@@ -681,15 +677,13 @@ def generate_release():
         ver_ok  = ee.get("version_ok", False)
         ver_act = ee.get("version_actual", "?") or "?"
         pods_ok = ee.get("pods_ok", False)
-        ppt     = ee.get("puppeteer_failed", 0)
-        ppt_ok  = ppt <= 5
         ds_err  = ee.get("ds_log_errors", 0)
         row = (
             '<tr><td>DE</td>'
             + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
             + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver_act)}</td>'
             + f'<td class="{status(pods_ok)}">{"✅ OK" if pods_ok else "❌ FAILED"}</td>'
-            + f'<td class="{status(ppt_ok)}">{"✅" if ppt_ok else "❌"} {ppt}</td>'
+            + td_ppt_breakdown(ee, threshold=0)
             + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
             + '</tr>'
         )
@@ -698,7 +692,7 @@ def generate_release():
         f'<h3>arm64{date_part}</h3>\n'
         '<table><thead><tr>'
         '<th>Edition</th><th>Healthcheck</th><th>Version</th>'
-        '<th>Pods</th><th>Puppeteer (≤5)</th><th>DS Log Errors</th>'
+        '<th>Pods</th><th>Puppeteer (=0)</th><th>DS Log Errors</th>'
         '</tr></thead><tbody>'
         + row
         + '</tbody></table>\n'

@@ -554,14 +554,17 @@ jobs:
           done
 
           echo "=== Puppeteer results ==="
-          for VAR in PUPPETEER_EE_FAILED PUPPETEER_DE_FAILED PUPPETEER_CE_FAILED; do
-            VAL="${!VAR}"
-            echo "$VAR: ${VAL:-0}"
-            if [ "${VAL:-0}" -gt 5 ]; then
-              echo "$VAR FAILED (threshold: 5)"
+          for EDITION in EE DE CE; do
+            F_VAR="PUPPETEER_${EDITION}_FAILED"
+            O_VAR="PUPPETEER_${EDITION}_OK"
+            T_VAR="PUPPETEER_${EDITION}_TOTAL"
+            F="${!F_VAR:-0}"; O="${!O_VAR:-0}"; T="${!T_VAR:-0}"
+            echo "$EDITION: ${O}/${T} passed, ${F} failed"
+            if [ "$F" -gt 0 ] || [ "$T" -eq 0 ]; then
+              echo "$EDITION puppeteer FAILED"
               FAILED=1
             else
-              echo "$VAR OK (${VAL:-0} failures, threshold: 5)"
+              echo "$EDITION puppeteer OK"
             fi
           done
 

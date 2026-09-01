@@ -763,8 +763,9 @@ jobs:
           else
             EE_SVC_ICON="❌"; EE_SVC_LABEL="FAILED"; FAILED=1
           fi
-          EE_P="${PUPPETEER_EE_FAILED:-0}"
-          if [ "${EE_P}" -gt 5 ]; then
+          EE_P="${PUPPETEER_EE_FAILED:-0}"; EE_O="${PUPPETEER_EE_OK:-0}"; EE_T="${PUPPETEER_EE_TOTAL:-0}"
+          EE_DETAIL="${EE_O}/${EE_T} passed, ${EE_P} failed"
+          if [ "${EE_P}" -gt 0 ] || [ "${EE_T}" -eq 0 ]; then
             EE_PPT_ICON="❌"; EE_PPT_LABEL="FAILED"; FAILED=1
           else
             EE_PPT_ICON="✅"; EE_PPT_LABEL="OK"
@@ -792,8 +793,9 @@ jobs:
           else
             DE_SVC_ICON="❌"; DE_SVC_LABEL="FAILED"; FAILED=1
           fi
-          DE_P="${PUPPETEER_DE_FAILED:-0}"
-          if [ "${DE_P}" -gt 5 ]; then
+          DE_P="${PUPPETEER_DE_FAILED:-0}"; DE_O="${PUPPETEER_DE_OK:-0}"; DE_T="${PUPPETEER_DE_TOTAL:-0}"
+          DE_DETAIL="${DE_O}/${DE_T} passed, ${DE_P} failed"
+          if [ "${DE_P}" -gt 0 ] || [ "${DE_T}" -eq 0 ]; then
             DE_PPT_ICON="❌"; DE_PPT_LABEL="FAILED"; FAILED=1
           else
             DE_PPT_ICON="✅"; DE_PPT_LABEL="OK"
@@ -821,8 +823,9 @@ jobs:
           else
             CE_SVC_ICON="❌"; CE_SVC_LABEL="FAILED"; FAILED=1
           fi
-          CE_P="${PUPPETEER_CE_FAILED:-0}"
-          if [ "${CE_P}" -gt 5 ]; then
+          CE_P="${PUPPETEER_CE_FAILED:-0}"; CE_O="${PUPPETEER_CE_OK:-0}"; CE_T="${PUPPETEER_CE_TOTAL:-0}"
+          CE_DETAIL="${CE_O}/${CE_T} passed, ${CE_P} failed"
+          if [ "${CE_P}" -gt 0 ] || [ "${CE_T}" -eq 0 ]; then
             CE_PPT_ICON="❌"; CE_PPT_LABEL="FAILED"; FAILED=1
           else
             CE_PPT_ICON="✅"; CE_PPT_LABEL="OK"
@@ -862,8 +865,9 @@ jobs:
           else
             JWT_ICON="❌"; JWT_LABEL="FAIL"; FAILED=1
           fi
-          UG_P="${PUPPETEER_EE_UPGRADE_FAILED:-0}"
-          if [ "${UG_P}" -gt 5 ]; then
+          UG_P="${PUPPETEER_EE_UPGRADE_FAILED:-0}"; UG_O="${PUPPETEER_EE_UPGRADE_OK:-0}"; UG_T="${PUPPETEER_EE_UPGRADE_TOTAL:-0}"
+          UG_DETAIL="${UG_O}/${UG_T} passed, ${UG_P} failed"
+          if [ "${UG_P}" -gt 0 ] || [ "${UG_T}" -eq 0 ]; then
             UG_PPT_ICON="❌"; UG_PPT_LABEL="FAILED"; FAILED=1
           else
             UG_PPT_ICON="✅"; UG_PPT_LABEL="OK"
@@ -881,13 +885,13 @@ jobs:
             echo ""
             echo "**Expected version:** \`${EXPECTED}\`"
             echo ""
-            echo "| Edition | Healthcheck | Version | SVC/JWT | Puppeteer (≤5) | DS Log Errors |"
+            echo "| Edition | Healthcheck | Version | SVC/JWT | Puppeteer (=0) | DS Log Errors |"
             echo "|---------|-------------|---------|---------|----------------|---------------|"
-            echo "| EE         | ${EE_HC_ICON} ${EE_HC_LABEL}  | ${EE_VER_ICON} \`${VERSION_EE_ACTUAL:-?}\`            | SVC: ${EE_SVC_ICON} ${EE_SVC_LABEL}  | ${EE_PPT_ICON} ${EE_PPT_LABEL} (${EE_P})  | ${EE_D} |"
-            echo "| DE         | ${DE_HC_ICON} ${DE_HC_LABEL}  | ${DE_VER_ICON} \`${VERSION_DE_ACTUAL:-?}\`            | SVC: ${DE_SVC_ICON} ${DE_SVC_LABEL}  | ${DE_PPT_ICON} ${DE_PPT_LABEL} (${DE_P})  | ${DE_D} |"
-            echo "| CE         | ${CE_HC_ICON} ${CE_HC_LABEL}  | ${CE_VER_ICON} \`${VERSION_CE_ACTUAL:-?}\`            | SVC: ${CE_SVC_ICON} ${CE_SVC_LABEL}  | ${CE_PPT_ICON} ${CE_PPT_LABEL} (${CE_P})  | ${CE_D} |"
+            echo "| EE         | ${EE_HC_ICON} ${EE_HC_LABEL}  | ${EE_VER_ICON} \`${VERSION_EE_ACTUAL:-?}\`            | SVC: ${EE_SVC_ICON} ${EE_SVC_LABEL}  | ${EE_PPT_ICON} ${EE_PPT_LABEL} ${EE_DETAIL}  | ${EE_D} |"
+            echo "| DE         | ${DE_HC_ICON} ${DE_HC_LABEL}  | ${DE_VER_ICON} \`${VERSION_DE_ACTUAL:-?}\`            | SVC: ${DE_SVC_ICON} ${DE_SVC_LABEL}  | ${DE_PPT_ICON} ${DE_PPT_LABEL} ${DE_DETAIL}  | ${DE_D} |"
+            echo "| CE         | ${CE_HC_ICON} ${CE_HC_LABEL}  | ${CE_VER_ICON} \`${VERSION_CE_ACTUAL:-?}\`            | SVC: ${CE_SVC_ICON} ${CE_SVC_LABEL}  | ${CE_PPT_ICON} ${CE_PPT_LABEL} ${CE_DETAIL}  | ${CE_D} |"
             echo "| EE Release | ${RH_HC_ICON} ${RH_HC_LABEL}  | \`${VERSION_EE_RELEASE_ACTUAL:-?}\`  | JWT: ${RH_JWT_ICON} ${RH_JWT_LABEL}  | —  | —  |"
-            echo "| EE Upgrade | ${UG_HC_ICON} ${UG_HC_LABEL}  | ${UG_VER_ICON} \`${VERSION_EE_UPGRADE_ACTUAL:-?}\` | JWT: ${JWT_ICON} ${JWT_LABEL}  | ${UG_PPT_ICON} ${UG_PPT_LABEL} (${UG_P}) | ${UG_D} |"
+            echo "| EE Upgrade | ${UG_HC_ICON} ${UG_HC_LABEL}  | ${UG_VER_ICON} \`${VERSION_EE_UPGRADE_ACTUAL:-?}\` | JWT: ${JWT_ICON} ${JWT_LABEL}  | ${UG_PPT_ICON} ${UG_PPT_LABEL} ${UG_DETAIL} | ${UG_D} |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -901,11 +905,11 @@ jobs:
           echo "$SEP"
           printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "Edition" "HC" "Version" "Svc/JWT" "Puppeteer" "DS Errors"
           echo "$SEP"
-          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "EE"          "${EE_HC_LABEL}"  "${EE_VER_LABEL}"  "SVC:${EE_SVC_LABEL}"  "${EE_PPT_LABEL}(${EE_P})"  "${EE_D}"
-          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "DE"          "${DE_HC_LABEL}"  "${DE_VER_LABEL}"  "SVC:${DE_SVC_LABEL}"  "${DE_PPT_LABEL}(${DE_P})"  "${DE_D}"
-          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "CE"          "${CE_HC_LABEL}"  "${CE_VER_LABEL}"  "SVC:${CE_SVC_LABEL}"  "${CE_PPT_LABEL}(${CE_P})"  "${CE_D}"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "EE"          "${EE_HC_LABEL}"  "${EE_VER_LABEL}"  "SVC:${EE_SVC_LABEL}"  "${EE_DETAIL}"  "${EE_D}"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "DE"          "${DE_HC_LABEL}"  "${DE_VER_LABEL}"  "SVC:${DE_SVC_LABEL}"  "${DE_DETAIL}"  "${DE_D}"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "CE"          "${CE_HC_LABEL}"  "${CE_VER_LABEL}"  "SVC:${CE_SVC_LABEL}"  "${CE_DETAIL}"  "${CE_D}"
           printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "EE Release"  "${RH_HC_LABEL}"  "${VERSION_EE_RELEASE_ACTUAL:-?}"  "JWT:${RH_JWT_LABEL}"  "—"  "—"
-          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "EE Upgrade"  "${UG_HC_LABEL}"  "${UG_VER_LABEL}"  "${JWT_LABEL}"     "${UG_PPT_LABEL}(${UG_P})"  "${UG_D}"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "EE Upgrade"  "${UG_HC_LABEL}"  "${UG_VER_LABEL}"  "${JWT_LABEL}"     "${UG_DETAIL}"  "${UG_D}"
           echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
@@ -930,7 +934,7 @@ jobs:
           def b(v):   return os.environ.get(v, 'false') == 'true'
           def n(v):   return int(os.environ.get(v, '0') or '0')
           def s(v):   return os.environ.get(v, 'not set')
-          def ok5(v): return n(v) <= 5
+          def ppt_ok(failed, total): return failed == 0 and total > 0
 
           arch = s('ARCH')
           data = {
@@ -941,10 +945,12 @@ jobs:
                   'version_actual':   s('VERSION_EE_ACTUAL'),
                   'services_ok':      b('SERVICES_EE_OK'),
                   'puppeteer_failed':      n('PUPPETEER_EE_FAILED'),
+                  'puppeteer_ok':          n('PUPPETEER_EE_OK'),
+                  'puppeteer_total':       n('PUPPETEER_EE_TOTAL'),
                   'puppeteer_api_failed':  n('PUPPETEER_EE_API_FAILED'),
                   'puppeteer_wopi_failed': n('PUPPETEER_EE_WOPI_FAILED'),
                   'ds_log_errors':         n('DS_LOG_ERRORS_EE'),
-                  'conclusion': 'success' if (b('HEALTHCHECK_EE') and b('VERSION_EE_OK') and b('SERVICES_EE_OK') and ok5('PUPPETEER_EE_FAILED') and n('DS_LOG_ERRORS_EE') == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_EE') and b('VERSION_EE_OK') and b('SERVICES_EE_OK') and ppt_ok(n('PUPPETEER_EE_FAILED'), n('PUPPETEER_EE_TOTAL')) and n('DS_LOG_ERRORS_EE') == 0) else 'failure',
               },
               'de': {
                   'healthy':          b('HEALTHCHECK_DE'),
@@ -952,10 +958,12 @@ jobs:
                   'version_actual':   s('VERSION_DE_ACTUAL'),
                   'services_ok':      b('SERVICES_DE_OK'),
                   'puppeteer_failed':      n('PUPPETEER_DE_FAILED'),
+                  'puppeteer_ok':          n('PUPPETEER_DE_OK'),
+                  'puppeteer_total':       n('PUPPETEER_DE_TOTAL'),
                   'puppeteer_api_failed':  n('PUPPETEER_DE_API_FAILED'),
                   'puppeteer_wopi_failed': n('PUPPETEER_DE_WOPI_FAILED'),
                   'ds_log_errors':         n('DS_LOG_ERRORS_DE'),
-                  'conclusion': 'success' if (b('HEALTHCHECK_DE') and b('VERSION_DE_OK') and b('SERVICES_DE_OK') and ok5('PUPPETEER_DE_FAILED') and n('DS_LOG_ERRORS_DE') == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_DE') and b('VERSION_DE_OK') and b('SERVICES_DE_OK') and ppt_ok(n('PUPPETEER_DE_FAILED'), n('PUPPETEER_DE_TOTAL')) and n('DS_LOG_ERRORS_DE') == 0) else 'failure',
               },
               'ce': {
                   'healthy':          b('HEALTHCHECK_CE'),
@@ -963,10 +971,12 @@ jobs:
                   'version_actual':   s('VERSION_CE_ACTUAL'),
                   'services_ok':      b('SERVICES_CE_OK'),
                   'puppeteer_failed':      n('PUPPETEER_CE_FAILED'),
+                  'puppeteer_ok':          n('PUPPETEER_CE_OK'),
+                  'puppeteer_total':       n('PUPPETEER_CE_TOTAL'),
                   'puppeteer_api_failed':  n('PUPPETEER_CE_API_FAILED'),
                   'puppeteer_wopi_failed': n('PUPPETEER_CE_WOPI_FAILED'),
                   'ds_log_errors':         n('DS_LOG_ERRORS_CE'),
-                  'conclusion': 'success' if (b('HEALTHCHECK_CE') and b('VERSION_CE_OK') and b('SERVICES_CE_OK') and ok5('PUPPETEER_CE_FAILED') and n('DS_LOG_ERRORS_CE') == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_CE') and b('VERSION_CE_OK') and b('SERVICES_CE_OK') and ppt_ok(n('PUPPETEER_CE_FAILED'), n('PUPPETEER_CE_TOTAL')) and n('DS_LOG_ERRORS_CE') == 0) else 'failure',
               },
               'ee_upgrade': {
                   'healthy_release':         b('HEALTHCHECK_EE_RELEASE'),
@@ -977,10 +987,12 @@ jobs:
                   'version_actual':          s('VERSION_EE_UPGRADE_ACTUAL'),
                   'jwt_match':               b('JWT_MATCH'),
                   'puppeteer_failed':        n('PUPPETEER_EE_UPGRADE_FAILED'),
+                  'puppeteer_ok':            n('PUPPETEER_EE_UPGRADE_OK'),
+                  'puppeteer_total':         n('PUPPETEER_EE_UPGRADE_TOTAL'),
                   'puppeteer_api_failed':    n('PUPPETEER_EE_UPGRADE_API_FAILED'),
                   'puppeteer_wopi_failed':   n('PUPPETEER_EE_UPGRADE_WOPI_FAILED'),
                   'ds_log_errors':           n('DS_LOG_ERRORS_EE_UPGRADE'),
-                  'conclusion': 'success' if (b('HEALTHCHECK_EE_RELEASE') and b('HEALTHCHECK_EE_UPGRADE') and b('VERSION_EE_UPGRADE_OK') and b('JWT_MATCH') and ok5('PUPPETEER_EE_UPGRADE_FAILED') and n('DS_LOG_ERRORS_EE_UPGRADE') == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_EE_RELEASE') and b('HEALTHCHECK_EE_UPGRADE') and b('VERSION_EE_UPGRADE_OK') and b('JWT_MATCH') and ppt_ok(n('PUPPETEER_EE_UPGRADE_FAILED'), n('PUPPETEER_EE_UPGRADE_TOTAL')) and n('DS_LOG_ERRORS_EE_UPGRADE') == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
           }

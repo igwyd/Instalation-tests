@@ -399,9 +399,9 @@ jobs:
           fi
           VER_DETAIL="exp: ${EXPECTED}, act: ${VERSION_ACTUAL:-not set}"
 
-          PPTR_TOTAL="${PUPPETEER_FAILED:-0}"
-          PPT_DETAIL="${PPTR_TOTAL} (threshold: 5)"
-          if [ "$PPTR_TOTAL" -gt 5 ]; then
+          PPTR_TOTAL="${PUPPETEER_FAILED:-0}"; PPT_O="${PUPPETEER_OK:-0}"; PPT_T="${PUPPETEER_TOTAL:-0}"
+          PPT_DETAIL="${PPT_O}/${PPT_T} passed, ${PPTR_TOTAL} failed"
+          if [ "$PPTR_TOTAL" -gt 0 ] || [ "$PPT_T" -eq 0 ]; then
             PPT_ICON="❌"; PPT_LABEL="FAILED"; FAILED=1
           else
             PPT_ICON="✅"; PPT_LABEL="OK"
@@ -475,6 +475,8 @@ jobs:
               "puppeteer_api_failed": int(os.environ.get('PUPPETEER_API_FAILED', '0') or '0'),
               "puppeteer_wopi_failed": int(os.environ.get('PUPPETEER_WOPI_FAILED', '0') or '0'),
               "puppeteer_total_failed": int(os.environ.get('PUPPETEER_FAILED', '0') or '0'),
+              "puppeteer_ok": int(os.environ.get('PUPPETEER_OK', '0') or '0'),
+              "puppeteer_total": int(os.environ.get('PUPPETEER_TOTAL', '0') or '0'),
               "ds_log_errors": int(os.environ.get('DS_LOG_ERRORS', '0') or '0'),
               "conclusion": os.environ.get('FINAL_CONCLUSION', 'failure'),
               "k6": {
