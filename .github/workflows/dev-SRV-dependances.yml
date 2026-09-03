@@ -920,7 +920,7 @@ jobs:
           echo "------------ STOP built-in redis, so only the cluster can serve DS -------------"
           sudo docker exec ds-ee-dev pkill -f redis-server || true
           sleep 5
-          sudo docker exec ds-ee-dev bash -c "ps aux | grep [r]edis-server || echo 'built-in redis-server stopped'"
+          sudo docker exec ds-ee-dev redis-cli -p 6379 ping 2>&1 || true
           echo "------------ Copy DS local-production-linux.json config -------------"
           sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
           rm -f ~/local-production-linux.json
@@ -966,6 +966,18 @@ jobs:
           else
             echo "CLUSTER_OK_REDIS_CLUSTER_REDIS=false" >> $GITHUB_ENV
           fi
+
+          # DS must talk to the cluster only — the built-in redis has to stay down.
+          # PONG (or NOAUTH, it has a generated password) means it is still serving.
+          LOCAL_PING=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev redis-cli -p 6379 ping 2>&1" || true)
+          echo "built-in redis ping: $LOCAL_PING"
+          case "$LOCAL_PING" in
+            *PONG*|*NOAUTH*)                  LOCAL_STOPPED=false ;;
+            *refused*|*"Could not connect"*)  LOCAL_STOPPED=true ;;
+            *)                                LOCAL_STOPPED=false ;;
+          esac
+          echo "REDIS_LOCAL_STOPPED_REDIS_CLUSTER_REDIS=$LOCAL_STOPPED" >> $GITHUB_ENV
 
       - name: REDIS_CLUSTER_REDIS Check version
         continue-on-error: true
@@ -1076,7 +1088,7 @@ jobs:
           echo "------------ STOP built-in redis, so only the cluster can serve DS -------------"
           sudo docker exec ds-ee-dev pkill -f redis-server || true
           sleep 5
-          sudo docker exec ds-ee-dev bash -c "ps aux | grep [r]edis-server || echo 'built-in redis-server stopped'"
+          sudo docker exec ds-ee-dev redis-cli -p 6379 ping 2>&1 || true
           echo "------------ Copy DS local-production-linux.json config -------------"
           sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
           rm -f ~/local-production-linux.json
@@ -1122,6 +1134,18 @@ jobs:
           else
             echo "CLUSTER_OK_REDIS_CLUSTER_IOREDIS=false" >> $GITHUB_ENV
           fi
+
+          # DS must talk to the cluster only — the built-in redis has to stay down.
+          # PONG (or NOAUTH, it has a generated password) means it is still serving.
+          LOCAL_PING=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev redis-cli -p 6379 ping 2>&1" || true)
+          echo "built-in redis ping: $LOCAL_PING"
+          case "$LOCAL_PING" in
+            *PONG*|*NOAUTH*)                  LOCAL_STOPPED=false ;;
+            *refused*|*"Could not connect"*)  LOCAL_STOPPED=true ;;
+            *)                                LOCAL_STOPPED=false ;;
+          esac
+          echo "REDIS_LOCAL_STOPPED_REDIS_CLUSTER_IOREDIS=$LOCAL_STOPPED" >> $GITHUB_ENV
 
       - name: REDIS_CLUSTER_IOREDIS Check version
         continue-on-error: true
@@ -1309,22 +1333,24 @@ jobs:
                   'version_ok':            b('VERSION_REDIS_CLUSTER_REDIS_OK'),
                   'version_actual':        s('VERSION_REDIS_CLUSTER_REDIS_ACTUAL'),
                   'cluster_ok':            b('CLUSTER_OK_REDIS_CLUSTER_REDIS'),
+                  'redis_local_stopped':   b('REDIS_LOCAL_STOPPED_REDIS_CLUSTER_REDIS'),
                   'puppeteer_failed':      cr_ppt,
                   'puppeteer_ok':          cr_ok,
                   'puppeteer_total':       cr_total,
                   'ds_log_errors':         cr_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_CLUSTER_REDIS') and b('VERSION_REDIS_CLUSTER_REDIS_OK') and b('CLUSTER_OK_REDIS_CLUSTER_REDIS') and ppt_ok(cr_ppt, cr_total) and cr_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_CLUSTER_REDIS') and b('VERSION_REDIS_CLUSTER_REDIS_OK') and b('CLUSTER_OK_REDIS_CLUSTER_REDIS') and b('REDIS_LOCAL_STOPPED_REDIS_CLUSTER_REDIS') and ppt_ok(cr_ppt, cr_total) and cr_ds == 0) else 'failure',
               },
               'redis_cluster_ioredis': {
                   'healthy':               b('HEALTHCHECK_REDIS_CLUSTER_IOREDIS'),
                   'version_ok':            b('VERSION_REDIS_CLUSTER_IOREDIS_OK'),
                   'version_actual':        s('VERSION_REDIS_CLUSTER_IOREDIS_ACTUAL'),
                   'cluster_ok':            b('CLUSTER_OK_REDIS_CLUSTER_IOREDIS'),
+                  'redis_local_stopped':   b('REDIS_LOCAL_STOPPED_REDIS_CLUSTER_IOREDIS'),
                   'puppeteer_failed':      ci_ppt,
                   'puppeteer_ok':          ci_ok,
                   'puppeteer_total':       ci_total,
                   'ds_log_errors':         ci_ds,
-                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_CLUSTER_IOREDIS') and b('VERSION_REDIS_CLUSTER_IOREDIS_OK') and b('CLUSTER_OK_REDIS_CLUSTER_IOREDIS') and ppt_ok(ci_ppt, ci_total) and ci_ds == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_CLUSTER_IOREDIS') and b('VERSION_REDIS_CLUSTER_IOREDIS_OK') and b('CLUSTER_OK_REDIS_CLUSTER_IOREDIS') and b('REDIS_LOCAL_STOPPED_REDIS_CLUSTER_IOREDIS') and ppt_ok(ci_ppt, ci_total) and ci_ds == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
           }

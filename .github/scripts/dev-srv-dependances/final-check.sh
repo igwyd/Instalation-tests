@@ -183,6 +183,13 @@ else
 fi
 CL6_DETAIL="cluster_state:ok + DS connected: ${CLUSTER_OK_REDIS_CLUSTER_REDIS:-not set}"
 
+if [ "${REDIS_LOCAL_STOPPED_REDIS_CLUSTER_REDIS}" = "true" ]; then
+  LOC6_ICON="✅"; LOC6_LABEL="OK"
+else
+  LOC6_ICON="❌"; LOC6_LABEL="FAILED"; FAILED=1
+fi
+LOC6_DETAIL="built-in redis stopped: ${REDIS_LOCAL_STOPPED_REDIS_CLUSTER_REDIS:-not set}"
+
 PPT6_F="${PUPPETEER_REDIS_CLUSTER_REDIS_FAILED:-0}"; PPT6_O="${PUPPETEER_REDIS_CLUSTER_REDIS_OK:-0}"; PPT6_T="${PUPPETEER_REDIS_CLUSTER_REDIS_TOTAL:-0}"
 PPT6_DETAIL="${PPT6_O}/${PPT6_T} passed, ${PPT6_F} failed"
 if [ "$PPT6_F" -gt 0 ] || [ "$PPT6_T" -eq 0 ]; then
@@ -215,6 +222,13 @@ else
   CL7_ICON="❌"; CL7_LABEL="FAILED"; FAILED=1
 fi
 CL7_DETAIL="cluster_state:ok + DS connected: ${CLUSTER_OK_REDIS_CLUSTER_IOREDIS:-not set}"
+
+if [ "${REDIS_LOCAL_STOPPED_REDIS_CLUSTER_IOREDIS}" = "true" ]; then
+  LOC7_ICON="✅"; LOC7_LABEL="OK"
+else
+  LOC7_ICON="❌"; LOC7_LABEL="FAILED"; FAILED=1
+fi
+LOC7_DETAIL="built-in redis stopped: ${REDIS_LOCAL_STOPPED_REDIS_CLUSTER_IOREDIS:-not set}"
 
 PPT7_F="${PUPPETEER_REDIS_CLUSTER_IOREDIS_FAILED:-0}"; PPT7_O="${PUPPETEER_REDIS_CLUSTER_IOREDIS_OK:-0}"; PPT7_T="${PUPPETEER_REDIS_CLUSTER_IOREDIS_TOTAL:-0}"
 PPT7_DETAIL="${PPT7_O}/${PPT7_T} passed, ${PPT7_F} failed"
@@ -288,6 +302,7 @@ if [ "$DS7" -gt 0 ]; then DS7_ICON="❌"; DS7_LABEL="FAILED"; else DS7_ICON="✅
   echo "| Healthcheck        | ${HC6_ICON} ${HC6_LABEL}  | ${HC6_DETAIL} |"
   echo "| Version            | ${VER6_ICON} ${VER6_LABEL} | \`${VERSION_REDIS_CLUSTER_REDIS_ACTUAL:-not set}\` |"
   echo "| Cluster connection | ${CL6_ICON} ${CL6_LABEL} | ${CL6_DETAIL} |"
+  echo "| Built-in redis     | ${LOC6_ICON} ${LOC6_LABEL} | ${LOC6_DETAIL} |"
   echo "| Puppeteer          | ${PPT6_ICON} ${PPT6_LABEL} | ${PPT6_DETAIL} |"
   echo "| DS Log Errors      | ${DS6_DETAIL} | |"
   echo ""
@@ -298,6 +313,7 @@ if [ "$DS7" -gt 0 ]; then DS7_ICON="❌"; DS7_LABEL="FAILED"; else DS7_ICON="✅
   echo "| Healthcheck        | ${HC7_ICON} ${HC7_LABEL}  | ${HC7_DETAIL} |"
   echo "| Version            | ${VER7_ICON} ${VER7_LABEL} | \`${VERSION_REDIS_CLUSTER_IOREDIS_ACTUAL:-not set}\` |"
   echo "| Cluster connection | ${CL7_ICON} ${CL7_LABEL} | ${CL7_DETAIL} |"
+  echo "| Built-in redis     | ${LOC7_ICON} ${LOC7_LABEL} | ${LOC7_DETAIL} |"
   echo "| Puppeteer          | ${PPT7_ICON} ${PPT7_LABEL} | ${PPT7_DETAIL} |"
   echo "| DS Log Errors      | ${DS7_DETAIL} | |"
   echo ""
@@ -371,6 +387,7 @@ echo "$SEP"
 printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"        "${HC6_LABEL}"  "${HC6_DETAIL}"
 printf "| %-20s | %-6s | %-42s |\n" "Version"            "${VER6_LABEL}" "${VER6_DETAIL}"
 printf "| %-20s | %-6s | %-42s |\n" "Cluster connection" "${CL6_LABEL}"  "${CL6_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Built-in redis"     "${LOC6_LABEL}" "${LOC6_DETAIL}"
 printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"          "${PPT6_LABEL}" "${PPT6_DETAIL}"
 printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors"      ""  "${DS6_DETAIL}"
 echo "$SEP"
@@ -382,6 +399,7 @@ echo "$SEP"
 printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"        "${HC7_LABEL}"  "${HC7_DETAIL}"
 printf "| %-20s | %-6s | %-42s |\n" "Version"            "${VER7_LABEL}" "${VER7_DETAIL}"
 printf "| %-20s | %-6s | %-42s |\n" "Cluster connection" "${CL7_LABEL}"  "${CL7_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Built-in redis"     "${LOC7_LABEL}" "${LOC7_DETAIL}"
 printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"          "${PPT7_LABEL}" "${PPT7_DETAIL}"
 printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors"      ""  "${DS7_DETAIL}"
 echo "$SEP"

@@ -636,12 +636,13 @@ def generate_dev():
     for label, key in [("redis", "redis_cluster_redis"), ("ioredis", "redis_cluster_ioredis")]:
         d = (dep_checks or {}).get(key)
         if d is None:
-            cluster_dep_rows.append(f'<tr><td>{label}</td>' + '<td class="na">—</td>' * 5 + '</tr>')
+            cluster_dep_rows.append(f'<tr><td>{label}</td>' + '<td class="na">—</td>' * 6 + '</tr>')
         else:
             hc     = d.get("healthy", False)
             ver_ok = d.get("version_ok", False)
             ver    = d.get("version_actual", "?") or "?"
             cl_ok  = d.get("cluster_ok", False)
+            loc_ok = d.get("redis_local_stopped", False)
             ds_err = d.get("ds_log_errors", 0)
             cluster_dep_rows.append(
                 f'<tr>'
@@ -649,6 +650,7 @@ def generate_dev():
                 + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
                 + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
                 + f'<td class="{status(cl_ok)}">{"✅ OK" if cl_ok else "❌ FAILED"}</td>'
+                + f'<td class="{status(loc_ok)}">{"✅ OK" if loc_ok else "❌ FAILED"}</td>'
                 + td_ppt_breakdown(d, threshold=0)
                 + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
                 + '</tr>'
@@ -673,7 +675,7 @@ def generate_dev():
         + '<h3>EE — Redis cluster</h3>\n'
         '<table><thead><tr>'
         '<th>Driver</th><th>Healthcheck</th><th>Version</th>'
-        '<th>Cluster connection</th>'
+        '<th>Cluster connection</th><th>Built-in redis stopped</th>'
         '<th>Puppeteer (=0)</th><th>DS Log Errors</th>'
         '</tr></thead><tbody>'
         + '\n'.join(cluster_dep_rows)
