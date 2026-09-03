@@ -274,16 +274,16 @@ jobs:
             --localscripts true
           EOF
 
-      - name: TEMP Workaround for Docker install issues
-        continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
-          sudo docker run -i -t -d -p 80:80 --name onlyoffice \
-            -e WOPI_ENABLED=true onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
-          EOF
-
       - name: Wait for Docker install to start
         run: sleep 240
+
+      - name: Get DS container ID for Docker install check
+        id: ds-container
+        continue-on-error: true
+        run: |
+          CONTAINER_ID=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
+            'sudo docker ps -q --filter "name=onlyoffice"')
+          echo "id=$CONTAINER_ID" >> $GITHUB_OUTPUT
 
       - name: Add example host to DS ipfilter Docker install
         continue-on-error: true
@@ -292,7 +292,7 @@ jobs:
           mode: ssh-docker
           ssh_host: ${{ env.EC2_IP }}
           ssh_user: ${{ matrix.ssh_user }}
-          container: onlyoffice
+          container: ${{ steps.ds-container.outputs.id }}
           allow_hosts: ${{ env.EC2_IP }}
 
       - name: INFO Docker install
@@ -326,14 +326,6 @@ jobs:
           else
             echo "DOCKER_VERSION_OK=false" >> $GITHUB_ENV
           fi
-
-      - name: Get DS container ID for Docker install check
-        id: ds-container
-        continue-on-error: true
-        run: |
-          CONTAINER_ID=$(ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
-            'sudo docker ps -q --filter "name=onlyoffice"')
-          echo "id=$CONTAINER_ID" >> $GITHUB_OUTPUT
 
       - name: Start ds:example Docker install
         continue-on-error: true
