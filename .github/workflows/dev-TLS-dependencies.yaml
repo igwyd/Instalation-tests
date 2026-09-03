@@ -1674,9 +1674,13 @@ jobs:
             VER_DETAIL[$CYCLE]="exp: ${EXPECTED}, act: ${VER_ACTUAL:-not set}"
 
             PPT_VAR="PUPPETEER_${CYCLE}_FAILED"
+            PPTOK_VAR="PUPPETEER_${CYCLE}_OK"
+            PPTTOTAL_VAR="PUPPETEER_${CYCLE}_TOTAL"
             PPTR_TOTAL="${!PPT_VAR:-999}"
-            PPT_DETAIL[$CYCLE]="${PPTR_TOTAL} (threshold: 0)"
-            if [ "$PPTR_TOTAL" -gt 0 ]; then
+            PPTR_OK="${!PPTOK_VAR:-0}"
+            PPTR_ALL="${!PPTTOTAL_VAR:-0}"
+            PPT_DETAIL[$CYCLE]="${PPTR_OK}/${PPTR_ALL} passed, ${PPTR_TOTAL} failed (threshold: 0)"
+            if [ "$PPTR_TOTAL" -gt 0 ] || [ "$PPTR_ALL" -eq 0 ]; then
               PPT_ICON[$CYCLE]="❌"; PPT_LABEL[$CYCLE]="FAILED"; FAILED=1
             else
               PPT_ICON[$CYCLE]="✅"; PPT_LABEL[$CYCLE]="OK"
@@ -1696,7 +1700,7 @@ jobs:
           {
             echo "## Final Check — TLS dependencies"
             echo ""
-            echo "| Dependency | Healthcheck | Version | TLS connection | Puppeteer | DS Log Errors |"
+            echo "| Dependency | Healthcheck | Version | TLS connection | Puppeteer (=0) | DS Log Errors |"
             echo "|------------|-------------|---------|-----------------|-----------|----------------|"
             echo "| PostgreSQL | ${HC_ICON[POSTGRES]} ${HC_LABEL[POSTGRES]} | ${VER_ICON[POSTGRES]} \`${VER_DETAIL[POSTGRES]}\` | ${TLS_ICON[POSTGRES]} ${TLS_LABEL[POSTGRES]} | ${PPT_ICON[POSTGRES]} ${PPT_DETAIL[POSTGRES]} | ${DS_DETAIL[POSTGRES]} |"
             echo "| MySQL      | ${HC_ICON[MYSQL]} ${HC_LABEL[MYSQL]}    | ${VER_ICON[MYSQL]} \`${VER_DETAIL[MYSQL]}\`    | ${TLS_ICON[MYSQL]} ${TLS_LABEL[MYSQL]}    | ${PPT_ICON[MYSQL]} ${PPT_DETAIL[MYSQL]}    | ${DS_DETAIL[MYSQL]} |"
@@ -1756,6 +1760,8 @@ jobs:
                   "version_actual": os.environ.get(f'VERSION_{cycle}_ACTUAL', 'not set'),
                   "version_ok": os.environ.get(f'VERSION_{cycle}_OK', '') == 'true',
                   "puppeteer_failed": int(os.environ.get(f'PUPPETEER_{cycle}_FAILED', '0') or '0'),
+                  "puppeteer_ok": int(os.environ.get(f'PUPPETEER_{cycle}_OK', '0') or '0'),
+                  "puppeteer_total": int(os.environ.get(f'PUPPETEER_{cycle}_TOTAL', '0') or '0'),
                   "tls_connection_ok": os.environ.get(f'TLS_CONNECTION_{cycle}_OK', '') == 'true',
                   "ds_log_errors": int(os.environ.get(f'DS_LOG_ERRORS_{cycle}', '0') or '0'),
               }
