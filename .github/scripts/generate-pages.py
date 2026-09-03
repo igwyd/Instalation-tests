@@ -632,6 +632,28 @@ def generate_dev():
                 + '</tr>'
             )
 
+    cluster_dep_rows = []
+    for label, key in [("redis", "redis_cluster_redis"), ("ioredis", "redis_cluster_ioredis")]:
+        d = (dep_checks or {}).get(key)
+        if d is None:
+            cluster_dep_rows.append(f'<tr><td>{label}</td>' + '<td class="na">—</td>' * 5 + '</tr>')
+        else:
+            hc     = d.get("healthy", False)
+            ver_ok = d.get("version_ok", False)
+            ver    = d.get("version_actual", "?") or "?"
+            cl_ok  = d.get("cluster_ok", False)
+            ds_err = d.get("ds_log_errors", 0)
+            cluster_dep_rows.append(
+                f'<tr>'
+                f'<td>{label}</td>'
+                + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
+                + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
+                + f'<td class="{status(cl_ok)}">{"✅ OK" if cl_ok else "❌ FAILED"}</td>'
+                + td_ppt_breakdown(d, threshold=0)
+                + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
+                + '</tr>'
+            )
+
     dep_body = (
         f'<h3>EE{dep_date_part}</h3>\n'
         '<table><thead><tr>'
@@ -647,6 +669,14 @@ def generate_dev():
         '<th>Puppeteer (=0)</th><th>DS Log Errors</th>'
         '</tr></thead><tbody>'
         + '\n'.join(redis_dep_rows)
+        + '</tbody></table>\n'
+        + '<h3>EE — Redis cluster</h3>\n'
+        '<table><thead><tr>'
+        '<th>Driver</th><th>Healthcheck</th><th>Version</th>'
+        '<th>Cluster connection</th>'
+        '<th>Puppeteer (=0)</th><th>DS Log Errors</th>'
+        '</tr></thead><tbody>'
+        + '\n'.join(cluster_dep_rows)
         + '</tbody></table>\n'
     )
 

@@ -1,0 +1,20 @@
+{
+    "services": {
+        "CoAuthoring": {
+            "redis": {
+                "name": "redis",
+                "optionsCluster": {
+                    "rootNodes": [
+                        {"url": "redis://redis-cluster:7000"},
+                        {"url": "redis://redis-cluster:7001"},
+                        {"url": "redis://redis-cluster:7002"}
+                    ],
+                    "defaults": {
+                        "username": "default",
+                        "password": "TEst1840"
+                    }
+                }
+            }
+        }
+    }
+}

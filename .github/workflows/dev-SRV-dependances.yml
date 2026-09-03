@@ -856,6 +856,347 @@ jobs:
           env_var: DS_LOG_ERRORS_REDIS_IOREDIS
           label: REDIS_IOREDIS
 
+      - name: REDIS_CLUSTER_REDIS Docker reInstall
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true
+          sudo docker rm \$(sudo docker ps -aq) 2>/dev/null || true
+          sudo docker network rm ds-network 2>/dev/null || true
+          sudo docker network create ds-network
+          sudo docker run -itd -p 80:80 \
+            --network ds-network \
+            --name ds-ee-dev \
+            -e WOPI_ENABLED=true \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: REDIS_CLUSTER_REDIS Start redis cluster
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          # 6 nodes (3 masters + 3 replicas) in one container on ds-network — same layout as
+          # the manual redis-cluster/{7000..7005} setup, just in docker next to DS.
+          sudo docker rm -f redis-cluster 2>/dev/null || true
+          sudo docker run -d --name redis-cluster --network ds-network redis:7-alpine sh -c '
+            for p in 7000 7001 7002 7003 7004 7005; do
+              mkdir -p /data/$p
+              redis-server --port $p --cluster-enabled yes --cluster-config-file nodes.conf \
+                --cluster-node-timeout 5000 --appendonly yes --dir /data/$p \
+                --requirepass TEst1840 --masterauth TEst1840 --bind 0.0.0.0 --daemonize yes
+            done
+            sleep infinity'
+          sleep 15
+          IP=$(sudo docker exec redis-cluster hostname -i | awk '{print $1}')
+          echo "redis-cluster container IP: $IP"
+          sudo docker exec redis-cluster redis-cli -a TEst1840 --cluster create \
+            $IP:7000 $IP:7001 $IP:7002 $IP:7003 $IP:7004 $IP:7005 --cluster-replicas 1 --cluster-yes
+          sleep 5
+          echo "------------ cluster nodes -------------"
+          sudo docker exec redis-cluster redis-cli -a TEst1840 -p 7000 cluster nodes
+          echo "------------ cluster info -------------"
+          sudo docker exec redis-cluster redis-cli -a TEst1840 -p 7000 cluster info
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ env.EC2_IP }}
+
+      - name: REDIS_CLUSTER_REDIS Configure cluster
+        continue-on-error: true
+        run: |
+          scp -o StrictHostKeyChecking=no redis/redis-cluster/local-production-linux.json \
+            ubuntu@${{ env.EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          echo "------------ STOP DS services -------------"
+          sudo docker exec ds-ee-dev supervisorctl stop ds:converter ds:docservice ds:adminpanel
+          echo "------------ STOP built-in redis, so only the cluster can serve DS -------------"
+          sudo docker exec ds-ee-dev pkill -f redis-server || true
+          sleep 5
+          sudo docker exec ds-ee-dev bash -c "ps aux | grep [r]edis-server || echo 'built-in redis-server stopped'"
+          echo "------------ Copy DS local-production-linux.json config -------------"
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          rm -f ~/local-production-linux.json
+          sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
+          echo "------------ START DS services -------------"
+          sudo docker exec ds-ee-dev supervisorctl start ds:converter ds:docservice ds:adminpanel
+          sleep 15
+          EOF
+
+      - name: REDIS_CLUSTER_REDIS Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          echo "-------------healthcheck-------------"
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: REDIS_CLUSTER_REDIS Check healthcheck and cluster
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_REDIS_CLUSTER_REDIS=$HC" >> $GITHUB_ENV
+
+          STATE=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec redis-cluster redis-cli -a TEst1840 -p 7000 cluster info 2>/dev/null | grep -c 'cluster_state:ok'" || echo 0)
+          DS_IP=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev hostname -i" | awk '{print $1}')
+          CLIENTS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "for p in 7000 7001 7002 7003 7004 7005; do sudo docker exec redis-cluster redis-cli -a TEst1840 -p \$p client list 2>/dev/null; done" \
+            | grep -c "addr=$DS_IP" || true)
+          echo "cluster_state:ok=$STATE, DS container IP=$DS_IP, DS connections to cluster nodes=$CLIENTS"
+          if [ "$STATE" = "1" ] && [ "$CLIENTS" -gt 0 ]; then
+            echo "CLUSTER_OK_REDIS_CLUSTER_REDIS=true" >> $GITHUB_ENV
+          else
+            echo "CLUSTER_OK_REDIS_CLUSTER_REDIS=false" >> $GITHUB_ENV
+          fi
+
+      - name: REDIS_CLUSTER_REDIS Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_REDIS_CLUSTER_REDIS_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_REDIS_CLUSTER_REDIS_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_REDIS_CLUSTER_REDIS_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: REDIS_CLUSTER_REDIS Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: REDIS_CLUSTER_REDIS Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: REDIS_CLUSTER_REDIS Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: REDIS_CLUSTER_REDIS Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: REDIS_CLUSTER_REDIS Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition REDIS_CLUSTER_REDIS
+
+      - name: REDIS_CLUSTER_REDIS Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+
+      - name: REDIS_CLUSTER_REDIS Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_REDIS_CLUSTER_REDIS
+          label: REDIS_CLUSTER_REDIS
+
+      - name: REDIS_CLUSTER_IOREDIS Docker reInstall
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          # redis cluster from the previous cycle is reused — only DS is reinstalled
+          sudo docker rm -f ds-ee-dev 2>/dev/null || true
+          sudo docker run -itd -p 80:80 \
+            --network ds-network \
+            --name ds-ee-dev \
+            -e WOPI_ENABLED=true \
+            onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          EOF
+
+      - name: Wait for DS startup 240
+        run: sleep 240
+
+      - name: Add example host to DS ipfilter
+        continue-on-error: true
+        uses: ./.github/actions/set-ipfilter
+        with:
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          allow_hosts: ${{ env.EC2_IP }}
+
+      - name: REDIS_CLUSTER_IOREDIS Configure cluster
+        continue-on-error: true
+        run: |
+          scp -o StrictHostKeyChecking=no redis/ioredis-cluster/local-production-linux.json \
+            ubuntu@${{ env.EC2_IP }}:~/local-production-linux.json
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << 'EOF'
+          echo "------------ STOP DS services -------------"
+          sudo docker exec ds-ee-dev supervisorctl stop ds:converter ds:docservice ds:adminpanel
+          echo "------------ STOP built-in redis, so only the cluster can serve DS -------------"
+          sudo docker exec ds-ee-dev pkill -f redis-server || true
+          sleep 5
+          sudo docker exec ds-ee-dev bash -c "ps aux | grep [r]edis-server || echo 'built-in redis-server stopped'"
+          echo "------------ Copy DS local-production-linux.json config -------------"
+          sudo docker cp ~/local-production-linux.json ds-ee-dev:/etc/onlyoffice/documentserver/local-production-linux.json
+          rm -f ~/local-production-linux.json
+          sudo docker exec ds-ee-dev cat /etc/onlyoffice/documentserver/local-production-linux.json
+          echo "------------ START DS services -------------"
+          sudo docker exec ds-ee-dev supervisorctl start ds:converter ds:docservice ds:adminpanel
+          sleep 15
+          EOF
+
+      - name: REDIS_CLUSTER_IOREDIS Info
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
+          echo "-------------healthcheck-------------"
+          curl -s http://${{ env.EC2_IP }}/healthcheck; echo
+          echo "-------------DS services-------------"
+          sudo docker exec ds-ee-dev supervisorctl status all || true
+          echo "---------Installed packages----------"
+          sudo docker exec ds-ee-dev bash -c "dpkg -l | grep onlyoffice"
+          echo "--------packageType--------"
+          sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
+          echo "-------------WOPI--------------"
+          curl -s http://${{ env.EC2_IP }}/hosting/discovery | tail -c 150; echo
+          EOF
+
+      - name: REDIS_CLUSTER_IOREDIS Check healthcheck and cluster
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK_REDIS_CLUSTER_IOREDIS=$HC" >> $GITHUB_ENV
+
+          STATE=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec redis-cluster redis-cli -a TEst1840 -p 7000 cluster info 2>/dev/null | grep -c 'cluster_state:ok'" || echo 0)
+          DS_IP=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev hostname -i" | awk '{print $1}')
+          CLIENTS=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "for p in 7000 7001 7002 7003 7004 7005; do sudo docker exec redis-cluster redis-cli -a TEst1840 -p \$p client list 2>/dev/null; done" \
+            | grep -c "addr=$DS_IP" || true)
+          echo "cluster_state:ok=$STATE, DS container IP=$DS_IP, DS connections to cluster nodes=$CLIENTS"
+          if [ "$STATE" = "1" ] && [ "$CLIENTS" -gt 0 ]; then
+            echo "CLUSTER_OK_REDIS_CLUSTER_IOREDIS=true" >> $GITHUB_ENV
+          else
+            echo "CLUSTER_OK_REDIS_CLUSTER_IOREDIS=false" >> $GITHUB_ENV
+          fi
+
+      - name: REDIS_CLUSTER_IOREDIS Check version
+        continue-on-error: true
+        run: |
+          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
+          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          echo "Version: installed=$VERSION, expected=$EXPECTED"
+          if [ "$VERSION" = "$EXPECTED" ]; then
+            echo "VERSION_REDIS_CLUSTER_IOREDIS_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_REDIS_CLUSTER_IOREDIS_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_REDIS_CLUSTER_IOREDIS_ACTUAL=$VERSION" >> $GITHUB_ENV
+
+      - name: REDIS_CLUSTER_IOREDIS Start ds-example
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
+            "sudo docker exec ds-ee-dev supervisorctl start ds:example"
+
+      - name: REDIS_CLUSTER_IOREDIS Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: REDIS_CLUSTER_IOREDIS Puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers example
+
+      - name: REDIS_CLUSTER_IOREDIS Puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          echo "-------------------------------------"
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          echo "-------------------------------------"
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+          # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome --providers wopi
+
+      - name: REDIS_CLUSTER_IOREDIS Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition REDIS_CLUSTER_IOREDIS
+
+      - name: REDIS_CLUSTER_IOREDIS Documentserver logs
+        continue-on-error: true
+        uses: ./.github/actions/ds-logs
+        with:
+          mode: ssh-docker
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+
+      - name: REDIS_CLUSTER_IOREDIS Check DS logs for errors
+        continue-on-error: true
+        uses: ./.github/actions/check-ds-logs
+        with:
+          mode: ssh-docker-logs
+          ssh_host: ${{ env.EC2_IP }}
+          container: ds-ee-dev
+          env_var: DS_LOG_ERRORS_REDIS_CLUSTER_IOREDIS
+          label: REDIS_CLUSTER_IOREDIS
+
       - name: Final check
         if: always()
         env:
@@ -893,11 +1234,19 @@ jobs:
           ri_ppt       = n('PUPPETEER_REDIS_IOREDIS_FAILED')
           ri_ok        = n('PUPPETEER_REDIS_IOREDIS_OK')
           ri_total     = n('PUPPETEER_REDIS_IOREDIS_TOTAL')
+          cr_ppt       = n('PUPPETEER_REDIS_CLUSTER_REDIS_FAILED')
+          cr_ok        = n('PUPPETEER_REDIS_CLUSTER_REDIS_OK')
+          cr_total     = n('PUPPETEER_REDIS_CLUSTER_REDIS_TOTAL')
+          ci_ppt       = n('PUPPETEER_REDIS_CLUSTER_IOREDIS_FAILED')
+          ci_ok        = n('PUPPETEER_REDIS_CLUSTER_IOREDIS_OK')
+          ci_total     = n('PUPPETEER_REDIS_CLUSTER_IOREDIS_TOTAL')
           vp_ds   = n('DS_LOG_ERRORS_DS_VPATH')
           art_ds  = n('DS_LOG_ERRORS_AMQP_ARTEMIS')
           cls_ds  = n('DS_LOG_ERRORS_AMQP_CLASSIC')
           rr_ds   = n('DS_LOG_ERRORS_REDIS_REDIS')
           ri_ds   = n('DS_LOG_ERRORS_REDIS_IOREDIS')
+          cr_ds   = n('DS_LOG_ERRORS_REDIS_CLUSTER_REDIS')
+          ci_ds   = n('DS_LOG_ERRORS_REDIS_CLUSTER_IOREDIS')
 
           data = {
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
@@ -954,6 +1303,28 @@ jobs:
                   'puppeteer_total':       ri_total,
                   'ds_log_errors':         ri_ds,
                   'conclusion': 'success' if (b('HEALTHCHECK_REDIS_IOREDIS') and b('VERSION_REDIS_IOREDIS_OK') and b('REDIS_SOCK_OK_REDIS_IOREDIS') and b('PORT_6379_CLOSED_REDIS_IOREDIS') and ppt_ok(ri_ppt, ri_total) and ri_ds == 0) else 'failure',
+              },
+              'redis_cluster_redis': {
+                  'healthy':               b('HEALTHCHECK_REDIS_CLUSTER_REDIS'),
+                  'version_ok':            b('VERSION_REDIS_CLUSTER_REDIS_OK'),
+                  'version_actual':        s('VERSION_REDIS_CLUSTER_REDIS_ACTUAL'),
+                  'cluster_ok':            b('CLUSTER_OK_REDIS_CLUSTER_REDIS'),
+                  'puppeteer_failed':      cr_ppt,
+                  'puppeteer_ok':          cr_ok,
+                  'puppeteer_total':       cr_total,
+                  'ds_log_errors':         cr_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_CLUSTER_REDIS') and b('VERSION_REDIS_CLUSTER_REDIS_OK') and b('CLUSTER_OK_REDIS_CLUSTER_REDIS') and ppt_ok(cr_ppt, cr_total) and cr_ds == 0) else 'failure',
+              },
+              'redis_cluster_ioredis': {
+                  'healthy':               b('HEALTHCHECK_REDIS_CLUSTER_IOREDIS'),
+                  'version_ok':            b('VERSION_REDIS_CLUSTER_IOREDIS_OK'),
+                  'version_actual':        s('VERSION_REDIS_CLUSTER_IOREDIS_ACTUAL'),
+                  'cluster_ok':            b('CLUSTER_OK_REDIS_CLUSTER_IOREDIS'),
+                  'puppeteer_failed':      ci_ppt,
+                  'puppeteer_ok':          ci_ok,
+                  'puppeteer_total':       ci_total,
+                  'ds_log_errors':         ci_ds,
+                  'conclusion': 'success' if (b('HEALTHCHECK_REDIS_CLUSTER_IOREDIS') and b('VERSION_REDIS_CLUSTER_IOREDIS_OK') and b('CLUSTER_OK_REDIS_CLUSTER_IOREDIS') and ppt_ok(ci_ppt, ci_total) and ci_ds == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
           }

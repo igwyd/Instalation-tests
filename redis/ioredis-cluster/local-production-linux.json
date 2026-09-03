@@ -1,0 +1,19 @@
+{
+    "services": {
+        "CoAuthoring": {
+            "redis": {
+                "name": "ioredis",
+                "iooptionsClusterNodes": [
+                    { "host": "redis-cluster", "port": 7000 },
+                    { "host": "redis-cluster", "port": 7001 },
+                    { "host": "redis-cluster", "port": 7002 }
+                ],
+                "iooptionsClusterOptions": {
+                    "redisOptions": {
+                        "password": "TEst1840"
+                    }
+                }
+            }
+        }
+    }
+}

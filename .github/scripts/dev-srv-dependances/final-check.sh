@@ -162,6 +162,72 @@ DS5="${DS_LOG_ERRORS_REDIS_IOREDIS:-0}"
 DS5_DETAIL="${DS5} errors"
 if [ "$DS5" -gt 0 ]; then DS5_ICON="❌"; DS5_LABEL="FAILED"; else DS5_ICON="✅"; DS5_LABEL="OK"; fi
 
+# --- REDIS_CLUSTER_REDIS ---
+if [ "${HEALTHCHECK_REDIS_CLUSTER_REDIS}" = "true" ]; then
+  HC6_ICON="✅"; HC6_LABEL="OK";     HC6_DETAIL="${HEALTHCHECK_REDIS_CLUSTER_REDIS}"
+else
+  HC6_ICON="❌"; HC6_LABEL="FAILED"; HC6_DETAIL="${HEALTHCHECK_REDIS_CLUSTER_REDIS:-not set}"; FAILED=1
+fi
+
+if [ "${VERSION_REDIS_CLUSTER_REDIS_OK}" = "true" ]; then
+  VER6_ICON="✅"; VER6_LABEL="OK"
+else
+  VER6_ICON="❌"; VER6_LABEL="FAILED"; FAILED=1
+fi
+VER6_DETAIL="exp: ${EXPECTED}, act: ${VERSION_REDIS_CLUSTER_REDIS_ACTUAL:-not set}"
+
+if [ "${CLUSTER_OK_REDIS_CLUSTER_REDIS}" = "true" ]; then
+  CL6_ICON="✅"; CL6_LABEL="OK"
+else
+  CL6_ICON="❌"; CL6_LABEL="FAILED"; FAILED=1
+fi
+CL6_DETAIL="cluster_state:ok + DS connected: ${CLUSTER_OK_REDIS_CLUSTER_REDIS:-not set}"
+
+PPT6_F="${PUPPETEER_REDIS_CLUSTER_REDIS_FAILED:-0}"; PPT6_O="${PUPPETEER_REDIS_CLUSTER_REDIS_OK:-0}"; PPT6_T="${PUPPETEER_REDIS_CLUSTER_REDIS_TOTAL:-0}"
+PPT6_DETAIL="${PPT6_O}/${PPT6_T} passed, ${PPT6_F} failed"
+if [ "$PPT6_F" -gt 0 ] || [ "$PPT6_T" -eq 0 ]; then
+  PPT6_ICON="❌"; PPT6_LABEL="FAILED"; FAILED=1
+else
+  PPT6_ICON="✅"; PPT6_LABEL="OK"
+fi
+
+DS6="${DS_LOG_ERRORS_REDIS_CLUSTER_REDIS:-0}"
+DS6_DETAIL="${DS6} errors"
+if [ "$DS6" -gt 0 ]; then DS6_ICON="❌"; DS6_LABEL="FAILED"; else DS6_ICON="✅"; DS6_LABEL="OK"; fi
+
+# --- REDIS_CLUSTER_IOREDIS ---
+if [ "${HEALTHCHECK_REDIS_CLUSTER_IOREDIS}" = "true" ]; then
+  HC7_ICON="✅"; HC7_LABEL="OK";     HC7_DETAIL="${HEALTHCHECK_REDIS_CLUSTER_IOREDIS}"
+else
+  HC7_ICON="❌"; HC7_LABEL="FAILED"; HC7_DETAIL="${HEALTHCHECK_REDIS_CLUSTER_IOREDIS:-not set}"; FAILED=1
+fi
+
+if [ "${VERSION_REDIS_CLUSTER_IOREDIS_OK}" = "true" ]; then
+  VER7_ICON="✅"; VER7_LABEL="OK"
+else
+  VER7_ICON="❌"; VER7_LABEL="FAILED"; FAILED=1
+fi
+VER7_DETAIL="exp: ${EXPECTED}, act: ${VERSION_REDIS_CLUSTER_IOREDIS_ACTUAL:-not set}"
+
+if [ "${CLUSTER_OK_REDIS_CLUSTER_IOREDIS}" = "true" ]; then
+  CL7_ICON="✅"; CL7_LABEL="OK"
+else
+  CL7_ICON="❌"; CL7_LABEL="FAILED"; FAILED=1
+fi
+CL7_DETAIL="cluster_state:ok + DS connected: ${CLUSTER_OK_REDIS_CLUSTER_IOREDIS:-not set}"
+
+PPT7_F="${PUPPETEER_REDIS_CLUSTER_IOREDIS_FAILED:-0}"; PPT7_O="${PUPPETEER_REDIS_CLUSTER_IOREDIS_OK:-0}"; PPT7_T="${PUPPETEER_REDIS_CLUSTER_IOREDIS_TOTAL:-0}"
+PPT7_DETAIL="${PPT7_O}/${PPT7_T} passed, ${PPT7_F} failed"
+if [ "$PPT7_F" -gt 0 ] || [ "$PPT7_T" -eq 0 ]; then
+  PPT7_ICON="❌"; PPT7_LABEL="FAILED"; FAILED=1
+else
+  PPT7_ICON="✅"; PPT7_LABEL="OK"
+fi
+
+DS7="${DS_LOG_ERRORS_REDIS_CLUSTER_IOREDIS:-0}"
+DS7_DETAIL="${DS7} errors"
+if [ "$DS7" -gt 0 ]; then DS7_ICON="❌"; DS7_LABEL="FAILED"; else DS7_ICON="✅"; DS7_LABEL="OK"; fi
+
 # --- GITHUB_STEP_SUMMARY (markdown table) ---
 {
   echo "## Final Check"
@@ -214,6 +280,26 @@ if [ "$DS5" -gt 0 ]; then DS5_ICON="❌"; DS5_LABEL="FAILED"; else DS5_ICON="✅
   echo "| Port 6379       | ${PORT5_ICON} ${PORT5_LABEL} | ${PORT5_DETAIL} |"
   echo "| Puppeteer       | ${PPT5_ICON} ${PPT5_LABEL} | ${PPT5_DETAIL} |"
   echo "| DS Log Errors   | ${DS5_DETAIL} | |"
+  echo ""
+  echo "### Redis cluster (redis driver)"
+  echo ""
+  echo "| Check | Result | Details |"
+  echo "|-------|--------|---------|"
+  echo "| Healthcheck        | ${HC6_ICON} ${HC6_LABEL}  | ${HC6_DETAIL} |"
+  echo "| Version            | ${VER6_ICON} ${VER6_LABEL} | \`${VERSION_REDIS_CLUSTER_REDIS_ACTUAL:-not set}\` |"
+  echo "| Cluster connection | ${CL6_ICON} ${CL6_LABEL} | ${CL6_DETAIL} |"
+  echo "| Puppeteer          | ${PPT6_ICON} ${PPT6_LABEL} | ${PPT6_DETAIL} |"
+  echo "| DS Log Errors      | ${DS6_DETAIL} | |"
+  echo ""
+  echo "### Redis cluster (ioredis driver)"
+  echo ""
+  echo "| Check | Result | Details |"
+  echo "|-------|--------|---------|"
+  echo "| Healthcheck        | ${HC7_ICON} ${HC7_LABEL}  | ${HC7_DETAIL} |"
+  echo "| Version            | ${VER7_ICON} ${VER7_LABEL} | \`${VERSION_REDIS_CLUSTER_IOREDIS_ACTUAL:-not set}\` |"
+  echo "| Cluster connection | ${CL7_ICON} ${CL7_LABEL} | ${CL7_DETAIL} |"
+  echo "| Puppeteer          | ${PPT7_ICON} ${PPT7_LABEL} | ${PPT7_DETAIL} |"
+  echo "| DS Log Errors      | ${DS7_DETAIL} | |"
   echo ""
   if [ "$FAILED" -eq 1 ]; then
     echo "> ❌ **Final check FAILED**"
@@ -277,6 +363,29 @@ printf "| %-20s | %-6s | %-42s |\n" "Port 6379"       "${PORT5_LABEL}" "${PORT5_
 printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"       "${PPT5_LABEL}"  "${PPT5_DETAIL}"
 printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors"   ""   "${DS5_DETAIL}"
 echo "$SEP"
+
+echo "=== Redis cluster (redis driver) ==="
+echo "$SEP"
+printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+echo "$SEP"
+printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"        "${HC6_LABEL}"  "${HC6_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Version"            "${VER6_LABEL}" "${VER6_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Cluster connection" "${CL6_LABEL}"  "${CL6_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"          "${PPT6_LABEL}" "${PPT6_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors"      ""  "${DS6_DETAIL}"
+echo "$SEP"
+echo ""
+echo "=== Redis cluster (ioredis driver) ==="
+echo "$SEP"
+printf "| %-20s | %-6s | %-42s |\n" "Check" "Result" "Details"
+echo "$SEP"
+printf "| %-20s | %-6s | %-42s |\n" "Healthcheck"        "${HC7_LABEL}"  "${HC7_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Version"            "${VER7_LABEL}" "${VER7_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Cluster connection" "${CL7_LABEL}"  "${CL7_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"          "${PPT7_LABEL}" "${PPT7_DETAIL}"
+printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors"      ""  "${DS7_DETAIL}"
+echo "$SEP"
+echo ""
 
 if [ "$FAILED" -eq 1 ]; then
   echo "FINAL_CONCLUSION=failure" >> "$GITHUB_ENV"
