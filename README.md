@@ -34,7 +34,7 @@ Pre-release builds from S3 dev repo.
 |------|--------|
 | dev-SRV-storage (S3, MinIO, Azure) | [![dev-SRV-storage](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-SRV-storage.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-SRV-storage.yml) |
 | dev-SRV-dependances (Virtual Path, ActiveMQ, Redis) | [![dev-SRV-dependances](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-SRV-dependances.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-SRV-dependances.yml) |
-| dev-TLS-dependencies | [![dev-TLS-dependencies](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-TLS-dependencies.yaml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-TLS-dependencies.yaml) |
+| dev-TLS-dependencies | [![dev-TLS-dependencies](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-TLS-dependencies.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-TLS-dependencies.yml) |
 
 
 ### Backend tests (10 runners at the same time)

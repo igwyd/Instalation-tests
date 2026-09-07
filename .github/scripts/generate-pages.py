@@ -691,7 +691,7 @@ def generate_dev():
         + section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body, db_run_date)
         + section("SRV Storage (S3, MinIO, Azure)", "dev-SRV-storage.yml", "dev SRV storage", server_body)
         + section("SRV Dependances (Virtual Path, ActiveMQ, Redis)", "dev-SRV-dependances.yml", "dev SRV dependances", dep_body)
-        + section("TLS Dependencies", "dev-TLS-dependencies.yaml", "dev TLS dependencies", tls_body(tls_deps))
+        + section("TLS Dependencies", "dev-TLS-dependencies.yml", "dev TLS dependencies", tls_body(tls_deps))
     )
     write("dev.html", page_html("DEV — ONLYOFFICE Docs Test Results", body, breadcrumb("DEV")))
 
