@@ -227,7 +227,7 @@ jobs:
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}:8083/example\"#" ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}:8083/example/\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
@@ -676,7 +676,7 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           # Upgrade kept the release's port (80) — repatch from the :8083 URL set for the earlier fresh installs
-          sed -i -E "s#\"url\": \"http://[^:]+:[0-9]+/example\"#\"url\": \"http://${{ env.EC2_IP }}:80/example\"#" ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"http://[^:]+:[0-9]+/example/?\"#\"url\": \"http://${{ env.EC2_IP }}:80/example/\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
