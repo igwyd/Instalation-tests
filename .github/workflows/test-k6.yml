@@ -15,12 +15,13 @@ jobs:
           git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
           cd document-server-stress-testing/K6/
 
-          sed -i 's|"serverProtoSuffix": ""|"serverProtoSuffix": "s"|' save-changes-document-random-close.json
-          sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "${{ vars.TEST_DSURL }}"|' save-changes-document-random-close.json
-          sed -i 's|"serverPort": 80|"serverPort": 443|' save-changes-document-random-close.json
-          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "https://${{ vars.TEST_DSURL }}/wopi/files/docid/contents"|' save-changes-document-random-close.json
-          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "https://${{ vars.TEST_DSURL }}/dummyCallback"|' save-changes-document-random-close.json
-          sed -i 's|"jwtSecret": ""|"jwtSecret": "doc-linux"|' save-changes-document-random-close.json
+          sed -i 's|"serverProtoSuffix": ""|"serverProtoSuffix": "${{ vars.TEST_K6_PROTO_SUFFIX }}"|' save-changes-document-random-close.json
+          sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "${{ vars.TEST_K6_DSURL }}"|' save-changes-document-random-close.json
+          sed -i 's|"serverPort": 80|"serverPort": ${{ vars.TEST_K6_DSPORT }}|' save-changes-document-random-close.json
+          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "https://${{ vars.TEST_K6_DSURL }}/wopi/files/docid/contents"|' save-changes-document-random-close.json
+          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "https://${{ vars.TEST_K6_DSURL }}/dummyCallback"|' save-changes-document-random-close.json
+          sed -i 's|"jwtSecret": ""|"jwtSecret": "${{ vars.TEST_K6_JWT }}"|' save-changes-document-random-close.json
+          sed -i 's|"changesPath": "dataset/[^/]*/changes.csv"|"changesPath": "dataset/${{ vars.TEST_K6_CHANGES_VERSION }}/changes.csv"|' save-changes-document-random-close.json
 
       - name: INFO about save-changes-document-random-close.json
         run: |
@@ -35,4 +36,4 @@ jobs:
           docker run --rm \
             -v $(pwd):/K6 \
             grafana/k6 run /K6/save-changes-document-random-close.js \
-            --quiet -s "2m":500 -s "8m":500 -s "1m":0
+            --quiet -s "2m":${{ vars.TEST_K6_VU }} -s "8m":${{ vars.TEST_K6_VU }} -s "1m":0
