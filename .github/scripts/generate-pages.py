@@ -157,12 +157,12 @@ def os_err_text(docker, native):
     return "\n".join(parts)
 
 
-def td_ds_errors(data, colored=False):
+def td_ds_errors(data):
     if data is None:
         return '<td class="na">—</td>'
     n = data.get("ds_log_errors", 0)
-    cls = f' class="{status(n == 0)}"' if colored else ''
-    label = f'{"✅" if n == 0 else "❌"} {n}' if colored else str(n)
+    cls = f' class="{status(n == 0)}"'
+    label = f'{"✅" if n == 0 else "❌"} {n}'
     text = (data.get("ds_log_errors_text") or "").strip()
     if not text:
         return f'<td{cls}>{label}</td>'
@@ -513,7 +513,7 @@ def generate_dev():
                     + td_ppt_breakdown(docker, threshold=0)
                     + td_ppt_breakdown(native, threshold=0)
                     + td_ds_errors({"ds_log_errors": d_err + n_err,
-                                    "ds_log_errors_text": os_err_text(docker, native)}, colored=True)
+                                    "ds_log_errors_text": os_err_text(docker, native)})
                     + '</tr>'
                 )
     os_body = (
@@ -589,7 +589,7 @@ def generate_dev():
                 + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
                 + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
                 + td_ppt_breakdown(d, threshold=0)
-                + td_ds_errors(d, colored=True)
+                + td_ds_errors(d)
                 + '</tr>'
             )
     server_body = (
@@ -621,7 +621,7 @@ def generate_dev():
                 + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
                 + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
                 + td_ppt_breakdown(d, threshold=0)
-                + td_ds_errors(d, colored=True)
+                + td_ds_errors(d)
                 + '</tr>'
             )
     redis_dep_rows = []
@@ -643,7 +643,7 @@ def generate_dev():
                 + f'<td class="{status(sock)}">{"✅ OK" if sock else "❌ FAILED"}</td>'
                 + f'<td class="{status(port)}">{"✅ OK" if port else "❌ FAILED"}</td>'
                 + td_ppt_breakdown(d, threshold=0)
-                + td_ds_errors(d, colored=True)
+                + td_ds_errors(d)
                 + '</tr>'
             )
 
@@ -666,7 +666,7 @@ def generate_dev():
                 + f'<td class="{status(cl_ok)}">{"✅ OK" if cl_ok else "❌ FAILED"}</td>'
                 + f'<td class="{status(loc_ok)}">{"✅ OK" if loc_ok else "❌ FAILED"}</td>'
                 + td_ppt_breakdown(d, threshold=0)
-                + td_ds_errors(d, colored=True)
+                + td_ds_errors(d)
                 + '</tr>'
             )
 
@@ -729,7 +729,7 @@ def generate_release():
             + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver_act)}</td>'
             + f'<td class="{status(pods_ok)}">{"✅ OK" if pods_ok else "❌ FAILED"}</td>'
             + td_ppt_breakdown(ee, threshold=0)
-            + td_ds_errors(ee, colored=True)
+            + td_ds_errors(ee)
             + '</tr>'
         )
 
