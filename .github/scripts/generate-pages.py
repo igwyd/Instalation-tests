@@ -47,7 +47,7 @@ nav.breadcrumb a { color: #cae8ff; text-decoration: none; }
 nav.breadcrumb a:hover { text-decoration: underline; }
 nav.breadcrumb span { color: #cae8ff; opacity: 0.6; margin: 0 6px; }
 main { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
-section { background: white; border: 1px solid #d0d7de; border-radius: 6px; margin-bottom: 24px; overflow: hidden; }
+section { background: white; border: 1px solid #d0d7de; border-radius: 6px; margin-bottom: 24px; }
 .section-header { padding: 12px 16px; border-bottom: 1px solid #d0d7de; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .section-header h2 { font-size: 16px; font-weight: 600; }
 .section-body { padding: 16px; }
@@ -89,6 +89,9 @@ footer a { color: #8c959f; }
 .k6-bar-track { flex: 1; background: #eaecef; border-radius: 2px; height: 13px; overflow: hidden; min-width: 40px; }
 .k6-bar-fill { height: 100%; border-radius: 2px; }
 .k6-bar-val { width: 52px; text-align: right; flex-shrink: 0; color: #24292f; font-weight: 500; }
+td details { position: relative; }
+td summary { cursor: pointer; text-decoration: underline dotted; }
+.dslog { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; width: 820px; max-width: 80vw; max-height: 50vh; overflow: auto; white-space: pre-wrap; word-break: break-word; text-align: left; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; line-height: 1.5; color: #24292f; background: white; border: 1px solid #d0d7de; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); padding: 10px 12px; }
 .k6-bar-p90 { width: 76px; text-align: right; flex-shrink: 0; color: #8c959f; }
 """
 
@@ -145,11 +148,26 @@ def td_ppt_breakdown(data, threshold=0):
     return f'<td class="{status(is_ok)}">{icon} {passed}/{total}</td>'
 
 
-def td_ds_errors(data):
+def os_err_text(docker, native):
+    parts = []
+    for label, d in (("docker", docker), ("native", native)):
+        t = ((d or {}).get("ds_log_errors_text") or "").strip()
+        if t:
+            parts.append(f"--- {label} ---\n{t}")
+    return "\n".join(parts)
+
+
+def td_ds_errors(data, colored=False):
     if data is None:
         return '<td class="na">—</td>'
     n = data.get("ds_log_errors", 0)
-    return f'<td>{n}</td>'
+    cls = f' class="{status(n == 0)}"' if colored else ''
+    label = f'{"✅" if n == 0 else "❌"} {n}' if colored else str(n)
+    text = (data.get("ds_log_errors_text") or "").strip()
+    if not text:
+        return f'<td{cls}>{label}</td>'
+    return (f'<td{cls}><details><summary>{label}</summary>'
+            f'<pre class="dslog">{escape(text)}</pre></details></td>')
 
 
 def pkg_table(data, arch_label):
@@ -484,7 +502,6 @@ def generate_dev():
                 n_vok  = (native or {}).get("version_ok", False)
                 d_err  = (docker or {}).get("ds_log_errors", 0)
                 n_err  = (native or {}).get("ds_log_errors", 0)
-                err_ok = (d_err + n_err) == 0
                 os_rows.append(
                     f'<tr>'
                     f'<td>{escape(os_label)}</td>'
@@ -495,7 +512,8 @@ def generate_dev():
                     + f'<td class="{status(n_vok)}">{"✅" if n_vok else "❌"} {escape(n_ver)}</td>'
                     + td_ppt_breakdown(docker, threshold=0)
                     + td_ppt_breakdown(native, threshold=0)
-                    + f'<td class="{status(err_ok)}">{"✅" if err_ok else "❌"} {d_err + n_err}</td>'
+                    + td_ds_errors({"ds_log_errors": d_err + n_err,
+                                    "ds_log_errors_text": os_err_text(docker, native)}, colored=True)
                     + '</tr>'
                 )
     os_body = (
@@ -565,14 +583,13 @@ def generate_dev():
             hc     = d.get("healthy", False)
             ver_ok = d.get("version_ok", False)
             ver    = d.get("version_actual", "?") or "?"
-            ds_err = d.get("ds_log_errors", 0)
             server_rows.append(
                 f'<tr>'
                 f'<td>{label}</td>'
                 + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
                 + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
                 + td_ppt_breakdown(d, threshold=0)
-                + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
+                + td_ds_errors(d, colored=True)
                 + '</tr>'
             )
     server_body = (
@@ -598,14 +615,13 @@ def generate_dev():
             hc     = d.get("healthy", False)
             ver_ok = d.get("version_ok", False)
             ver    = d.get("version_actual", "?") or "?"
-            ds_err = d.get("ds_log_errors", 0)
             dep_rows.append(
                 f'<tr>'
                 f'<td>{label}</td>'
                 + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
                 + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
                 + td_ppt_breakdown(d, threshold=0)
-                + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
+                + td_ds_errors(d, colored=True)
                 + '</tr>'
             )
     redis_dep_rows = []
@@ -619,7 +635,6 @@ def generate_dev():
             ver    = d.get("version_actual", "?") or "?"
             sock   = d.get("redis_sock_ok", False)
             port   = d.get("port_6379_closed", False)
-            ds_err = d.get("ds_log_errors", 0)
             redis_dep_rows.append(
                 f'<tr>'
                 f'<td>{label}</td>'
@@ -628,7 +643,7 @@ def generate_dev():
                 + f'<td class="{status(sock)}">{"✅ OK" if sock else "❌ FAILED"}</td>'
                 + f'<td class="{status(port)}">{"✅ OK" if port else "❌ FAILED"}</td>'
                 + td_ppt_breakdown(d, threshold=0)
-                + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
+                + td_ds_errors(d, colored=True)
                 + '</tr>'
             )
 
@@ -643,7 +658,6 @@ def generate_dev():
             ver    = d.get("version_actual", "?") or "?"
             cl_ok  = d.get("cluster_ok", False)
             loc_ok = d.get("redis_local_stopped", False)
-            ds_err = d.get("ds_log_errors", 0)
             cluster_dep_rows.append(
                 f'<tr>'
                 f'<td>{label}</td>'
@@ -652,7 +666,7 @@ def generate_dev():
                 + f'<td class="{status(cl_ok)}">{"✅ OK" if cl_ok else "❌ FAILED"}</td>'
                 + f'<td class="{status(loc_ok)}">{"✅ OK" if loc_ok else "❌ FAILED"}</td>'
                 + td_ppt_breakdown(d, threshold=0)
-                + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
+                + td_ds_errors(d, colored=True)
                 + '</tr>'
             )
 
@@ -709,14 +723,13 @@ def generate_release():
         ver_ok  = ee.get("version_ok", False)
         ver_act = ee.get("version_actual", "?") or "?"
         pods_ok = ee.get("pods_ok", False)
-        ds_err  = ee.get("ds_log_errors", 0)
         row = (
             '<tr><td>DE</td>'
             + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
             + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver_act)}</td>'
             + f'<td class="{status(pods_ok)}">{"✅ OK" if pods_ok else "❌ FAILED"}</td>'
             + td_ppt_breakdown(ee, threshold=0)
-            + f'<td class="{status(ds_err == 0)}">{"✅" if ds_err == 0 else "❌"} {ds_err}</td>'
+            + td_ds_errors(ee, colored=True)
             + '</tr>'
         )
 

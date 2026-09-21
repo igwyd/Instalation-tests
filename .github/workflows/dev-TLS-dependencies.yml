@@ -1764,6 +1764,7 @@ jobs:
                   "puppeteer_total": int(os.environ.get(f'PUPPETEER_{cycle}_TOTAL', '0') or '0'),
                   "tls_connection_ok": os.environ.get(f'TLS_CONNECTION_{cycle}_OK', '') == 'true',
                   "ds_log_errors": int(os.environ.get(f'DS_LOG_ERRORS_{cycle}', '0') or '0'),
+                  "ds_log_errors_text": os.environ.get(f'DS_LOG_ERRORS_{cycle}_TEXT', ''),
               }
 
           data = {

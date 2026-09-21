@@ -350,6 +350,7 @@ jobs:
                   'puppeteer_ok':          n('PUPPETEER_DE_OK'),
                   'puppeteer_total':       n('PUPPETEER_DE_TOTAL'),
                   'ds_log_errors':         n('DS_LOG_ERRORS'),
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK') and b('VERSION_OK') and b('PODS_OK') and ppt_ok(n('PUPPETEER_DE_FAILED'), n('PUPPETEER_DE_TOTAL')) and n('DS_LOG_ERRORS') == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),

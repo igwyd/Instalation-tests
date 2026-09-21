@@ -664,6 +664,7 @@ jobs:
                   'puppeteer_api_failed':  n('PUPPETEER_DOCKER_API_FAILED'),
                   'puppeteer_wopi_failed': n('PUPPETEER_DOCKER_WOPI_FAILED'),
                   'ds_log_errors':         n('DS_LOG_ERRORS_DOCKER'),
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_DOCKER_TEXT', ''),
                   'conclusion': 'success' if (b('DOCKER_HEALTHY') and b('DOCKER_VERSION_OK') and ppt_ok(n('PUPPETEER_DOCKER_FAILED'), n('PUPPETEER_DOCKER_TOTAL')) and n('DS_LOG_ERRORS_DOCKER') == 0) else 'failure',
               },
               'native': {
@@ -676,6 +677,7 @@ jobs:
                   'puppeteer_api_failed':  n('PUPPETEER_NATIVE_API_FAILED'),
                   'puppeteer_wopi_failed': n('PUPPETEER_NATIVE_WOPI_FAILED'),
                   'ds_log_errors':         n('DS_LOG_ERRORS_NATIVE'),
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_NATIVE_TEXT', ''),
                   'conclusion': 'success' if (b('NATIVE_HEALTHY') and b('NATIVE_VERSION_OK') and ppt_ok(n('PUPPETEER_NATIVE_FAILED'), n('PUPPETEER_NATIVE_TOTAL')) and n('DS_LOG_ERRORS_NATIVE') == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),

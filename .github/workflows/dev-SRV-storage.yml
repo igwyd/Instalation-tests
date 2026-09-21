@@ -1630,6 +1630,7 @@ jobs:
                   'puppeteer_ok':          s3f_ok,
                   'puppeteer_total':       s3f_total,
                   'ds_log_errors':         s3f_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_AWS_S3_FALSE_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_FALSE') and b('VERSION_AWS_S3_FALSE_OK') and ppt_ok(s3f_ppt, s3f_total) and s3f_ds == 0) else 'failure',
               },
               's3_true': {
@@ -1640,6 +1641,7 @@ jobs:
                   'puppeteer_ok':          s3t_ok,
                   'puppeteer_total':       s3t_total,
                   'ds_log_errors':         s3t_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_AWS_S3_TRUE_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_TRUE') and b('VERSION_AWS_S3_TRUE_OK') and ppt_ok(s3t_ppt, s3t_total) and s3t_ds == 0) else 'failure',
               },
               's3_path_style': {
@@ -1650,6 +1652,7 @@ jobs:
                   'puppeteer_ok':          sp_ok,
                   'puppeteer_total':       sp_total,
                   'ds_log_errors':         sp_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_AWS_S3_PATH_STYLE_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_PATH_STYLE') and b('VERSION_AWS_S3_PATH_STYLE_OK') and ppt_ok(sp_ppt, sp_total) and sp_ds == 0) else 'failure',
               },
               's3_kms': {
@@ -1660,6 +1663,7 @@ jobs:
                   'puppeteer_ok':          kms_ok,
                   'puppeteer_total':       kms_total,
                   'ds_log_errors':         kms_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_AWS_S3_KMS_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_AWS_S3_KMS') and b('VERSION_AWS_S3_KMS_OK') and ppt_ok(kms_ppt, kms_total) and kms_ds == 0) else 'failure',
               },
               'minio_http_false': {
@@ -1670,6 +1674,7 @@ jobs:
                   'puppeteer_ok':          mnf_ok,
                   'puppeteer_total':       mnf_total,
                   'ds_log_errors':         mnf_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_MINIO_HTTP_FALSE_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_MINIO_HTTP_FALSE') and b('VERSION_MINIO_HTTP_FALSE_OK') and ppt_ok(mnf_ppt, mnf_total) and mnf_ds == 0) else 'failure',
               },
               'minio_http_true': {
@@ -1680,6 +1685,7 @@ jobs:
                   'puppeteer_ok':          mnt_ok,
                   'puppeteer_total':       mnt_total,
                   'ds_log_errors':         mnt_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_MINIO_HTTP_TRUE_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_MINIO_HTTP_TRUE') and b('VERSION_MINIO_HTTP_TRUE_OK') and ppt_ok(mnt_ppt, mnt_total) and mnt_ds == 0) else 'failure',
               },
               'minio_http_path_style': {
@@ -1690,6 +1696,7 @@ jobs:
                   'puppeteer_ok':          mnp_ok,
                   'puppeteer_total':       mnp_total,
                   'ds_log_errors':         mnp_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_MINIO_HTTP_PATH_STYLE_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_MINIO_HTTP_PATH_STYLE') and b('VERSION_MINIO_HTTP_PATH_STYLE_OK') and ppt_ok(mnp_ppt, mnp_total) and mnp_ds == 0) else 'failure',
               },
               'az_false': {
@@ -1700,6 +1707,7 @@ jobs:
                   'puppeteer_ok':          azf_ok,
                   'puppeteer_total':       azf_total,
                   'ds_log_errors':         azf_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_AZURE_STORAGE_DIRECTURL_FALSE_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_AZURE_STORAGE_DIRECTURL_FALSE') and b('VERSION_AZURE_STORAGE_DIRECTURL_FALSE_OK') and ppt_ok(azf_ppt, azf_total) and azf_ds == 0) else 'failure',
               },
               'az_true': {
@@ -1710,6 +1718,7 @@ jobs:
                   'puppeteer_ok':          azt_ok,
                   'puppeteer_total':       azt_total,
                   'ds_log_errors':         azt_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_AZURE_STORAGE_DIRECTURL_TRUE_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_AZURE_STORAGE_DIRECTURL_TRUE') and b('VERSION_AZURE_STORAGE_DIRECTURL_TRUE_OK') and ppt_ok(azt_ppt, azt_total) and azt_ds == 0) else 'failure',
               },
               'az_encryption_scope': {
@@ -1720,6 +1729,7 @@ jobs:
                   'puppeteer_ok':          aze_ok,
                   'puppeteer_total':       aze_total,
                   'ds_log_errors':         aze_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_AZURE_STORAGE_ENCRYPTION_SCOPE_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_AZURE_STORAGE_ENCRYPTION_SCOPE') and b('VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_OK') and ppt_ok(aze_ppt, aze_total) and aze_ds == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),

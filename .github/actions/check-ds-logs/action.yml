@@ -24,6 +24,10 @@ inputs:
     description: 'Label for log output (e.g. EE, DE, CE)'
     required: false
     default: ''
+  sample_lines:
+    description: 'How many unique error lines to keep for the dashboard'
+    required: false
+    default: '20'
 
 runs:
   using: composite
@@ -46,28 +50,42 @@ runs:
           /var/log/onlyoffice/documentserver/adminpanel/out.log
           /var/log/onlyoffice/documentserver/adminpanel/err.log
         )
+        # writes matches to a temp file, then prints: count, marker, deduped sample
+        TAIL="> /tmp/ds_log_errors.txt; wc -l < /tmp/ds_log_errors.txt; echo ===SAMPLE===; sort -u /tmp/ds_log_errors.txt | head -n ${{ inputs.sample_lines }} | cut -c1-300"
 
         case "${{ inputs.mode }}" in
           ssh-native)
-            ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
-              "sudo grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" | wc -l" 2>/dev/null || echo "0")
+            OUT=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
+              "sudo grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" $TAIL" 2>/dev/null || echo "0")
             ;;
           ssh-docker)
-            ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
-              "sudo docker exec ${{ inputs.container }} bash -c 'grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" | wc -l'" 2>/dev/null || echo "0")
+            OUT=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
+              "sudo docker exec ${{ inputs.container }} bash -c 'grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" $TAIL'" 2>/dev/null || echo "0")
             ;;
           docker-local)
-            ERRORS=$(docker exec ${{ inputs.container }} bash -c "grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" | wc -l" 2>/dev/null || echo "0")
+            OUT=$(docker exec ${{ inputs.container }} bash -c "grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" $TAIL" 2>/dev/null || echo "0")
             ;;
           ssh-docker-logs)
-            ERRORS=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
-              "sudo docker logs ${{ inputs.container }} 2>&1 | grep -Ph \"$PATTERN\" 2>/dev/null | grep -Pv \"$EXCLUDE\" | wc -l" 2>/dev/null || echo "0")
+            OUT=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
+              "sudo docker logs ${{ inputs.container }} 2>&1 | grep -Ph \"$PATTERN\" 2>/dev/null | grep -Pv \"$EXCLUDE\" $TAIL" 2>/dev/null || echo "0")
             ;;
           *)
             echo "Unknown mode: ${{ inputs.mode }}"
-            ERRORS=0
+            OUT="0"
             ;;
         esac
 
+        ERRORS=$(printf '%s\n' "$OUT" | head -n 1 | tr -dc '0-9')
+        if [ -z "$ERRORS" ]; then ERRORS=0; fi
+        # everything after the marker is the sample; strip our own heredoc delimiter just in case
+        SAMPLE=$(printf '%s\n' "$OUT" | sed -n '/^===SAMPLE===$/,$p' | tail -n +2 | grep -v '^DSLOGEOF$' || true)
+
         echo "DS log errors ${{ inputs.label }}: $ERRORS"
-        echo "${{ inputs.env_var }}=$ERRORS" >> $GITHUB_ENV
+        if [ -n "$SAMPLE" ]; then printf '%s\n' "$SAMPLE"; fi
+
+        {
+          echo "${{ inputs.env_var }}=$ERRORS"
+          echo "${{ inputs.env_var }}_TEXT<<DSLOGEOF"
+          printf '%s\n' "$SAMPLE"
+          echo "DSLOGEOF"
+        } >> $GITHUB_ENV

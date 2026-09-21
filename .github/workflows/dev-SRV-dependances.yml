@@ -1282,6 +1282,7 @@ jobs:
                   'puppeteer_ok':          vp_ok,
                   'puppeteer_total':       vp_total,
                   'ds_log_errors':         vp_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_DS_VPATH_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_DS_VPATH') and b('VERSION_DS_VPATH_OK') and ppt_ok(vp_ppt, vp_total) and vp_ds == 0) else 'failure',
               },
               'amqp_artemis': {
@@ -1292,6 +1293,7 @@ jobs:
                   'puppeteer_ok':          art_ok,
                   'puppeteer_total':       art_total,
                   'ds_log_errors':         art_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_AMQP_ARTEMIS_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_AMQP_ARTEMIS') and b('VERSION_AMQP_ARTEMIS_OK') and ppt_ok(art_ppt, art_total) and art_ds == 0) else 'failure',
               },
               'amqp_classic': {
@@ -1302,6 +1304,7 @@ jobs:
                   'puppeteer_ok':          cls_ok,
                   'puppeteer_total':       cls_total,
                   'ds_log_errors':         cls_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_AMQP_CLASSIC_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_AMQP_CLASSIC') and b('VERSION_AMQP_CLASSIC_OK') and ppt_ok(cls_ppt, cls_total) and cls_ds == 0) else 'failure',
               },
               'redis_redis': {
@@ -1314,6 +1317,7 @@ jobs:
                   'puppeteer_ok':          rr_ok,
                   'puppeteer_total':       rr_total,
                   'ds_log_errors':         rr_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_REDIS_REDIS_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_REDIS_REDIS') and b('VERSION_REDIS_REDIS_OK') and b('REDIS_SOCK_OK_REDIS_REDIS') and b('PORT_6379_CLOSED_REDIS_REDIS') and ppt_ok(rr_ppt, rr_total) and rr_ds == 0) else 'failure',
               },
               'redis_ioredis': {
@@ -1326,6 +1330,7 @@ jobs:
                   'puppeteer_ok':          ri_ok,
                   'puppeteer_total':       ri_total,
                   'ds_log_errors':         ri_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_REDIS_IOREDIS_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_REDIS_IOREDIS') and b('VERSION_REDIS_IOREDIS_OK') and b('REDIS_SOCK_OK_REDIS_IOREDIS') and b('PORT_6379_CLOSED_REDIS_IOREDIS') and ppt_ok(ri_ppt, ri_total) and ri_ds == 0) else 'failure',
               },
               'redis_cluster_redis': {
@@ -1338,6 +1343,7 @@ jobs:
                   'puppeteer_ok':          cr_ok,
                   'puppeteer_total':       cr_total,
                   'ds_log_errors':         cr_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_REDIS_CLUSTER_REDIS_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_REDIS_CLUSTER_REDIS') and b('VERSION_REDIS_CLUSTER_REDIS_OK') and b('CLUSTER_OK_REDIS_CLUSTER_REDIS') and b('REDIS_LOCAL_STOPPED_REDIS_CLUSTER_REDIS') and ppt_ok(cr_ppt, cr_total) and cr_ds == 0) else 'failure',
               },
               'redis_cluster_ioredis': {
@@ -1350,6 +1356,7 @@ jobs:
                   'puppeteer_ok':          ci_ok,
                   'puppeteer_total':       ci_total,
                   'ds_log_errors':         ci_ds,
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_REDIS_CLUSTER_IOREDIS_TEXT', ''),
                   'conclusion': 'success' if (b('HEALTHCHECK_REDIS_CLUSTER_IOREDIS') and b('VERSION_REDIS_CLUSTER_IOREDIS_OK') and b('CLUSTER_OK_REDIS_CLUSTER_IOREDIS') and b('REDIS_LOCAL_STOPPED_REDIS_CLUSTER_IOREDIS') and ppt_ok(ci_ppt, ci_total) and ci_ds == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
