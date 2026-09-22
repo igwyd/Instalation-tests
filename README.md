@@ -4,6 +4,31 @@ Automated installation testing of ONLYOFFICE Docs packages via GitHub Actions.
 
 📊 **[Test Results Dashboard](https://d2a3vv866b8brc.cloudfront.net/)** — detailed results for all dev builds
 
+## Weekly schedule
+
+Everything is scheduled on **Wednesday**. Jobs = GitHub-hosted runners the slot occupies at once
+(matrix entries), so the peak is 18 at 11:00 UTC.
+
+| UTC | Moscow | Workflow | Jobs |
+|-----|--------|----------|------|
+| 10:00 | 13:00 Wed | Update version in README | 1 |
+| 11:00 | 14:00 Wed | dev-DEB | 2 |
+| 11:00 | 14:00 Wed | dev-RPM | 2 |
+| 11:00 | 14:00 Wed | dev-OS | 14 |
+| 13:00 | 16:00 Wed | dev-Docker-DEB | 2 |
+| 13:00 | 16:00 Wed | dev-Docker-RPM | 2 |
+| 13:00 | 16:00 Wed | dev-SRV-storage | 1 |
+| 13:00 | 16:00 Wed | dev-SRV-dependances | 1 |
+| 13:00 | 16:00 Wed | dev-TLS-dependencies | 1 |
+| 14:00 | 17:00 Wed | dev-DB-check | 10 |
+| 20:00 | 23:00 Wed | Deploy Dashboard | 1 |
+| 21:30 | 00:30 Thu | Deploy Weekly Snapshot | 1 |
+
+Concurrency limit for GitHub-hosted Linux runners is per account plan — 20 on Free, 40 on Pro,
+60 on Team, 500 on Enterprise. Jobs over the limit are queued, not dropped. The 11:00 slot uses
+18 of them, and its runs are long enough to still be busy at 13:00 (18 + 7 = 25), so on the Free
+plan part of the 13:00 slot waits in the queue.
+
 ## Develop **<!-- onlyoffice-version-start -->v10.0.0-77<!-- onlyoffice-version-end -->**
 
 Pre-release builds from S3 dev repo.
