@@ -9,7 +9,7 @@ Automated installation testing of ONLYOFFICE Docs packages via GitHub Actions.
 Everything is scheduled on **Wednesday**. Jobs = GitHub-hosted runners the slot occupies at once
 (matrix entries), so the peak is 18 at 11:00 UTC.
 
-| UTC | Moscow | Workflow | Jobs |
+| UTC | UTC+3 | Workflow | Jobs |
 |-----|--------|----------|------|
 | 10:30 | 13:30 Wed | Update version in README | 1 |
 | 11:00 | 14:00 Wed | dev-DEB | 2 |

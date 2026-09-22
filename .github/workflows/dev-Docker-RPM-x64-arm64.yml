@@ -2,7 +2,7 @@ name: dev Docker RPM x64-arm64
 
 on:
   schedule:
-    - cron: '0 13 * * 3'  # Wednesday 16:00 Moscow time (UTC+3)
+    - cron: '0 13 * * 3'  # Wednesday 16:00 UTC+3
   workflow_dispatch:
 
 permissions:

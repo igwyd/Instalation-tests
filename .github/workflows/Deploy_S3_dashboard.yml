@@ -2,7 +2,7 @@ name: Deploy Dashboard
 
 on:
   schedule:
-    - cron: '0 20 * * 3'  # Wednesday 23:00 Moscow time (UTC+3)
+    - cron: '0 20 * * 3'  # Wednesday 23:00 UTC+3
   workflow_dispatch:
 
 jobs:
