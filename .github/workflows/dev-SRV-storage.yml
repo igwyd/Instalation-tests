@@ -709,10 +709,13 @@ jobs:
           sudo docker run -d --name minio -p 9000:9000 \
             -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
             -e "MINIO_API_CORS_ALLOW_ORIGIN=*" \
-            -v /opt/minio/data:/data minio/minio server /data
+            -v /opt/minio/data:/data quay.io/minio/minio server /data
           sleep 15
-          sudo docker run --rm --network host --entrypoint /bin/sh minio/mc \
+          sudo docker run --rm --network host --entrypoint /bin/sh quay.io/minio/mc \
             -c "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/ds-http-minio"
+          # step is continue-on-error, so print the container state — a dead MinIO otherwise
+          # only shows up much later as failing puppeteer tests
+          sudo docker ps -a --filter name=minio --format 'minio container: {{.Status}}'
           # hairpin workaround: DS container -> EC2 public IP:9000 -> host MinIO
           sudo iptables -t nat -C PREROUTING -p tcp -d ${{ vars.AWS_DEV_SERVER_EC2_IP }} --dport 9000 -j DNAT --to-destination 172.17.0.1:9000 2>/dev/null || \
             sudo iptables -t nat -A PREROUTING -p tcp -d ${{ vars.AWS_DEV_SERVER_EC2_IP }} --dport 9000 -j DNAT --to-destination 172.17.0.1:9000
