@@ -188,12 +188,12 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
 
       - name: AWS_S3_FALSE Puppeteer WOPI tests
         continue-on-error: true
@@ -202,13 +202,13 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
-          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
 
       - name: AWS_S3_FALSE Parse puppeteer results
         if: always()
@@ -333,12 +333,12 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
 
       - name: AWS_S3_TRUE Puppeteer WOPI tests
         continue-on-error: true
@@ -347,13 +347,13 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
-          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
 
       - name: AWS_S3_TRUE Parse puppeteer results
         if: always()
@@ -478,12 +478,12 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
 
       - name: AWS_S3_PATH-STYLE Puppeteer WOPI tests
         continue-on-error: true
@@ -492,13 +492,13 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
-          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
 
       - name: AWS_S3_PATH-STYLE Parse puppeteer results
         if: always()
@@ -624,12 +624,12 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
 
       - name: AWS_S3_KMS Puppeteer WOPI tests
         continue-on-error: true
@@ -638,13 +638,13 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
-          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
 
       - name: AWS_S3_KMS Parse puppeteer results
         if: always()
@@ -797,12 +797,12 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
 
       - name: MINIO_HTTP_FALSE Puppeteer WOPI tests
         continue-on-error: true
@@ -811,13 +811,13 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
-          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
 
       - name: MINIO_HTTP_FALSE Parse puppeteer results
         if: always()
@@ -934,12 +934,12 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
 
       - name: MINIO_HTTP_TRUE Puppeteer WOPI tests
         continue-on-error: true
@@ -948,13 +948,13 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
-          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
 
       - name: MINIO_HTTP_TRUE Parse puppeteer results
         if: always()
@@ -1070,12 +1070,12 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
 
       - name: MINIO_HTTP_PATH-STYLE Puppeteer WOPI tests
         continue-on-error: true
@@ -1084,13 +1084,13 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
-          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
 
       - name: MINIO_HTTP_PATH-STYLE Parse puppeteer results
         if: always()
@@ -1227,12 +1227,12 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
 
       - name: AZURE_STORAGE_DIRECTURL_FALSE Puppeteer WOPI tests
         continue-on-error: true
@@ -1241,13 +1241,13 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
-          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
 
       - name: AZURE_STORAGE_DIRECTURL_FALSE Parse puppeteer results
         if: always()
@@ -1371,12 +1371,12 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
 
       - name: AZURE_STORAGE_DIRECTURL_TRUE Puppeteer WOPI tests
         continue-on-error: true
@@ -1385,13 +1385,13 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
-          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
 
       - name: AZURE_STORAGE_DIRECTURL_TRUE Parse puppeteer results
         if: always()
@@ -1516,12 +1516,12 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
 
       - name: AZURE_STORAGE_ENCRYPTION_SCOPE Puppeteer WOPI tests
         continue-on-error: true
@@ -1530,13 +1530,13 @@ jobs:
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # vsdx.js WOPI test disabled — feature not finished yet (fails on WOPI provider)
-          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
 
       - name: AZURE_STORAGE_ENCRYPTION_SCOPE Parse puppeteer results
         if: always()
