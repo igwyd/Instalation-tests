@@ -240,7 +240,9 @@ jobs:
           ERROR_COUNT=0
           for pod in $(kubectl get pods --no-headers -o custom-columns=':metadata.name' \
             | grep -E "^(adminpanel|converter|docservice|example)"); do
-            COUNT=$(kubectl logs $pod 2>&1 | grep -ciE '\[ERROR\]|typeerror|failed to load|load error' || echo 0)
+            # grep -c always prints a count but exits 1 when it is zero — `|| echo 0`
+            # appended a second "0" and broke the arithmetic below
+            COUNT=$(kubectl logs $pod 2>&1 | grep -ciE '\[ERROR\]|typeerror|failed to load|load error') || true
             ERROR_COUNT=$((ERROR_COUNT + COUNT))
           done
           echo "DS_LOG_ERRORS=$ERROR_COUNT" >> $GITHUB_ENV
