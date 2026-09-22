@@ -388,11 +388,6 @@ jobs:
           sudo docker system prune -af 2>/dev/null || true
           EOF
 
-      - name: TEST docker cleanup
-        continue-on-error: true
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} 'sudo docker ps -a'
-
       # ==================== Native install (printf "n") ====================
       - name: Download OneClickInstall-Docs repo for native install
         continue-on-error: true
