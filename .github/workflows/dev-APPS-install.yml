@@ -1,0 +1,525 @@
+name: dev APPS install
+
+# Installs ONLYOFFICE Docs (dev build), checks the /welcome "Install apps" modal, then installs
+# ONLYOFFICE Apps (ex-DocSpace) on top of it with the 4testing packages/images and checks that
+# Apps is up, Docs survived (port move / data migration) and an editor opens from this Docs.
+# EC2 instances are NOT terminated — they are left for manual checks. Re-run with cleanup=true
+# to terminate everything this workflow created (tag Name=demin_apps-*).
+
+on:
+  workflow_dispatch:
+    inputs:
+      cases:
+        description: '"all" or comma list of case numbers from the table in README (1-12)'
+        default: 'all'
+      apps_branch:
+        description: 'DocSpace-buildtools branch with apps-install.sh'
+        default: 'release/v4.0.0'
+      cleanup:
+        description: 'Only terminate EC2 instances left by previous runs, test nothing'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    if: ${{ inputs.cleanup }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Terminate EC2 instances left by previous runs
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          IDS=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=demin_apps-*" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+            --query "Reservations[].Instances[].InstanceId" --output text)
+          [ -z "$IDS" ] && { echo "Nothing to terminate"; exit 0; }
+          echo "Terminating: $IDS"
+          aws ec2 terminate-instances --instance-ids $IDS
+
+  prepare:
+    if: ${{ !inputs.cleanup }}
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Build matrix
+        id: matrix
+        env:
+          CASES: ${{ inputs.cases }}
+        run: |
+          python3 - << 'PYEOF' >> "$GITHUB_OUTPUT"
+          import json, os, sys
+          # os key: name, package type, ssh user, root device, AMI per arch
+          OS = {
+              'ubuntu2404': ('Ubuntu 24.04', 'deb', 'ubuntu',   '/dev/sda1', {'x64': 'ami-0b6c6ebed2801a5cb', 'arm64': 'ami-0a7a4e87939439934'}),
+              'ubuntu2604': ('Ubuntu 26.04', 'deb', 'ubuntu',   '/dev/sda1', {'x64': 'ami-091138d0f0d41ff90', 'arm64': 'ami-07ad186bc37b8dac4'}),
+              'debian12':   ('Debian 12',    'deb', 'admin',    '/dev/xvda', {'x64': 'ami-095f312bef9bfe5b1', 'arm64': 'ami-04308cee1a3c8bb1c'}),
+              'debian13':   ('Debian 13',    'deb', 'admin',    '/dev/xvda', {'x64': 'ami-023a5c1706f994759', 'arm64': 'ami-040945d6282a26609'}),
+              'rhel9':      ('RHEL 9',       'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-0d8d3b1122e36c000', 'arm64': 'ami-0734d5fad59e3ba53'}),
+              'rhel10':     ('RHEL 10',      'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-0ad50334604831820', 'arm64': 'ami-02d5b54ba15715d30'}),
+              'centos9':    ('CentOS 9',     'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-04331ec57720ee626', 'arm64': 'ami-058dc7e5ef5f28287'}),
+              'centos10':   ('CentOS 10',    'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-011969aa4b0fec8fe', 'arm64': 'ami-0da965a0c246cec33'}),
+          }
+          # Keep in sync with the table in README.md. Within each method every arch sees all editions
+          # and all ports; both methods together cover all 9 edition x port pairs. 8888 is a custom
+          # port outside the ports Apps needs itself (8080 is one of them: package install refuses).
+          CASES = [
+              (1,  'package', 'ubuntu2404', 'x64',   'ee', 80),
+              (2,  'package', 'debian13',   'x64',   'de', 8083),
+              (3,  'package', 'rhel9',      'x64',   'ce', 8888),
+              (4,  'package', 'ubuntu2604', 'arm64', 'de', 80),
+              (5,  'package', 'centos10',   'arm64', 'ce', 8083),
+              (6,  'package', 'rhel10',     'arm64', 'ee', 8888),
+              (7,  'docker',  'centos9',    'x64',   'ee', 8083),
+              (8,  'docker',  'debian12',   'x64',   'de', 8888),
+              (9,  'docker',  'rhel10',     'x64',   'ce', 80),
+              (10, 'docker',  'ubuntu2604', 'arm64', 'ce', 8083),
+              (11, 'docker',  'rhel9',      'arm64', 'ee', 80),
+              (12, 'docker',  'ubuntu2404', 'arm64', 'de', 8888),
+          ]
+          want = [x.strip() for x in os.environ['CASES'].split(',') if x.strip()]
+          ids = [c[0] for c in CASES]
+          if want != ['all']:
+              bad = [x for x in want if not x.isdigit() or int(x) not in ids]
+              if bad or not want:
+                  sys.exit(f'cases: bad value(s) {bad or want}, allowed: all or {ids}')
+              ids = sorted({int(x) for x in want})
+          include = []
+          for cid, method, os_key, arch, edition, port in CASES:
+              if cid not in ids:
+                  continue
+              name, os_type, user, device, ami = OS[os_key]
+              include.append({
+                  'case': cid, 'method': method, 'os_key': os_key, 'os_name': name, 'os_type': os_type,
+                  'ssh_user': user, 'device_name': device, 'ami': ami[arch], 'arch': arch,
+                  'instance_type': 't3.xlarge' if arch == 'x64' else 't4g.xlarge',
+                  'edition': edition, 'docs_port': str(port),
+                  'tag': f'apps-{cid}-{method}-{os_key}-{arch}-{edition}-{port}',
+              })
+          print('matrix=' + json.dumps({'include': include}))
+          PYEOF
+
+  test:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    name: "#${{ matrix.case }} ${{ matrix.method }} ${{ matrix.os_name }} ${{ matrix.arch }} ${{ matrix.edition }} docs:${{ matrix.docs_port }}"
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    env:
+      SSH_OPTS: -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=20
+      U: ${{ matrix.ssh_user }}
+      DS_VERSION: ${{ vars.ONLYOFFICE_DEV_VERSION }}
+      DS_BUILD: ${{ vars.ONLYOFFICE_DEV_BUILD }}
+      DOCS_PORT: ${{ matrix.docs_port }}
+      APPS_BRANCH: ${{ inputs.apps_branch }}
+      APPS_ADMIN_EMAIL: apps-qa@example.com
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Check required secrets
+        env:
+          APPS_ADMIN_PASSWORD: ${{ secrets.APPS_ADMIN_PASSWORD }}
+          DH_LOGIN: ${{ secrets.ONLYOFFICE_DOCKERHUB_LOGIN }}
+          DH_SECRET: ${{ secrets.ONLYOFFICE_DOCKERHUB_SECRET }}
+        run: |
+          # the repo is public: the Apps admin password must come from a secret, never be printed
+          [ -n "$APPS_ADMIN_PASSWORD" ] || { echo "::error::secret APPS_ADMIN_PASSWORD is not set"; exit 1; }
+          if [ "${{ matrix.method }}" = "docker" ]; then
+            [ -n "$DH_LOGIN" ] && [ -n "$DH_SECRET" ] || { echo "::error::ONLYOFFICE_DOCKERHUB_LOGIN / ONLYOFFICE_DOCKERHUB_SECRET are not set"; exit 1; }
+          fi
+
+      - name: Resolve edition
+        run: |
+          case "${{ matrix.edition }}" in
+            ce) SUFFIX="";    TYPE=COMMUNITY;  ADMIN_PANEL=false ;;
+            de) SUFFIX="-de"; TYPE=DEVELOPER;  ADMIN_PANEL=true ;;
+            ee) SUFFIX="-ee"; TYPE=ENTERPRISE; ADMIN_PANEL=true ;;
+          esac
+          {
+            echo "DS_PKG=onlyoffice-documentserver${SUFFIX}"
+            echo "DS_IMAGE=onlyoffice/4testing-documentserver${SUFFIX}"
+            echo "DS_TYPE=${TYPE}"
+            echo "EXPECTED_ADMIN_PANEL=${ADMIN_PANEL}"
+            # apps-install.sh must take the Apps edition from the installed Docs: paid Docs -> paid Apps,
+            # whose wizard asks for a license
+            [ "${{ matrix.edition }}" = "ce" ] && echo "EXPECTED_LICENSE_REQUIRED=false" || echo "EXPECTED_LICENSE_REQUIRED=true"
+            [ "${{ matrix.method }}" = "docker" ] && echo "EXPECTED_PLATFORM=docker" || echo "EXPECTED_PLATFORM=linux"
+            # packages: Apps needs port 80, so a Docs sitting on 80 is moved to 8083; any other port stays
+            [ "$DOCS_PORT" = "80" ] && echo "EXPECTED_DOCS_PORT_AFTER=8083" || echo "EXPECTED_DOCS_PORT_AFTER=$DOCS_PORT"
+          } >> "$GITHUB_ENV"
+
+      - name: Initialize check defaults
+        run: |
+          for v in DOCS_BEFORE_OK WELCOME_OK WELCOME_ADMIN_PANEL_OK APPS_INSTALL_OK APPS_UP \
+                   DOCS_AFTER_OK DOCS_PORT_OK DOCS_SAME_OK SMOKE_OK APPS_EDITION_OK; do
+            echo "$v=false" >> "$GITHUB_ENV"
+          done
+          for v in WELCOME_PLATFORM WELCOME_ADMIN_PANEL WELCOME_CMD APPS_INSTALL_RC DOCS_PORT_AFTER \
+                   DOCS_AFTER_URL DOCS_SAME_INFO APPS_INSTALL_TYPE SMOKE_INFO LICENSE_REQUIRED; do
+            echo "$v=not set" >> "$GITHUB_ENV"
+          done
+
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-east-1
+
+      # Apps' hardware check wants 4 cores, 8000+ MB RAM and 40 GB free disk on top of Docs (t3/t4g.xlarge)
+      - name: Create EC2 Instance
+        run: |
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id ${{ matrix.ami }} \
+            --instance-type ${{ matrix.instance_type }} \
+            --key-name demin \
+            --security-groups AllPortsOpened \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_${{ matrix.tag }}}]' \
+            --block-device-mappings '[{"DeviceName":"${{ matrix.device_name }}","Ebs":{"VolumeSize":80,"VolumeType":"gp3"}}]' \
+            --query "Instances[0].InstanceId" --output text)
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+          aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+
+      - name: Get EC2 Public IP
+        run: |
+          IP=$(aws ec2 describe-instances --instance-ids ${{ env.INSTANCE_ID }} \
+            --query "Reservations[].Instances[].PublicIpAddress" --output text)
+          echo "EC2 Public IP: $IP"
+          echo "EC2_IP=$IP" >> $GITHUB_ENV
+
+      - name: Wait for SSH to be Ready
+        run: sleep 120
+
+      - name: Add SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Upgrade packages
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP << 'EOF'
+          if command -v apt-get &>/dev/null; then
+            for i in 1 2 3; do
+              sudo apt-get update && sudo apt-get upgrade -y && break
+              [ $i -lt 3 ] && { echo "Attempt $i failed, retrying in 30s..."; sleep 30; }
+            done
+          else
+            sudo dnf -y clean all && sudo dnf -y update --nobest --skip-broken
+          fi
+          EOF
+
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Wait for instance to reboot after upgrade
+        run: sleep 180
+
+      # CentOS AMIs ship an active firewalld; not part of what we test, so open the ports up front
+      - name: Open firewall ports
+        if: matrix.os_type == 'rpm'
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env P=$DOCS_PORT bash -s" << 'EOF'
+          systemctl is-active --quiet firewalld || { echo "firewalld is not active"; exit 0; }
+          for p in 80 8083 $P; do firewall-cmd --zone=public --add-port=$p/tcp --permanent; done
+          firewall-cmd --reload
+          EOF
+
+      # ==================== Docs ====================
+      - name: Download OneClickInstall-Docs
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP << 'EOF'
+          rm -rf OneClickInstall-Docs && mkdir OneClickInstall-Docs
+          curl -fsSL https://github.com/ONLYOFFICE/OneClickInstall-Docs/archive/refs/heads/${{ vars.ONLYOFFICE_ONECLICK_BRANCH }}.tar.gz \
+            | tar xz --strip-components=1 -C OneClickInstall-Docs
+          EOF
+
+      - name: Install Docs from DEB/RPM package
+        if: matrix.method == 'package'
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP << EOF
+          set -x
+          if [ "${{ matrix.os_type }}" = "deb" ]; then
+            echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable $DS_VERSION" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
+            sudo apt-get update
+            apt-get download $DS_PKG=$DS_VERSION-$DS_BUILD
+          else
+            sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-$DS_VERSION.repo
+            sudo dnf download --destdir "\$HOME" $DS_PKG-$DS_VERSION-$DS_BUILD.el7.\$(uname -m)
+          fi
+          PKG=\$(ls "\$HOME"/${DS_PKG}[_-]$DS_VERSION*)
+          echo "Downloaded package: \$PKG"
+          cd OneClickInstall-Docs
+          printf "n\n" | sudo bash docs-install.sh --installationtype $DS_TYPE --docsport $DOCS_PORT \
+            --skiphardwarecheck true --localscripts true --packagepath "\$PKG"
+          EOF
+
+      # Minimal RHEL 10 AMIs lack the netfilter kernel modules for the running kernel, so dnf satisfies
+      # docker's kmod deps with kernel-debug-modules* and dockerd fails to start (same as dev-OS)
+      - name: Preinstall kernel netfilter modules on RHEL 10
+        if: matrix.method == 'docker' && matrix.os_key == 'rhel10'
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP 'sudo dnf install -y kernel-modules-"$(uname -r)" kernel-modules-extra-"$(uname -r)"'
+
+      - name: Install Docs in Docker
+        if: matrix.method == 'docker'
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP << EOF
+          cd OneClickInstall-Docs
+          printf "y\n" | sudo bash docs-install.sh --installationtype $DS_TYPE --docsport $DOCS_PORT \
+            --documentimage $DS_IMAGE --documentversion $DS_VERSION.$DS_BUILD \
+            --skiphardwarecheck true --localscripts true
+          EOF
+
+      - name: Wait for Docs healthcheck
+        continue-on-error: true
+        run: |
+          for i in $(seq 1 60); do
+            HC=$(curl -s --max-time 5 "http://$EC2_IP:$DOCS_PORT/healthcheck" || true)
+            [ "$HC" = "true" ] && { echo "DOCS_BEFORE_OK=true" >> $GITHUB_ENV; echo "Docs is up on :$DOCS_PORT"; exit 0; }
+            sleep 10
+          done
+          echo "::error::Docs healthcheck on :$DOCS_PORT is not true after 10 min"
+
+      # Fingerprint of this Docs to prove later that Apps kept it instead of deploying another one:
+      # sha256 of the JWT secret (never the secret itself — public repo) and, for Docker, the image
+      # plus marker files in Data/ and custom fonts, which install-Docker.sh has to migrate.
+      - name: Record Docs fingerprint
+        continue-on-error: true
+        run: |
+          if [ "${{ matrix.method }}" = "package" ]; then
+            LOCAL_JSON=$(ssh $SSH_OPTS $U@$EC2_IP 'sudo cat /etc/onlyoffice/documentserver/local.json')
+          else
+            ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -s' << 'EOF'
+          echo apps-migration-marker > /app/onlyoffice/DocumentServer/data/apps-migration-marker.txt
+          echo apps-migration-marker > /app/onlyoffice/DocumentServer/fonts/apps-migration-marker.txt
+          EOF
+            C=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps --format '{{.Names}} {{.Image}}' | awk '\$2 ~ /documentserver/ {print \$1; exit}'")
+            LOCAL_JSON=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C cat /etc/onlyoffice/documentserver/local.json")
+            IMAGE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker inspect -f '{{.Config.Image}}' $C")
+            echo "DS container before: $C ($IMAGE)"
+            echo "DS_IMAGE_BEFORE=$IMAGE" >> $GITHUB_ENV
+          fi
+          JWT_SHA=$(echo "$LOCAL_JSON" | jq -r '.services.CoAuthoring.secret.inbox.string // empty' | sha256sum | cut -c1-16)
+          echo "JWT secret sha256 (prefix): $JWT_SHA"
+          echo "JWT_SHA_BEFORE=$JWT_SHA" >> $GITHUB_ENV
+
+      - name: Check welcome page
+        continue-on-error: true
+        run: |
+          mkdir -p out
+          curl -sL --max-time 20 "http://$EC2_IP:$DOCS_PORT/welcome/" -o out/welcome.html
+          python3 - << 'PYEOF'
+          import html, os, re
+          page = open('out/welcome.html', encoding='utf-8', errors='replace').read()
+          text = html.unescape(page)
+          attr = lambda n: (re.search(rf'<html[^>]*\b{n}="([^"]*)"', page) or [None, 'missing'])[1]
+          platform, admin = attr('data-platform'), attr('data-has-admin-panel')
+          placeholders = sorted(set(re.findall(r'\{\{\s*\w+\s*\}\}', page)))
+          mode = 'docker' if os.environ['EXPECTED_PLATFORM'] == 'docker' else 'package'
+          cmd = f'curl -O https://download.onlyoffice.com/apps/apps-install.sh && bash apps-install.sh {mode}'
+          ok = platform == os.environ['EXPECTED_PLATFORM'] and not placeholders and cmd in text
+          print(f'data-platform={platform} (expected {os.environ["EXPECTED_PLATFORM"]})')
+          print(f'data-has-admin-panel={admin} (expected {os.environ["EXPECTED_ADMIN_PANEL"]})')
+          print(f'unsubstituted placeholders: {placeholders or "none"}')
+          print(f'command present: {cmd in text} -> {cmd}')
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f'WELCOME_OK={str(ok).lower()}\nWELCOME_PLATFORM={platform}\nWELCOME_ADMIN_PANEL={admin}\n')
+              f.write(f'WELCOME_ADMIN_PANEL_OK={str(admin == os.environ["EXPECTED_ADMIN_PANEL"]).lower()}\n')
+              f.write(f'WELCOME_CMD={cmd if cmd in text else "not found"}\n')
+          PYEOF
+
+      # ==================== Apps ====================
+      # The published command (checked above) pulls production packages that do not exist yet, so Apps
+      # is installed the way its developers test it: apps-install.sh from the release branch plus the
+      # 4testing repos (packages) / 4testing- images (docker). The install mode (package|docker) is the
+      # same one the welcome page offers for this platform.
+      - name: Add 4testing repos for Docs and Apps
+        if: matrix.method == 'package'
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env DS_VERSION=$DS_VERSION bash -s" << 'EOF'
+          set -x
+          if command -v apt-get >/dev/null; then
+            echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${DS_VERSION}" > /etc/apt/sources.list.d/onlyoffice-dev.list
+            echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://nexus.onlyoffice.com/repository/4testing-debian stable main" > /etc/apt/sources.list.d/onlyoffice4testing.list
+            curl -fsSL https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE | gpg --batch --yes --dearmor -o /usr/share/keyrings/onlyoffice.gpg
+          else
+            curl -fsSL "https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${DS_VERSION}.repo" \
+              -o "/etc/yum.repos.d/onlyoffice-dev-${DS_VERSION}.repo"
+            cat > /etc/yum.repos.d/onlyoffice4testing.repo << END
+          [onlyoffice4testing]
+          name=onlyoffice4testing repo
+          baseurl=https://nexus.onlyoffice.com/repository/centos-testing/4testing/main/noarch
+          gpgcheck=1
+          enabled=1
+          gpgkey=https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE
+          END
+          fi
+          EOF
+
+      - name: Install Apps
+        continue-on-error: true
+        timeout-minutes: 100
+        env:
+          DH_LOGIN: ${{ secrets.ONLYOFFICE_DOCKERHUB_LOGIN }}
+          DH_SECRET: ${{ secrets.ONLYOFFICE_DOCKERHUB_SECRET }}
+        run: |
+          if [ "${{ matrix.method }}" = "docker" ]; then
+            ARGS="docker -gb $APPS_BRANCH -s 4testing- -un $(printf %q "$DH_LOGIN") -p $(printf %q "$DH_SECRET")"
+          else
+            ARGS="package -gb $APPS_BRANCH"
+          fi
+          # stdin from /dev/null: an unexpected prompt fails fast instead of eating the heredoc; the
+          # timeout guards against prompt loops that spin on EOF
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env ARGS=$(printf %q "$ARGS") BRANCH=$APPS_BRANCH bash -s" << 'EOF'
+          mkdir -p /opt/apps-test && cd /opt/apps-test
+          curl -fsSLO "https://raw.githubusercontent.com/ONLYOFFICE/DocSpace-buildtools/refs/heads/${BRANCH}/install/OneClickInstall/apps-install.sh"
+          timeout 5400 bash apps-install.sh $ARGS < /dev/null > apps-install.out 2>&1
+          echo $? > apps-install.rc
+          EOF
+          RC=$(ssh $SSH_OPTS $U@$EC2_IP 'cat /opt/apps-test/apps-install.rc')
+          ssh $SSH_OPTS $U@$EC2_IP 'tail -n 60 /opt/apps-test/apps-install.out'
+          echo "apps-install.sh exit code: $RC"
+          echo "APPS_INSTALL_RC=$RC" >> $GITHUB_ENV
+          [ "$RC" = "0" ] && echo "APPS_INSTALL_OK=true" >> $GITHUB_ENV || echo "::error::apps-install.sh exited with $RC"
+
+      - name: Wait for Apps
+        continue-on-error: true
+        run: |
+          # Apps answers on port 80 with its own API; /api/2.0/settings is public on a fresh portal
+          for i in $(seq 1 90); do
+            CODE=$(curl -s -o /tmp/settings.json -w '%{http_code}' --max-time 10 "http://$EC2_IP/api/2.0/settings" || true)
+            if [ "$CODE" = "200" ] && jq -e '.response' /tmp/settings.json >/dev/null 2>&1; then
+              echo "APPS_UP=true" >> $GITHUB_ENV; echo "Apps API is up"; exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::Apps API http://$EC2_IP/api/2.0/settings is not up after 30 min (last code $CODE)"
+
+      - name: Check Docs after Apps install
+        continue-on-error: true
+        run: |
+          if [ "${{ matrix.method }}" = "package" ]; then
+            PORT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -oP '^\s*listen\s+(\S*:)?\K\d+' /etc/onlyoffice/documentserver/nginx/ds.conf | head -1")
+            URL="http://$EC2_IP:$PORT"
+            LOCAL_JSON=$(ssh $SSH_OPTS $U@$EC2_IP 'sudo cat /etc/onlyoffice/documentserver/local.json')
+            SAME_EXTRA=true; INFO=""
+          else
+            C=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps --format '{{.Names}} {{.Image}}' | awk '\$2 ~ /documentserver/ {print \$1; exit}'")
+            echo "DS container after: $C"
+            ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}'"
+            PORT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker port $C 80/tcp 2>/dev/null | head -1 | awk -F: '{print \$NF}'")
+            # Apps may stop publishing Docs directly and proxy it under /ds-vpath/ instead
+            if [ -n "$PORT" ]; then URL="http://$EC2_IP:$PORT"; else PORT="none"; URL="http://$EC2_IP/ds-vpath"; fi
+            LOCAL_JSON=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C cat /etc/onlyoffice/documentserver/local.json")
+            IMAGE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker inspect -f '{{.Config.Image}}' $C")
+            MARKERS=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C sh -c 'cat /var/www/onlyoffice/Data/apps-migration-marker.txt /usr/share/fonts/truetype/custom/apps-migration-marker.txt' 2>&1" | grep -c apps-migration-marker || true)
+            TYPE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -h '^INSTALLATION_TYPE=' /app/onlyoffice/.env 2>/dev/null | cut -d= -f2" || true)
+            echo "APPS_INSTALL_TYPE=${TYPE:-not found}" >> $GITHUB_ENV
+            echo "image $DS_IMAGE_BEFORE -> $IMAGE, markers migrated: $MARKERS/2"
+            [ "$IMAGE" = "$DS_IMAGE_BEFORE" ] && [ "$MARKERS" = "2" ] && SAME_EXTRA=true || SAME_EXTRA=false
+            INFO=", image $( [ "$IMAGE" = "$DS_IMAGE_BEFORE" ] && echo same || echo changed ), markers $MARKERS/2"
+          fi
+          HC=$(curl -s --max-time 10 "$URL/healthcheck" || true)
+          JWT_SHA=$(echo "$LOCAL_JSON" | jq -r '.services.CoAuthoring.secret.inbox.string // empty' | sha256sum | cut -c1-16)
+          echo "Docs after: $URL healthcheck=$HC, JWT sha $JWT_SHA_BEFORE -> $JWT_SHA"
+          {
+            echo "DOCS_PORT_AFTER=$PORT"
+            echo "DOCS_AFTER_URL=$URL"
+            [ "$HC" = "true" ] && echo "DOCS_AFTER_OK=true"
+            [ "$PORT" = "$EXPECTED_DOCS_PORT_AFTER" ] && echo "DOCS_PORT_OK=true"
+            [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] && [ "$SAME_EXTRA" = "true" ] && echo "DOCS_SAME_OK=true"
+            echo "DOCS_SAME_INFO=JWT $( [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] && echo same || echo changed )$INFO"
+          } >> $GITHUB_ENV
+
+      - name: Setup Playwright
+        continue-on-error: true
+        run: |
+          pip install --quiet playwright
+          python3 -m playwright install --with-deps chromium
+
+      - name: Smoke - wizard, create a document, open it in the editor
+        continue-on-error: true
+        env:
+          APPS_ADMIN_PASSWORD: ${{ secrets.APPS_ADMIN_PASSWORD }}
+          # Apps EE/DE licenses are different files; once uploaded to Apps they license its Docs too
+          APPS_LICENSE_KEY: ${{ matrix.edition == 'ee' && secrets.APPS_LICENSE_EE || matrix.edition == 'de' && secrets.APPS_LICENSE_DE || '' }}
+        run: |
+          python3 .github/scripts/apps-install/smoke.py \
+            --url "http://$EC2_IP" \
+            --email "$APPS_ADMIN_EMAIL" \
+            --expected-version "$DS_VERSION" \
+            --out out
+
+      - name: Check Apps edition matches Docs
+        continue-on-error: true
+        run: |
+          # LICENSE_REQUIRED comes from the wizard (smoke step); docker also records INSTALLATION_TYPE in .env
+          OK=true
+          [ "$LICENSE_REQUIRED" = "$EXPECTED_LICENSE_REQUIRED" ] || OK=false
+          if [ "${{ matrix.method }}" = "docker" ]; then
+            [ "${APPS_INSTALL_TYPE,,}" = "${DS_TYPE,,}" ] || OK=false
+          fi
+          echo "license required: $LICENSE_REQUIRED (expected $EXPECTED_LICENSE_REQUIRED), .env INSTALLATION_TYPE: $APPS_INSTALL_TYPE (Docs $DS_TYPE)"
+          echo "APPS_EDITION_OK=$OK" >> $GITHUB_ENV
+
+      - name: Collect logs
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p out
+          ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -c "cd /opt/apps-test 2>/dev/null && tar czf - apps-install.out OneClick*.log 2>/dev/null"' > out/apps-install-logs.tar.gz || true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.tag }}
+          path: out/
+          if-no-files-found: ignore
+
+      - name: Final check
+        if: always()
+        run: |
+          r() { [ "$1" = "true" ] && echo "✅" || echo "❌"; }
+          {
+            echo "### #${{ matrix.case }} · ${{ matrix.method }} · ${{ matrix.os_name }} ${{ matrix.arch }} · Docs ${{ matrix.edition }} on :$DOCS_PORT"
+            echo
+            echo "| Check | Result | Details |"
+            echo "|---|---|---|"
+            echo "| Docs installed | $(r $DOCS_BEFORE_OK) | $DS_TYPE, healthcheck on :$DOCS_PORT |"
+            echo "| Welcome page | $(r $WELCOME_OK) | data-platform=\`$WELCOME_PLATFORM\` (expected \`$EXPECTED_PLATFORM\`), command: \`$WELCOME_CMD\` |"
+            echo "| Welcome admin panel flag | $(r $WELCOME_ADMIN_PANEL_OK) | data-has-admin-panel=\`$WELCOME_ADMIN_PANEL\` (expected \`$EXPECTED_ADMIN_PANEL\`) |"
+            echo "| Apps install | $(r $APPS_INSTALL_OK) | exit code $APPS_INSTALL_RC |"
+            echo "| Apps is up | $(r $APPS_UP) | http://$EC2_IP/ |"
+            echo "| Docs alive after | $(r $DOCS_AFTER_OK) | $DOCS_AFTER_URL/healthcheck |"
+            echo "| Docs port after | $(r $DOCS_PORT_OK) | $DOCS_PORT → $DOCS_PORT_AFTER (expected $EXPECTED_DOCS_PORT_AFTER) |"
+            echo "| Same Docs kept | $(r $DOCS_SAME_OK) | $DOCS_SAME_INFO |"
+            echo "| Apps edition = Docs edition | $(r $APPS_EDITION_OK) | wizard asks for license: $LICENSE_REQUIRED (expected $EXPECTED_LICENSE_REQUIRED); .env INSTALLATION_TYPE (docker): $APPS_INSTALL_TYPE |"
+            echo "| Smoke: document opens in this Docs | $(r $SMOKE_OK) | $SMOKE_INFO |"
+            echo
+            echo "**Left running for manual checks:** \`ssh $U@$EC2_IP\` · Apps http://$EC2_IP/ (login \`$APPS_ADMIN_EMAIL\`, password from secret \`APPS_ADMIN_PASSWORD\`) · Docs $DOCS_AFTER_URL/ · instance \`$INSTANCE_ID\`, terminate with cleanup=true"
+          } >> $GITHUB_STEP_SUMMARY
+          cat $GITHUB_STEP_SUMMARY
+
+          FAILED=""
+          for v in DOCS_BEFORE_OK WELCOME_OK APPS_INSTALL_OK APPS_UP DOCS_AFTER_OK APPS_EDITION_OK SMOKE_OK; do
+            [ "${!v}" = "true" ] || FAILED="$FAILED $v"
+          done
+          # port move and "same Docs" apply to what the installers promise; failing them is a real bug
+          [ "${{ matrix.method }}" = "package" ] && [ "$DOCS_PORT_OK" != "true" ] && FAILED="$FAILED DOCS_PORT_OK"
+          [ "$DOCS_SAME_OK" = "true" ] || FAILED="$FAILED DOCS_SAME_OK"
+          [ -z "$FAILED" ] || { echo "::error::Failed:$FAILED"; exit 1; }
