@@ -150,6 +150,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.EC2_IP }}/ds-vpath/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_DS_VPATH=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/ds-vpath/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_DS_VPATH=$HC" >> $GITHUB_ENV
 
@@ -289,6 +291,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_AMQP_ARTEMIS=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AMQP_ARTEMIS=$HC" >> $GITHUB_ENV
 
@@ -420,6 +424,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_AMQP_CLASSIC=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AMQP_CLASSIC=$HC" >> $GITHUB_ENV
 
@@ -580,6 +586,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_REDIS_REDIS=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_REDIS_REDIS=$HC" >> $GITHUB_ENV
 
@@ -760,6 +768,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_REDIS_IOREDIS=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_REDIS_IOREDIS=$HC" >> $GITHUB_ENV
 
@@ -950,6 +960,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_REDIS_CLUSTER_REDIS=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_REDIS_CLUSTER_REDIS=$HC" >> $GITHUB_ENV
 
@@ -1118,6 +1130,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_REDIS_CLUSTER_IOREDIS=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_REDIS_CLUSTER_IOREDIS=$HC" >> $GITHUB_ENV
 
@@ -1276,6 +1290,7 @@ jobs:
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
               'vpath': {
                   'healthy':               b('HEALTHCHECK_DS_VPATH'),
+                  'hc_port': os.environ.get('HC_PORT_DS_VPATH', ''),
                   'version_ok':            b('VERSION_DS_VPATH_OK'),
                   'version_actual':        s('VERSION_DS_VPATH_ACTUAL'),
                   'puppeteer_failed':      vp_ppt,
@@ -1287,6 +1302,7 @@ jobs:
               },
               'amqp_artemis': {
                   'healthy':               b('HEALTHCHECK_AMQP_ARTEMIS'),
+                  'hc_port': os.environ.get('HC_PORT_AMQP_ARTEMIS', ''),
                   'version_ok':            b('VERSION_AMQP_ARTEMIS_OK'),
                   'version_actual':        s('VERSION_AMQP_ARTEMIS_ACTUAL'),
                   'puppeteer_failed':      art_ppt,
@@ -1298,6 +1314,7 @@ jobs:
               },
               'amqp_classic': {
                   'healthy':               b('HEALTHCHECK_AMQP_CLASSIC'),
+                  'hc_port': os.environ.get('HC_PORT_AMQP_CLASSIC', ''),
                   'version_ok':            b('VERSION_AMQP_CLASSIC_OK'),
                   'version_actual':        s('VERSION_AMQP_CLASSIC_ACTUAL'),
                   'puppeteer_failed':      cls_ppt,
@@ -1309,6 +1326,7 @@ jobs:
               },
               'redis_redis': {
                   'healthy':               b('HEALTHCHECK_REDIS_REDIS'),
+                  'hc_port': os.environ.get('HC_PORT_REDIS_REDIS', ''),
                   'version_ok':            b('VERSION_REDIS_REDIS_OK'),
                   'version_actual':        s('VERSION_REDIS_REDIS_ACTUAL'),
                   'redis_sock_ok':         b('REDIS_SOCK_OK_REDIS_REDIS'),
@@ -1322,6 +1340,7 @@ jobs:
               },
               'redis_ioredis': {
                   'healthy':               b('HEALTHCHECK_REDIS_IOREDIS'),
+                  'hc_port': os.environ.get('HC_PORT_REDIS_IOREDIS', ''),
                   'version_ok':            b('VERSION_REDIS_IOREDIS_OK'),
                   'version_actual':        s('VERSION_REDIS_IOREDIS_ACTUAL'),
                   'redis_sock_ok':         b('REDIS_SOCK_OK_REDIS_IOREDIS'),
@@ -1335,6 +1354,7 @@ jobs:
               },
               'redis_cluster_redis': {
                   'healthy':               b('HEALTHCHECK_REDIS_CLUSTER_REDIS'),
+                  'hc_port': os.environ.get('HC_PORT_REDIS_CLUSTER_REDIS', ''),
                   'version_ok':            b('VERSION_REDIS_CLUSTER_REDIS_OK'),
                   'version_actual':        s('VERSION_REDIS_CLUSTER_REDIS_ACTUAL'),
                   'cluster_ok':            b('CLUSTER_OK_REDIS_CLUSTER_REDIS'),
@@ -1348,6 +1368,7 @@ jobs:
               },
               'redis_cluster_ioredis': {
                   'healthy':               b('HEALTHCHECK_REDIS_CLUSTER_IOREDIS'),
+                  'hc_port': os.environ.get('HC_PORT_REDIS_CLUSTER_IOREDIS', ''),
                   'version_ok':            b('VERSION_REDIS_CLUSTER_IOREDIS_OK'),
                   'version_actual':        s('VERSION_REDIS_CLUSTER_IOREDIS_ACTUAL'),
                   'cluster_ok':            b('CLUSTER_OK_REDIS_CLUSTER_IOREDIS'),

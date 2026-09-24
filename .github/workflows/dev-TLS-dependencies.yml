@@ -149,6 +149,8 @@ jobs:
 
           echo "-------------healthcheck-------------"
           HEALTHCHECK_POSTGRES=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_POSTGRES=$(curl -s -o /dev/null -w '%{remote_port}' "http://${RUNNER_IP}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HEALTHCHECK_POSTGRES"
           {
             echo "HEALTHCHECK_POSTGRES<<EOF_HC"
@@ -360,6 +362,8 @@ jobs:
 
           echo "-------------healthcheck-------------"
           HEALTHCHECK_MYSQL=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_MYSQL=$(curl -s -o /dev/null -w '%{remote_port}' "http://${RUNNER_IP}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HEALTHCHECK_MYSQL"
           {
             echo "HEALTHCHECK_MYSQL<<EOF_HC"
@@ -570,6 +574,8 @@ jobs:
 
           echo "-------------healthcheck-------------"
           HEALTHCHECK_MARIADB=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_MARIADB=$(curl -s -o /dev/null -w '%{remote_port}' "http://${RUNNER_IP}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HEALTHCHECK_MARIADB"
           {
             echo "HEALTHCHECK_MARIADB<<EOF_HC"
@@ -780,6 +786,8 @@ jobs:
 
           echo "-------------healthcheck-------------"
           HEALTHCHECK_MSSQL=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_MSSQL=$(curl -s -o /dev/null -w '%{remote_port}' "http://${RUNNER_IP}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HEALTHCHECK_MSSQL"
           {
             echo "HEALTHCHECK_MSSQL<<EOF_HC"
@@ -984,6 +992,8 @@ jobs:
 
           echo "-------------healthcheck-------------"
           HEALTHCHECK_REDIS=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_REDIS=$(curl -s -o /dev/null -w '%{remote_port}' "http://${RUNNER_IP}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HEALTHCHECK_REDIS"
           {
             echo "HEALTHCHECK_REDIS<<EOF_HC"
@@ -1222,6 +1232,8 @@ jobs:
 
           echo "-------------healthcheck-------------"
           HEALTHCHECK_RABBITMQ=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_RABBITMQ=$(curl -s -o /dev/null -w '%{remote_port}' "http://${RUNNER_IP}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HEALTHCHECK_RABBITMQ"
           {
             echo "HEALTHCHECK_RABBITMQ<<EOF_HC"
@@ -1527,6 +1539,8 @@ jobs:
 
           echo "-------------healthcheck-------------"
           HEALTHCHECK_ALL=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_ALL=$(curl -s -o /dev/null -w '%{remote_port}' "http://${RUNNER_IP}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HEALTHCHECK_ALL"
           {
             echo "HEALTHCHECK_ALL<<EOF_HC"
@@ -1756,6 +1770,7 @@ jobs:
           def cycle_data(cycle):
               return {
                   "healthy": os.environ.get(f'HEALTHCHECK_{cycle}', '') == 'true',
+                  "hc_port": os.environ.get(f'HC_PORT_{cycle}', ''),
                   "version_expected": os.environ.get('EXPECTED_VERSION', ''),
                   "version_actual": os.environ.get(f'VERSION_{cycle}_ACTUAL', 'not set'),
                   "version_ok": os.environ.get(f'VERSION_{cycle}_OK', '') == 'true',

@@ -306,6 +306,8 @@ jobs:
 
           echo "=== Healthcheck ==="
           RESULT=$(curl -s http://${{ env.EC2_IP }}/healthcheck)
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_DOCKER=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck result: $RESULT"
           if [ "$RESULT" = "true" ]; then
             echo "DOCKER_HEALTHY=true" >> $GITHUB_ENV
@@ -447,6 +449,8 @@ jobs:
         run: |
           echo "----------Healthcheck----------"
           RESULT=$(curl -s http://${{ env.EC2_IP }}/healthcheck)
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_NATIVE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck result: $RESULT"
           if [ "$RESULT" = "true" ]; then
             echo "NATIVE_HEALTHY=true" >> $GITHUB_ENV
@@ -651,6 +655,7 @@ jobs:
               'arch':     s('ARCH'),
               'docker': {
                   'healthy':               b('DOCKER_HEALTHY'),
+                  'hc_port': os.environ.get('HC_PORT_DOCKER', ''),
                   'version_ok':            b('DOCKER_VERSION_OK'),
                   'version_actual':        s('DOCKER_VERSION_ACTUAL'),
                   'puppeteer_failed':      n('PUPPETEER_DOCKER_FAILED'),
@@ -664,6 +669,7 @@ jobs:
               },
               'native': {
                   'healthy':               b('NATIVE_HEALTHY'),
+                  'hc_port': os.environ.get('HC_PORT_NATIVE', ''),
                   'version_ok':            b('NATIVE_VERSION_OK'),
                   'version_actual':        s('NATIVE_VERSION_ACTUAL'),
                   'puppeteer_failed':      n('PUPPETEER_NATIVE_FAILED'),

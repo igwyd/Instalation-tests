@@ -154,6 +154,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_AWS_S3_FALSE=$(curl -s -o /dev/null -w '%{remote_port}' "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AWS_S3_FALSE=$HC" >> $GITHUB_ENV
 
@@ -300,6 +302,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_AWS_S3_TRUE=$(curl -s -o /dev/null -w '%{remote_port}' "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AWS_S3_TRUE=$HC" >> $GITHUB_ENV
 
@@ -445,6 +449,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_AWS_S3_PATH_STYLE=$(curl -s -o /dev/null -w '%{remote_port}' "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AWS_S3_PATH_STYLE=$HC" >> $GITHUB_ENV
 
@@ -591,6 +597,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_AWS_S3_KMS=$(curl -s -o /dev/null -w '%{remote_port}' "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AWS_S3_KMS=$HC" >> $GITHUB_ENV
 
@@ -761,6 +769,8 @@ jobs:
           # No HTTPS here on purpose — DS served plain HTTP/IP so the browser doesn't hit
           # mixed-content blocking when it fetches presigned URLs directly from MinIO (also HTTP).
           HC=$(curl -s "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_MINIO_HTTP_FALSE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_MINIO_HTTP_FALSE=$HC" >> $GITHUB_ENV
 
@@ -901,6 +911,8 @@ jobs:
           # No HTTPS here on purpose — DS served plain HTTP/IP so the browser doesn't hit
           # mixed-content blocking when it fetches presigned URLs directly from MinIO (also HTTP).
           HC=$(curl -s "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_MINIO_HTTP_TRUE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_MINIO_HTTP_TRUE=$HC" >> $GITHUB_ENV
 
@@ -1037,6 +1049,8 @@ jobs:
         run: |
           # No HTTPS here on purpose — see MINIO_HTTP_TRUE Check healthcheck for why
           HC=$(curl -s "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_MINIO_HTTP_PATH_STYLE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_MINIO_HTTP_PATH_STYLE=$HC" >> $GITHUB_ENV
 
@@ -1191,6 +1205,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_AZURE_STORAGE_DIRECTURL_FALSE=$(curl -s -o /dev/null -w '%{remote_port}' "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AZURE_STORAGE_DIRECTURL_FALSE=$HC" >> $GITHUB_ENV
 
@@ -1338,6 +1354,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_AZURE_STORAGE_DIRECTURL_TRUE=$(curl -s -o /dev/null -w '%{remote_port}' "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AZURE_STORAGE_DIRECTURL_TRUE=$HC" >> $GITHUB_ENV
 
@@ -1483,6 +1501,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_AZURE_STORAGE_ENCRYPTION_SCOPE=$(curl -s -o /dev/null -w '%{remote_port}' "https://${{ vars.AWS_DEV_SERVER_DOMAIN }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_AZURE_STORAGE_ENCRYPTION_SCOPE=$HC" >> $GITHUB_ENV
 
@@ -1627,6 +1647,7 @@ jobs:
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
               's3_false': {
                   'healthy':               b('HEALTHCHECK_AWS_S3_FALSE'),
+                  'hc_port': os.environ.get('HC_PORT_AWS_S3_FALSE', ''),
                   'version_ok':            b('VERSION_AWS_S3_FALSE_OK'),
                   'version_actual':        s('VERSION_AWS_S3_FALSE_ACTUAL'),
                   'puppeteer_failed':      s3f_ppt,
@@ -1638,6 +1659,7 @@ jobs:
               },
               's3_true': {
                   'healthy':               b('HEALTHCHECK_AWS_S3_TRUE'),
+                  'hc_port': os.environ.get('HC_PORT_AWS_S3_TRUE', ''),
                   'version_ok':            b('VERSION_AWS_S3_TRUE_OK'),
                   'version_actual':        s('VERSION_AWS_S3_TRUE_ACTUAL'),
                   'puppeteer_failed':      s3t_ppt,
@@ -1649,6 +1671,7 @@ jobs:
               },
               's3_path_style': {
                   'healthy':               b('HEALTHCHECK_AWS_S3_PATH_STYLE'),
+                  'hc_port': os.environ.get('HC_PORT_AWS_S3_PATH_STYLE', ''),
                   'version_ok':            b('VERSION_AWS_S3_PATH_STYLE_OK'),
                   'version_actual':        s('VERSION_AWS_S3_PATH_STYLE_ACTUAL'),
                   'puppeteer_failed':      sp_ppt,
@@ -1660,6 +1683,7 @@ jobs:
               },
               's3_kms': {
                   'healthy':               b('HEALTHCHECK_AWS_S3_KMS'),
+                  'hc_port': os.environ.get('HC_PORT_AWS_S3_KMS', ''),
                   'version_ok':            b('VERSION_AWS_S3_KMS_OK'),
                   'version_actual':        s('VERSION_AWS_S3_KMS_ACTUAL'),
                   'puppeteer_failed':      kms_ppt,
@@ -1671,6 +1695,7 @@ jobs:
               },
               'minio_http_false': {
                   'healthy':               b('HEALTHCHECK_MINIO_HTTP_FALSE'),
+                  'hc_port': os.environ.get('HC_PORT_MINIO_HTTP_FALSE', ''),
                   'version_ok':            b('VERSION_MINIO_HTTP_FALSE_OK'),
                   'version_actual':        s('VERSION_MINIO_HTTP_FALSE_ACTUAL'),
                   'puppeteer_failed':      mnf_ppt,
@@ -1682,6 +1707,7 @@ jobs:
               },
               'minio_http_true': {
                   'healthy':               b('HEALTHCHECK_MINIO_HTTP_TRUE'),
+                  'hc_port': os.environ.get('HC_PORT_MINIO_HTTP_TRUE', ''),
                   'version_ok':            b('VERSION_MINIO_HTTP_TRUE_OK'),
                   'version_actual':        s('VERSION_MINIO_HTTP_TRUE_ACTUAL'),
                   'puppeteer_failed':      mnt_ppt,
@@ -1693,6 +1719,7 @@ jobs:
               },
               'minio_http_path_style': {
                   'healthy':               b('HEALTHCHECK_MINIO_HTTP_PATH_STYLE'),
+                  'hc_port': os.environ.get('HC_PORT_MINIO_HTTP_PATH_STYLE', ''),
                   'version_ok':            b('VERSION_MINIO_HTTP_PATH_STYLE_OK'),
                   'version_actual':        s('VERSION_MINIO_HTTP_PATH_STYLE_ACTUAL'),
                   'puppeteer_failed':      mnp_ppt,
@@ -1704,6 +1731,7 @@ jobs:
               },
               'az_false': {
                   'healthy':               b('HEALTHCHECK_AZURE_STORAGE_DIRECTURL_FALSE'),
+                  'hc_port': os.environ.get('HC_PORT_AZURE_STORAGE_DIRECTURL_FALSE', ''),
                   'version_ok':            b('VERSION_AZURE_STORAGE_DIRECTURL_FALSE_OK'),
                   'version_actual':        s('VERSION_AZURE_STORAGE_DIRECTURL_FALSE_ACTUAL'),
                   'puppeteer_failed':      azf_ppt,
@@ -1715,6 +1743,7 @@ jobs:
               },
               'az_true': {
                   'healthy':               b('HEALTHCHECK_AZURE_STORAGE_DIRECTURL_TRUE'),
+                  'hc_port': os.environ.get('HC_PORT_AZURE_STORAGE_DIRECTURL_TRUE', ''),
                   'version_ok':            b('VERSION_AZURE_STORAGE_DIRECTURL_TRUE_OK'),
                   'version_actual':        s('VERSION_AZURE_STORAGE_DIRECTURL_TRUE_ACTUAL'),
                   'puppeteer_failed':      azt_ppt,
@@ -1726,6 +1755,7 @@ jobs:
               },
               'az_encryption_scope': {
                   'healthy':               b('HEALTHCHECK_AZURE_STORAGE_ENCRYPTION_SCOPE'),
+                  'hc_port': os.environ.get('HC_PORT_AZURE_STORAGE_ENCRYPTION_SCOPE', ''),
                   'version_ok':            b('VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_OK'),
                   'version_actual':        s('VERSION_AZURE_STORAGE_ENCRYPTION_SCOPE_ACTUAL'),
                   'puppeteer_failed':      aze_ppt,

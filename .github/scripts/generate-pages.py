@@ -109,8 +109,12 @@ def status(ok):
     return "ok" if ok else "fail"
 
 
-def td_bool(v):
-    return f'<td class="{status(v)}">{"✅ OK" if v else "❌ FAILED"}</td>'
+# port = real TCP port curl connected to in the workflow's "Check healthcheck" step (hc_port in JSON);
+# missing (old results) or 0/-1 (no connection) → no port shown
+def td_hc(v, port=None):
+    port = str(port or "")
+    suffix = f' <span class="date">:{port}</span>' if port.isdigit() and int(port) > 0 else ""
+    return f'<td class="{status(v)}">{"✅ OK" if v else "❌ FAILED"}{suffix}</td>'
 
 
 def td_version(data):
@@ -189,7 +193,7 @@ def pkg_table(data, arch_label):
                         f'SVC: {"✅ OK" if svc_ok else "❌ FAILED"}</td>')
             rows.append(
                 f'<tr><td>{label}</td>'
-                + td_bool(ed.get("healthy", False))
+                + td_hc(ed.get("healthy", False), ed.get("hc_port"))
                 + td_version(ed)
                 + svc_cell
                 + td_ppt_breakdown(ed)
@@ -206,7 +210,7 @@ def pkg_table(data, arch_label):
         hc_rel  = ug.get("healthy_release", False)
         rows.append(
             f'<tr><td>EE Release</td>'
-            + td_bool(hc_rel)
+            + td_hc(hc_rel, ug.get("hc_port_release"))
             + f'<td>{escape(ver_rel)}</td>'
             + f'<td class="{status(jwt_rel)}">JWT: {"✅ YES" if jwt_rel else "❌ FAIL"}</td>'
             + '<td class="na">—</td>'
@@ -218,7 +222,7 @@ def pkg_table(data, arch_label):
         jwt_match = ug.get("jwt_match", False)
         rows.append(
             f'<tr><td>EE Upgrade</td>'
-            + td_bool(hc_upg)
+            + td_hc(hc_upg, ug.get("hc_port_upgrade"))
             + td_version(ug)
             + f'<td class="{status(jwt_match)}">JWT: {"✅ MATCH" if jwt_match else "❌ FAIL"}</td>'
             + td_ppt_breakdown(ug)
@@ -251,7 +255,7 @@ def docker_table(data, arch_label):
                         f'SVC: {"✅ OK" if svc_ok else "❌ FAILED"}</td>')
             rows.append(
                 f'<tr><td>{label}</td>'
-                + td_bool(ed.get("healthy", False))
+                + td_hc(ed.get("healthy", False), ed.get("hc_port"))
                 + td_version(ed)
                 + svc_cell
                 + td_ppt_breakdown(ed)
@@ -506,9 +510,9 @@ def generate_dev():
                     f'<tr>'
                     f'<td>{escape(os_label)}</td>'
                     f'<td>{arch}</td>'
-                    + f'<td class="{status(d_hc)}">{"✅ OK" if d_hc else "❌ FAILED"}</td>'
+                    + td_hc(d_hc, (docker or {}).get("hc_port"))
                     + f'<td class="{status(d_vok)}">{"✅" if d_vok else "❌"} {escape(d_ver)}</td>'
-                    + f'<td class="{status(n_hc)}">{"✅ OK" if n_hc else "❌ FAILED"}</td>'
+                    + td_hc(n_hc, (native or {}).get("hc_port"))
                     + f'<td class="{status(n_vok)}">{"✅" if n_vok else "❌"} {escape(n_ver)}</td>'
                     + td_ppt_breakdown(docker, threshold=0)
                     + td_ppt_breakdown(native, threshold=0)
@@ -556,7 +560,7 @@ def generate_dev():
         else:
             db_rows.append(
                 f'<tr><td>{escape(label)}</td>'
-                + td_bool(d.get("healthy", False))
+                + td_hc(d.get("healthy", False), d.get("hc_port"))
                 + td_version(d)
                 + td_ppt_breakdown(d)
                 + td_ds_errors(d)
@@ -586,7 +590,7 @@ def generate_dev():
             server_rows.append(
                 f'<tr>'
                 f'<td>{label}</td>'
-                + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
+                + td_hc(hc, d.get("hc_port"))
                 + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
                 + td_ppt_breakdown(d, threshold=0)
                 + td_ds_errors(d)
@@ -618,7 +622,7 @@ def generate_dev():
             dep_rows.append(
                 f'<tr>'
                 f'<td>{label}</td>'
-                + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
+                + td_hc(hc, d.get("hc_port"))
                 + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
                 + td_ppt_breakdown(d, threshold=0)
                 + td_ds_errors(d)
@@ -638,7 +642,7 @@ def generate_dev():
             redis_dep_rows.append(
                 f'<tr>'
                 f'<td>{label}</td>'
-                + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
+                + td_hc(hc, d.get("hc_port"))
                 + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
                 + f'<td class="{status(sock)}">{"✅ OK" if sock else "❌ FAILED"}</td>'
                 + f'<td class="{status(port)}">{"✅ OK" if port else "❌ FAILED"}</td>'
@@ -661,7 +665,7 @@ def generate_dev():
             cluster_dep_rows.append(
                 f'<tr>'
                 f'<td>{label}</td>'
-                + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
+                + td_hc(hc, d.get("hc_port"))
                 + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver)}</td>'
                 + f'<td class="{status(cl_ok)}">{"✅ OK" if cl_ok else "❌ FAILED"}</td>'
                 + f'<td class="{status(loc_ok)}">{"✅ OK" if loc_ok else "❌ FAILED"}</td>'
@@ -725,7 +729,7 @@ def generate_release():
         pods_ok = ee.get("pods_ok", False)
         row = (
             '<tr><td>DE</td>'
-            + f'<td class="{status(hc)}">{"✅ OK" if hc else "❌ FAILED"}</td>'
+            + td_hc(hc, ee.get("hc_port"))
             + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver_act)}</td>'
             + f'<td class="{status(pods_ok)}">{"✅ OK" if pods_ok else "❌ FAILED"}</td>'
             + td_ppt_breakdown(ee, threshold=0)
@@ -760,7 +764,7 @@ def tls_body(data):
             tls_ok = d.get("tls_connection_ok", False)
             rows.append(
                 f'<tr><td>{label}</td>'
-                + td_bool(d.get("healthy", False))
+                + td_hc(d.get("healthy", False), d.get("hc_port"))
                 + td_version(d)
                 + f'<td class="{status(tls_ok)}">{"✅ OK" if tls_ok else "❌ FAILED"}</td>'
                 + td_ppt_breakdown(d, threshold=0)

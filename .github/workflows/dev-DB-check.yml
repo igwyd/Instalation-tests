@@ -224,6 +224,8 @@ jobs:
 
           echo "-------------healthcheck-------------"
           HEALTHCHECK_RESULT=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_RESULT=$(curl -s -o /dev/null -w '%{remote_port}' "http://${RUNNER_IP}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HEALTHCHECK_RESULT"
           echo "HEALTHCHECK_RESULT=$HEALTHCHECK_RESULT" >> $GITHUB_ENV
           echo "-------------DS services-------------"
@@ -477,6 +479,7 @@ jobs:
           data = {
               "run_date": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
               "healthy": os.environ.get('HEALTHCHECK_RESULT', '') == 'true',
+              "hc_port": os.environ.get('HC_PORT_RESULT', ''),
               "version_expected": os.environ.get('EXPECTED_VERSION', ''),
               "version_actual": os.environ.get('VERSION_ACTUAL', 'not set'),
               "version_ok": os.environ.get('VERSION_OK', '') == 'true',

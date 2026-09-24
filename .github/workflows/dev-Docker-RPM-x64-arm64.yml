@@ -156,6 +156,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_EE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck EE: $HC"
           echo "HEALTHCHECK_EE=$HC" >> $GITHUB_ENV
 
@@ -279,6 +281,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_DE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck DE: $HC"
           echo "HEALTHCHECK_DE=$HC" >> $GITHUB_ENV
 
@@ -401,6 +405,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_CE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck CE: $HC"
           echo "HEALTHCHECK_CE=$HC" >> $GITHUB_ENV
 
@@ -631,6 +637,7 @@ jobs:
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
               'ee': {
                   'healthy':          b('HEALTHCHECK_EE'),
+                  'hc_port': os.environ.get('HC_PORT_EE', ''),
                   'version_ok':       b('VERSION_EE_OK'),
                   'version_actual':   s('VERSION_EE_ACTUAL'),
                   'services_ok':      b('SERVICES_EE_OK'),
@@ -645,6 +652,7 @@ jobs:
               },
               'de': {
                   'healthy':               b('HEALTHCHECK_DE'),
+                  'hc_port': os.environ.get('HC_PORT_DE', ''),
                   'version_ok':            b('VERSION_DE_OK'),
                   'version_actual':        s('VERSION_DE_ACTUAL'),
                   'services_ok':           b('SERVICES_DE_OK'),
@@ -659,6 +667,7 @@ jobs:
               },
               'ce': {
                   'healthy':               b('HEALTHCHECK_CE'),
+                  'hc_port': os.environ.get('HC_PORT_CE', ''),
                   'version_ok':            b('VERSION_CE_OK'),
                   'version_actual':        s('VERSION_CE_ACTUAL'),
                   'services_ok':           b('SERVICES_CE_OK'),

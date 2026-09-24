@@ -183,6 +183,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.LB_HOST }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.LB_HOST }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK=$HC" >> $GITHUB_ENV
 
@@ -343,6 +345,7 @@ jobs:
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
               'ee': {
                   'healthy':               b('HEALTHCHECK'),
+                  'hc_port': os.environ.get('HC_PORT', ''),
                   'version_ok':            b('VERSION_OK'),
                   'version_actual':        s('VERSION_ACTUAL'),
                   'pods_ok':               b('PODS_OK'),
