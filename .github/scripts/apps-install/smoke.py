@@ -13,10 +13,11 @@ from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
 
 p = argparse.ArgumentParser()
-p.add_argument('--url', required=True)            # http://<IP>
+p.add_argument('--url', required=True)            # http://<IP> or https://<domain>
 p.add_argument('--email', required=True)
 p.add_argument('--expected-version', required=True)  # Docs version, e.g. 10.0.0.105
 p.add_argument('--out', default='out')
+p.add_argument('--insecure', action='store_true')  # self-signed certificate
 a = p.parse_args()
 os.makedirs(a.out, exist_ok=True)
 password = os.environ['APPS_ADMIN_PASSWORD']
@@ -44,7 +45,7 @@ def api(req, method, path, **kw):
 
 
 with sync_playwright() as pw:
-    req = pw.request.new_context(extra_http_headers={'Accept': 'application/json'})
+    req = pw.request.new_context(ignore_https_errors=a.insecure, extra_http_headers={'Accept': 'application/json'})
 
     s = api(req, 'GET', '/api/2.0/settings')
     ph = s['passwordHash']
@@ -88,7 +89,7 @@ with sync_playwright() as pw:
     print(f'file {file_id}, editorUrl {editor_url}')
 
     browser = pw.chromium.launch()
-    ctx = browser.new_context(viewport={'width': 1440, 'height': 900})
+    ctx = browser.new_context(ignore_https_errors=a.insecure, viewport={'width': 1440, 'height': 900})
     ctx.add_cookies([{'name': 'asc_auth_key', 'value': auth['token'], 'url': a.url}])
     # the Docs editor posts {event: 'onDocumentReady'} to the parent once the document is loaded
     ctx.add_init_script("window.__docReady = false; window.addEventListener('message', e => {"

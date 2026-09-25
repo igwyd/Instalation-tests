@@ -753,6 +753,15 @@ def generate_release():
     write("release.html", page_html("RELEASE — ONLYOFFICE Docs Test Results", body, breadcrumb("RELEASE")))
 
 
+def td_https(d):
+    ssl = d.get("ssl", "none")
+    if ssl == "none":
+        return '<td class="na">—</td>'
+    v = d.get("https_ok", False)
+    return (f'<td class="{status(v)}" title="{escape(d.get("https_info", ""))}">'
+            f'{"✅" if v else "❌"} {escape(ssl)}</td>')
+
+
 def apps_body():
     # one JSON per case (dev-apps-<case>.json): the workflow is manual and may run only some cases
     files = sorted((f for f in os.listdir(RESULTS_DIR) if f.startswith("dev-apps-") and f.endswith(".json")),
@@ -779,7 +788,7 @@ def apps_body():
             + ok("docs_after_ok") + ok("docs_port_ok")
             + f'<td class="{status(d.get("docs_same_ok"))}" title="{escape(d.get("docs_same_info", ""))}">'
             f'{"✅" if d.get("docs_same_ok") else "❌"}</td>'
-            + ok("apps_edition_ok") + smoke_td
+            + ok("apps_edition_ok") + td_https(d) + smoke_td
             + f'<td class="date">{escape(d.get("run_date", ""))}</td></tr>'
         )
     if not rows:
@@ -787,7 +796,7 @@ def apps_body():
     return ('<table><thead><tr>'
             '<th>#</th><th>Method</th><th>OS</th><th>Arch</th><th>Docs</th><th>Docs port</th>'
             '<th>Docs installed</th><th>Welcome</th><th>Apps install</th><th>Apps up</th>'
-            '<th>Docs alive</th><th>Port moved</th><th>Same Docs</th><th>Edition</th>'
+            '<th>Docs alive</th><th>Port moved</th><th>Same Docs</th><th>Edition</th><th>HTTPS takeover</th>'
             '<th>Editor + typing</th><th>Run</th>'
             '</tr></thead><tbody>' + '\n'.join(rows) + '</tbody></table>\n')
 
