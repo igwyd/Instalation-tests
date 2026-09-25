@@ -1,5 +1,5 @@
 """Smoke test for a fresh ONLYOFFICE Apps (DocSpace) install: complete the first-run wizard,
-log in, create a .docx and open it in the editor — then check the editor really comes from the
+log in, create a .docx, open it in the editor and type 'test' — then check the editor really comes from the
 Docs installed on this server (Apps serves it under /ds-vpath/, the version is reported by Docs).
 
 Password comes from env APPS_ADMIN_PASSWORD (never printed); APPS_LICENSE_KEY (the EE or DE license,
@@ -102,6 +102,15 @@ with sync_playwright() as pw:
     except Exception as e:
         page.screenshot(path=f'{a.out}/editor.png')
         done(False, f'editor did not load: {str(e).splitlines()[0]}')
+    # the page is a canvas: a click into it focuses the editor's hidden input, then keys go to the document
+    try:
+        page.frame(name='frameEditor').click('#editor_sdk', timeout=30000)
+        page.keyboard.type('test', delay=100)
+        page.wait_for_timeout(2000)  # let the canvas redraw before the screenshot
+    except Exception as e:
+        page.screenshot(path=f'{a.out}/editor.png')
+        done(False, f'could not type into the editor: {str(e).splitlines()[0]}')
+    steps.append("typed 'test'")
     page.screenshot(path=f'{a.out}/editor.png')
     browser.close()
 

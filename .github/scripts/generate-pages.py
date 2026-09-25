@@ -92,6 +92,7 @@ footer a { color: #8c959f; }
 td details { position: relative; }
 td summary { cursor: pointer; text-decoration: underline dotted; }
 .dslog { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; width: 820px; max-width: 80vw; max-height: 50vh; overflow: auto; white-space: pre-wrap; word-break: break-word; text-align: left; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; line-height: 1.5; color: #24292f; background: white; border: 1px solid #d0d7de; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); padding: 10px 12px; }
+.shot { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; width: 900px; max-width: 80vw; border: 1px solid #d0d7de; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); background: white; }
 .k6-bar-p90 { width: 76px; text-align: right; flex-shrink: 0; color: #8c959f; }
 """
 
@@ -460,7 +461,7 @@ def generate_main():
         '<a class="card card-dev" href="dev.html">\n'
         '  <div class="card-label">Pre-release builds</div>\n'
         '  <div class="card-title">DEV</div>\n'
-        '  <div class="card-desc">DEB, RPM, Docker, OS (OneClickInstall),<br>Database, SRV Storage, SRV Dependances</div>\n'
+        '  <div class="card-desc">DEB, RPM, Docker, OS (OneClickInstall),<br>Database, SRV Storage, SRV Dependances,<br>Apps install</div>\n'
         '  <div class="card-arrow">Open →</div>\n'
         '</a>\n'
         '<a class="card card-release" href="release.html">\n'
@@ -710,6 +711,7 @@ def generate_dev():
         + section("SRV Storage (S3, MinIO, Azure)", "dev-SRV-storage.yml", "dev SRV storage", server_body)
         + section("SRV Dependances (Virtual Path, ActiveMQ, Redis)", "dev-SRV-dependances.yml", "dev SRV dependances", dep_body)
         + section("TLS Dependencies", "dev-TLS-dependencies.yml", "dev TLS dependencies", tls_body(tls_deps))
+        + section("Apps install (on top of Docs)", "dev-APPS-install.yml", "dev APPS install", apps_body())
     )
     write("dev.html", page_html("DEV — ONLYOFFICE Docs Test Results", body, breadcrumb("DEV")))
 
@@ -749,6 +751,45 @@ def generate_release():
 
     body = section("K8s EKS arm64", "release-K8s-EKS-arm64.yml", "release-K8s-EKS-arm64", k8s_body)
     write("release.html", page_html("RELEASE — ONLYOFFICE Docs Test Results", body, breadcrumb("RELEASE")))
+
+
+def apps_body():
+    # one JSON per case (dev-apps-<case>.json): the workflow is manual and may run only some cases
+    files = sorted((f for f in os.listdir(RESULTS_DIR) if f.startswith("dev-apps-") and f.endswith(".json")),
+                   key=lambda f: int(f[9:-5]) if f[9:-5].isdigit() else 0) if os.path.isdir(RESULTS_DIR) else []
+    rows = []
+    for f in files:
+        d = load(f)
+        if not d:
+            continue
+        ok = lambda k: f'<td class="{status(d.get(k))}">{"✅" if d.get(k) else "❌"}</td>'
+        smoke = d.get("smoke_ok", False)
+        label = f'{"✅" if smoke else "❌"} {"OK" if smoke else "FAILED"}'
+        info = escape(d.get("smoke_info", ""))
+        shot = d.get("screenshot", "")
+        smoke_td = (f'<td class="{status(smoke)}" title="{info}"><details><summary>{label}</summary>'
+                    f'<img class="shot" loading="lazy" src="{escape(shot)}" alt="editor screenshot"></details></td>'
+                    if shot else f'<td class="{status(smoke)}" title="{info}">{label}</td>')
+        rows.append(
+            f'<tr><td>{d.get("case")}</td><td>{escape(d.get("method", ""))}</td>'
+            f'<td>{escape(d.get("os_name", ""))}</td><td>{escape(d.get("arch", ""))}</td>'
+            f'<td>{escape(str(d.get("edition", "")).upper())}</td>'
+            f'<td>{escape(str(d.get("docs_port", "")))} → {escape(str(d.get("docs_port_after", "")))}</td>'
+            + ok("docs_before_ok") + ok("welcome_ok") + ok("apps_install_ok") + ok("apps_up")
+            + ok("docs_after_ok") + ok("docs_port_ok")
+            + f'<td class="{status(d.get("docs_same_ok"))}" title="{escape(d.get("docs_same_info", ""))}">'
+            f'{"✅" if d.get("docs_same_ok") else "❌"}</td>'
+            + ok("apps_edition_ok") + smoke_td
+            + f'<td class="date">{escape(d.get("run_date", ""))}</td></tr>'
+        )
+    if not rows:
+        return '<div class="placeholder"><p>No data yet</p></div>\n'
+    return ('<table><thead><tr>'
+            '<th>#</th><th>Method</th><th>OS</th><th>Arch</th><th>Docs</th><th>Docs port</th>'
+            '<th>Docs installed</th><th>Welcome</th><th>Apps install</th><th>Apps up</th>'
+            '<th>Docs alive</th><th>Port moved</th><th>Same Docs</th><th>Edition</th>'
+            '<th>Editor + typing</th><th>Run</th>'
+            '</tr></thead><tbody>' + '\n'.join(rows) + '</tbody></table>\n')
 
 
 def tls_body(data):

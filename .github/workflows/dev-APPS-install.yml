@@ -491,6 +491,50 @@ jobs:
           path: out/
           if-no-files-found: ignore
 
+      # the screenshot goes to screenshots/ at the bucket root, not results/: the dashboard deploy syncs
+      # _site with --content-type text/html, which would break a png copied through it
+      - name: Save results
+        if: always()
+        continue-on-error: true
+        env:
+          CASE: ${{ matrix.case }}
+          METHOD: ${{ matrix.method }}
+          OS_NAME: ${{ matrix.os_name }}
+          ARCH: ${{ matrix.arch }}
+          EDITION: ${{ matrix.edition }}
+          BUCKET: ${{ vars.DASHBOARD_BUCKET_NAME }}
+          REGION: ${{ vars.DASHBOARD_BUCKET_REGION }}
+        run: |
+          SHOT=""
+          if [ -f out/editor.png ]; then
+            aws s3 cp out/editor.png "s3://$BUCKET/screenshots/dev-apps-$CASE.png" --region "$REGION" \
+              --content-type image/png --cache-control "no-cache" && SHOT="/screenshots/dev-apps-$CASE.png"
+          fi
+          export SHOT
+          python3 - << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+          e = os.environ.get
+          b = lambda v: e(v) == 'true'
+          data = {
+              'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              'case': int(e('CASE')), 'method': e('METHOD'), 'os_name': e('OS_NAME'), 'arch': e('ARCH'),
+              'edition': e('EDITION'), 'docs_port': e('DOCS_PORT'), 'docs_port_after': e('DOCS_PORT_AFTER'),
+              'docs_before_ok': b('DOCS_BEFORE_OK'), 'welcome_ok': b('WELCOME_OK'),
+              'apps_install_ok': b('APPS_INSTALL_OK'), 'apps_up': b('APPS_UP'),
+              'docs_after_ok': b('DOCS_AFTER_OK'),
+              # docker keeps its published port, only packages promise the 80 -> 8083 move
+              'docs_port_ok': b('DOCS_PORT_OK') or e('METHOD') == 'docker',
+              'docs_same_ok': b('DOCS_SAME_OK'), 'docs_same_info': e('DOCS_SAME_INFO', ''),
+              'apps_edition_ok': b('APPS_EDITION_OK'),
+              'smoke_ok': b('SMOKE_OK'), 'smoke_info': e('SMOKE_INFO', ''),
+              'screenshot': e('SHOT', ''),
+          }
+          with open(f"dev-apps-{data['case']}.json", 'w') as f:
+              json.dump(data, f, indent=2)
+          PYEOF
+          aws s3 cp "dev-apps-$CASE.json" "s3://$BUCKET/results/dev-apps-$CASE.json" --region "$REGION"
+
       - name: Final check
         if: always()
         run: |
