@@ -598,11 +598,18 @@ jobs:
           echo "HTTPS_DETECTED_INFO=${GOT:-not detected}" >> $GITHUB_ENV
           [ "$GOT" = "$DOMAIN" ] && echo "HTTPS_DETECTED_OK=true" >> $GITHUB_ENV
 
-          # 2. Apps serves 443 with the very certificate Docs had
+          # 2. Apps serves 443 with the very certificate Docs had - except Docker + Let's Encrypt, where Apps
+          # requests its own for the same domain (a copy would have nothing to renew it): there the served
+          # cert only has to validate for the domain
           FP=$(echo | openssl s_client -connect "$EC2_IP:443" -servername "$DOMAIN" 2>/dev/null | openssl x509 -noout -fingerprint -sha256 | cut -d= -f2)
           echo "certificate sha256: Docs before $DOCS_CERT_BEFORE, Apps now ${FP:-none}"
           echo "DOCS_CERT_AFTER=${FP:-none}" >> $GITHUB_ENV
-          [ -n "$FP" ] && [ "$FP" = "$DOCS_CERT_BEFORE" ] && echo "HTTPS_CERT_SAME_OK=true" >> $GITHUB_ENV
+          if [ "$DOCS_SSL" = "letsencrypt" ] && [ "${{ matrix.method }}" = "docker" ]; then
+            curl -s -o /dev/null --max-time 10 "https://$DOMAIN/" && echo "HTTPS_CERT_SAME_OK=true" >> $GITHUB_ENV \
+              || echo "::error::https://$DOMAIN/ does not present a valid certificate"
+          else
+            [ -n "$FP" ] && [ "$FP" = "$DOCS_CERT_BEFORE" ] && echo "HTTPS_CERT_SAME_OK=true" >> $GITHUB_ENV
+          fi
 
           # 3. plain HTTP redirects to HTTPS on the same domain
           R=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 10 "http://$DOMAIN/" || true)
@@ -629,8 +636,9 @@ jobs:
           echo "DOCS_DEMOTED_OK=$OK" >> $GITHUB_ENV
 
           # 5. Let's Encrypt: renewal handed over to Apps. Packages: certbot on the host, Docs' own renew cron
-          # removed. Docker: a renewal config for the domain on the host or in an Apps container - the Docs
-          # container doesn't count, what it renews never reaches the copy Apps serves.
+          # removed. Docker standard (DE/EE): apps-ssl-setup puts a weekly cron that runs certbot/certbot in
+          # docker - run that very command as --dry-run. Docker community (CE): certbot lives inside
+          # onlyoffice-apps; the Docs container never counts, what it renews doesn't reach Apps.
           if [ "$DOCS_SSL" = "letsencrypt" ]; then
             if [ "${{ matrix.method }}" = "package" ]; then
               ssh $SSH_OPTS $U@$EC2_IP "sudo certbot renew --dry-run --cert-name $DOMAIN" > /tmp/renew.log 2>&1 && RENEW=ok || RENEW=failed
@@ -638,20 +646,29 @@ jobs:
               INFO="renew --dry-run $RENEW, Docs cron $CRON"
               [ "$RENEW" = "ok" ] && [ "$CRON" = "removed" ] && echo "LE_RENEW_OK=true" >> $GITHUB_ENV
             else
-              WHERE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo bash -s" << EOF
-          [ -f /etc/letsencrypt/renewal/$DOMAIN.conf ] && { echo host; exit; }
-          for c in \$(docker ps --format '{{.Names}}'); do
-            [ "\$c" = "$C" ] && continue
-            docker exec \$c test -f /etc/letsencrypt/renewal/$DOMAIN.conf 2>/dev/null && { echo \$c; exit; }
+              ssh $SSH_OPTS $U@$EC2_IP "sudo env DS=$C bash -s" > /tmp/renew.log 2>&1 << 'EOF' || true
+          CRON=$(ls /etc/cron.weekly/*-renew-letsencrypt 2>/dev/null | head -1)
+          if [ -n "$CRON" ]; then
+            echo "WHERE=$CRON"
+            CMD=$(sed -n '/docker run/,/certbot renew/p' "$CRON" | sed 's/--force-renewal/--dry-run/; s/2>&1 | tee.*//')
+            echo "+ $CMD"
+            bash -c "$CMD" && echo "RENEW=ok" || echo "RENEW=failed"
+            exit
+          fi
+          for c in $(docker ps --format '{{.Names}}'); do
+            [ "$c" = "$DS" ] && continue
+            if docker exec "$c" sh -c 'ls /etc/letsencrypt/renewal/*.conf' >/dev/null 2>&1; then
+              echo "WHERE=container $c"
+              docker exec "$c" certbot renew --dry-run && echo "RENEW=ok" || echo "RENEW=failed"
+              exit
+            fi
           done
+          echo "WHERE=none"
+          echo "RENEW=not configured anywhere"
           EOF
-              ) || true
-              case "$WHERE" in
-                "")   RENEW="not configured anywhere"; echo "no renewal config for $DOMAIN" > /tmp/renew.log ;;
-                host) ssh $SSH_OPTS $U@$EC2_IP "sudo certbot renew --dry-run --cert-name $DOMAIN" > /tmp/renew.log 2>&1 && RENEW=ok || RENEW=failed ;;
-                *)    ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $WHERE certbot renew --dry-run --cert-name $DOMAIN" > /tmp/renew.log 2>&1 && RENEW=ok || RENEW=failed ;;
-              esac
-              INFO="renewal config: ${WHERE:-none}, renew --dry-run $RENEW"
+              WHERE=$(grep -oP '^WHERE=\K.*' /tmp/renew.log | tail -1)
+              RENEW=$(grep -oP '^RENEW=\K.*' /tmp/renew.log | tail -1)
+              INFO="renewal: ${WHERE:-?}, renew --dry-run ${RENEW:-?}"
               [ "$RENEW" = "ok" ] && echo "LE_RENEW_OK=true" >> $GITHUB_ENV
             fi
             tail -n 20 /tmp/renew.log
@@ -783,7 +800,7 @@ jobs:
             echo "| Smoke: document opens in this Docs | $(r $SMOKE_OK) | $SMOKE_INFO |"
             if [ "$DOCS_SSL" != "none" ]; then
               echo "| HTTPS: installer detected it | $(r $HTTPS_DETECTED_OK) | inherited for \`$HTTPS_DETECTED_INFO\` (expected \`$DOMAIN\`) |"
-              echo "| HTTPS: Apps serves the same cert | $(r $HTTPS_CERT_SAME_OK) | Docs \`$DOCS_CERT_BEFORE\` → Apps \`$DOCS_CERT_AFTER\` |"
+              echo "| HTTPS: Apps serves the same cert (Docker+LE: its own valid one) | $(r $HTTPS_CERT_SAME_OK) | Docs \`$DOCS_CERT_BEFORE\` → Apps \`$DOCS_CERT_AFTER\` |"
               echo "| HTTPS: HTTP redirects to HTTPS | $(r $HTTPS_REDIRECT_OK) | http://$DOMAIN/ → $HTTPS_REDIRECT_INFO |"
               echo "| HTTPS: Docs demoted to HTTP | $(r $DOCS_DEMOTED_OK) | $DOCS_DEMOTED_INFO |"
               [ "$DOCS_SSL" = "letsencrypt" ] && \
