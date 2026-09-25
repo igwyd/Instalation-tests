@@ -59,7 +59,8 @@ jobs:
           ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "$APPS_DNS_ZONE" --query 'HostedZones[0].Id' --output text)
           aws route53 list-resource-record-sets --hosted-zone-id "$ZONE_ID" \
             --query "ResourceRecordSets[?Type=='A' && starts_with(Name, 'apps-')]" --output json > rr.json
-          python3 -c "import json; rr = json.load(open('rr.json')); print(len(rr)); json.dump({'Changes': [{'Action': 'DELETE', 'ResourceRecordSet': x} for x in rr]}, open('batch.json', 'w'))" > count
+          # the zone is shared: only names this workflow creates, apps-<case>-<run>.[div.]<zone>
+          python3 -c "import json, re, os; z = re.escape(os.environ['APPS_DNS_ZONE']); rr = [x for x in json.load(open('rr.json')) if re.fullmatch(rf'apps-\d+-\d+\.(div\.)?{z}\.', x['Name'])]; print(len(rr)); json.dump({'Changes': [{'Action': 'DELETE', 'ResourceRecordSet': x} for x in rr]}, open('batch.json', 'w'))" > count
           [ "$(cat count)" = "0" ] && { echo "No DNS records to delete"; exit 0; }
           jq -r '.Changes[].ResourceRecordSet.Name' batch.json
           aws route53 change-resource-record-sets --hosted-zone-id "$ZONE_ID" --change-batch file://batch.json
@@ -642,12 +643,18 @@ jobs:
           # removed. Docker standard (DE/EE): apps-ssl-setup puts a weekly cron that runs certbot/certbot in
           # docker - run that very command as --dry-run. Docker community (CE): certbot lives inside
           # onlyoffice-apps; the Docs container never counts, what it renews doesn't reach Apps.
+          # A passing dry run is not enough: something has to fire it. product-ssl-setup / apps-ssl-setup
+          # both schedule /etc/cron.weekly/<product>-renew-letsencrypt, so that file and a running cron daemon
+          # (minimal RHEL AMIs may lack cronie) are required too.
           if [ "$DOCS_SSL" = "letsencrypt" ]; then
+            CROND=$(ssh $SSH_OPTS $U@$EC2_IP "systemctl is-active crond cron 2>/dev/null | grep -qx active && echo active || echo inactive")
             if [ "${{ matrix.method }}" = "package" ]; then
               ssh $SSH_OPTS $U@$EC2_IP "sudo certbot renew --dry-run --cert-name $DOMAIN" > /tmp/renew.log 2>&1 && RENEW=ok || RENEW=failed
               CRON=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -f /etc/cron.d/letsencrypt && echo present || echo removed")
-              INFO="renew --dry-run $RENEW, Docs cron $CRON"
-              [ "$RENEW" = "ok" ] && [ "$CRON" = "removed" ] && echo "LE_RENEW_OK=true" >> $GITHUB_ENV
+              WEEKLY=$(ssh $SSH_OPTS $U@$EC2_IP "ls /etc/cron.weekly/*-renew-letsencrypt 2>/dev/null | head -1" || true)
+              INFO="renew --dry-run $RENEW, scheduled by ${WEEKLY:-nothing}, cron daemon $CROND, Docs cron $CRON"
+              [ "$RENEW" = "ok" ] && [ "$CRON" = "removed" ] && [ -n "$WEEKLY" ] && [ "$CROND" = "active" ] \
+                && echo "LE_RENEW_OK=true" >> $GITHUB_ENV
             else
               ssh $SSH_OPTS $U@$EC2_IP "sudo env DS=$C bash -s" > /tmp/renew.log 2>&1 << 'EOF' || true
           CRON=$(ls /etc/cron.weekly/*-renew-letsencrypt 2>/dev/null | head -1)
@@ -671,8 +678,11 @@ jobs:
           EOF
               WHERE=$(grep -oP '^WHERE=\K.*' /tmp/renew.log | tail -1)
               RENEW=$(grep -oP '^RENEW=\K.*' /tmp/renew.log | tail -1)
-              INFO="renewal: ${WHERE:-?}, renew --dry-run ${RENEW:-?}"
-              [ "$RENEW" = "ok" ] && echo "LE_RENEW_OK=true" >> $GITHUB_ENV
+              INFO="renewal: ${WHERE:-?}, renew --dry-run ${RENEW:-?}, cron daemon $CROND"
+              # a host cron file needs the host cron daemon; renewal inside a container is on its own
+              if [ "$RENEW" = "ok" ] && { [[ "$WHERE" != /etc/cron.weekly/* ]] || [ "$CROND" = "active" ]; }; then
+                echo "LE_RENEW_OK=true" >> $GITHUB_ENV
+              fi
             fi
             tail -n 20 /tmp/renew.log
             echo "$INFO"
@@ -795,7 +805,7 @@ jobs:
             echo "| Welcome page | $(r $WELCOME_OK) | data-platform=\`$WELCOME_PLATFORM\` (expected \`$EXPECTED_PLATFORM\`), command: \`$WELCOME_CMD\` |"
             echo "| Welcome admin panel flag | $(r $WELCOME_ADMIN_PANEL_OK) | data-has-admin-panel=\`$WELCOME_ADMIN_PANEL\` (expected \`$EXPECTED_ADMIN_PANEL\`) |"
             echo "| Apps install | $(r $APPS_INSTALL_OK) | exit code $APPS_INSTALL_RC |"
-            echo "| Apps is up | $(r $APPS_UP) | http://$EC2_IP/ |"
+            echo "| Apps is up | $(r $APPS_UP) | $APPS_URL/ |"
             echo "| Docs alive after | $(r $DOCS_AFTER_OK) | $DOCS_AFTER_URL/healthcheck |"
             echo "| Docs port after | $(r $DOCS_PORT_OK) | $DOCS_PORT → $DOCS_PORT_AFTER (expected $EXPECTED_DOCS_PORT_AFTER) |"
             echo "| Same Docs kept | $(r $DOCS_SAME_OK) | $DOCS_SAME_INFO |"
