@@ -361,6 +361,8 @@ jobs:
           set -ex
           NG=/etc/onlyoffice/documentserver/nginx
           if [ "$MODE" = "letsencrypt" ]; then
+            # only certbot itself: whatever else documentserver-letsencrypt.sh needs is the package's
+            # business - installing it here would hide a packaging bug
             if ! command -v certbot >/dev/null; then
               if command -v apt-get >/dev/null; then
                 apt-get install -y certbot
@@ -575,8 +577,16 @@ jobs:
             if [ -n "$PORT" ]; then URL="http://$EC2_IP:$PORT"; else PORT="none"; URL="http://$EC2_IP/ds-vpath"; fi
             LOCAL_JSON=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C cat /etc/onlyoffice/documentserver/local.json")
             IMAGE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker inspect -f '{{.Config.Image}}' $C")
-            MARKERS=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C sh -c 'cat /var/www/onlyoffice/Data/apps-migration-marker.txt /usr/share/fonts/truetype/custom/apps-migration-marker.txt' 2>&1" | grep -c apps-migration-marker || true)
-            TYPE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -h '^INSTALLATION_TYPE=' /app/onlyoffice/.env 2>/dev/null | cut -d= -f2" || true)
+            # look the markers up by name (not by fixed path: community mounts the fonts elsewhere) and count
+            # files found, not output lines - a "No such file" error mentions the name too
+            FOUND=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C find /var/www/onlyoffice/Data /usr/share/fonts -name apps-migration-marker.txt 2>/dev/null" || true)
+            echo "markers found in the container: ${FOUND:-none}"
+            MARKERS=0
+            grep -q '^/var/www/onlyoffice/Data/' <<< "$FOUND" && MARKERS=$((MARKERS + 1))
+            grep -q '^/usr/share/fonts/' <<< "$FOUND" && MARKERS=$((MARKERS + 1))
+            # .env lines are indented (spaces before INSTALLATION_TYPE=) and the value may be quoted
+            TYPE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -hoP '^\s*INSTALLATION_TYPE=\K.*' /app/onlyoffice/.env 2>/dev/null | head -1" || true)
+            TYPE=${TYPE//[\"\']/}
             echo "APPS_INSTALL_TYPE=${TYPE:-not found}" >> $GITHUB_ENV
             echo "image $DS_IMAGE_BEFORE -> $IMAGE, markers migrated: $MARKERS/2"
             [ "$IMAGE" = "$DS_IMAGE_BEFORE" ] && [ "$MARKERS" = "2" ] && SAME_EXTRA=true || SAME_EXTRA=false
@@ -730,6 +740,19 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p out
+          # what the installer's "OK"/"Thank you" does not tell: failed units, container states and logs
+          ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -s' > out/diagnostics.txt 2>&1 << 'EOF' || true
+          echo "### listening ports"; ss -lntp
+          echo "### failed systemd units"; systemctl --failed --no-pager
+          for u in $(systemctl list-units --failed --plain --no-legend | awk '{print $1}'); do
+            echo "### journal $u"; journalctl -u "$u" -n 80 --no-pager
+          done
+          if command -v docker >/dev/null; then
+            echo "### docker ps -a"; docker ps -a --format 'table {{.Names}}	{{.Image}}	{{.Status}}	{{.Ports}}'
+            for c in $(docker ps -a --format '{{.Names}}'); do echo "### docker logs $c"; docker logs --tail 80 "$c" 2>&1; done
+          fi
+          echo "### openresty/nginx configs with ssl"; grep -rlE 'listen\s+\S*443|ssl_certificate' /etc/openresty /etc/nginx 2>/dev/null
+          EOF
           ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -c "cd /opt/apps-test 2>/dev/null && tar czf - apps-install.out OneClick*.log 2>/dev/null"' > out/apps-install-logs.tar.gz || true
 
       - name: Upload artifacts
@@ -812,7 +835,11 @@ jobs:
             echo "| Apps install | $(r $APPS_INSTALL_OK) | exit code $APPS_INSTALL_RC |"
             echo "| Apps is up | $(r $APPS_UP) | $APPS_URL/ |"
             echo "| Docs alive after | $(r $DOCS_AFTER_OK) | $DOCS_AFTER_URL/healthcheck |"
-            echo "| Docs port after | $(r $DOCS_PORT_OK) | $DOCS_PORT → $DOCS_PORT_AFTER (expected $EXPECTED_DOCS_PORT_AFTER) |"
+            if [ "${{ matrix.method }}" = "package" ]; then
+              echo "| Docs port after | $(r $DOCS_PORT_OK) | $DOCS_PORT → $DOCS_PORT_AFTER (expected $EXPECTED_DOCS_PORT_AFTER) |"
+            else
+              echo "| Docs port after | ➖ | $DOCS_PORT → $DOCS_PORT_AFTER (docker: not checked, Apps may proxy Docs under /ds-vpath/) |"
+            fi
             echo "| Same Docs kept | $(r $DOCS_SAME_OK) | $DOCS_SAME_INFO |"
             echo "| Apps edition = Docs edition | $(r $APPS_EDITION_OK) | wizard asks for license: $LICENSE_REQUIRED (expected $EXPECTED_LICENSE_REQUIRED); .env INSTALLATION_TYPE (docker): $APPS_INSTALL_TYPE |"
             echo "| Smoke: document opens in this Docs | $(r $SMOKE_OK) | $SMOKE_INFO |"
