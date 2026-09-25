@@ -70,7 +70,7 @@ Pre-release builds from S3 dev repo.
 | dev-DB-check (MySQL, PostgreSQL, MSSQL, Oracle, Dameng, MariaDB) | [![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml) |
 
 
-### ONLYOFFICE Apps install (up to 17 runners, manual)
+### ONLYOFFICE Apps install (up to 18 runners, manual)
 - Install dev Docs, check the `/welcome` "Install apps" modal, install ONLYOFFICE Apps (4testing) on top of it and open a document from Apps in this Docs. Triggered manually via `workflow_dispatch` (`cases`: `all` or case numbers, e.g. `1,7`). EC2 instances are left running for manual checks — re-run with `cleanup=true` to terminate them.
 
 | Test | Status |
@@ -98,8 +98,9 @@ Cases 1–12: within each method every architecture gets all three editions and 
 | 15 | docker | Debian 12 | x64 | CE | 80 + 443 | wildcard `*.div.qa-onlyoffice.net` |
 | 16 | docker | Ubuntu 24.04 | arm64 | DE | 80 + 443 | Let's Encrypt |
 | 17 | package | RHEL 10 | x64 | CE | 80 + 443 | Let's Encrypt |
+| 18 | docker | Debian 13 | arm64 | CE | 80 + 443 | Let's Encrypt |
 
-Cases 13–17: Docs already serves HTTPS on 443 for `apps-<case>-<run>.qa-onlyoffice.net` (`.div.qa-onlyoffice.net` for the wildcard cases; an A record created in Route53 for the run) and Apps must take the certificate over: Apps serves 443 with the same certificate, redirects HTTP to HTTPS and moves Docs to plain HTTP behind itself. The Let's Encrypt cases also check that renewal is handed over to Apps.
+Cases 13–18: Docs already serves HTTPS on 443 for `apps-<case>-<run>.qa-onlyoffice.net` (`.div.qa-onlyoffice.net` for the wildcard cases; an A record created in Route53 for the run) and Apps must take the certificate over: Apps serves 443 with the same certificate, redirects HTTP to HTTPS and moves Docs to plain HTTP behind itself. The Let's Encrypt cases also check that renewal is handed over to Apps. Docker + Let's Encrypt runs twice because Apps deploys CE in the `community` topology and DE/EE in the `standard` one, which obtain the certificate differently.
 
 
 ## Release

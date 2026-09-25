@@ -5,14 +5,14 @@ name: dev APPS install
 # Apps is up, Docs survived (port move / data migration) and an editor opens from this Docs.
 # EC2 instances are NOT terminated — they are left for manual checks. Re-run with cleanup=true
 # to terminate everything this workflow created (tag Name=demin_apps-*, DNS records apps-*.<APPS_DNS_ZONE>).
-# Cases 13-17: Docs serves HTTPS on 443 (self-signed, wildcard or Let's Encrypt) for a Route53 name created per run,
+# Cases 13-18: Docs serves HTTPS on 443 (self-signed, wildcard or Let's Encrypt) for a Route53 name created per run,
 # and Apps has to take that certificate over.
 
 on:
   workflow_dispatch:
     inputs:
       cases:
-        description: '"all" or comma list of case numbers from the table in README (1-17)'
+        description: '"all" or comma list of case numbers from the table in README (1-18)'
         default: 'all'
       apps_branch:
         description: 'DocSpace-buildtools branch with apps-install.sh'
@@ -91,9 +91,11 @@ jobs:
           # Keep in sync with the table in README.md. Cases 1-12: within each method every arch sees
           # all editions and all ports; both methods together cover all 9 edition x port pairs. 8888 is
           # a custom port outside the ports Apps needs itself (8080 is one of them: package install
-          # refuses). Cases 13-17: Docs on HTTPS (80 + 443), Apps must inherit its certificate. One
+          # refuses). Cases 13-18: Docs on HTTPS (80 + 443), Apps must inherit its certificate. One
           # self-signed case is enough for the plain file-cert path; wildcard and Let's Encrypt run on both
           # package (check-ports.sh) and docker (install-Docker.sh), LE also checks the renewal handover.
+          # Docker LE twice: Apps' CE runs the community topology (certbot inside onlyoffice-apps), DE/EE
+          # the standard one (certbot/certbot from apps-ssl-setup) - different code.
           CASES = [
               (1,  'package', 'ubuntu2404', 'x64',   'ee', 80,   'none'),
               (2,  'package', 'debian13',   'x64',   'de', 8083, 'none'),
@@ -112,6 +114,7 @@ jobs:
               (15, 'docker',  'debian12',   'x64',   'ce', 80,   'wildcard'),
               (16, 'docker',  'ubuntu2404', 'arm64', 'de', 80,   'letsencrypt'),
               (17, 'package', 'rhel10',     'x64',   'ce', 80,   'letsencrypt'),
+              (18, 'docker',  'debian13',   'arm64', 'ce', 80,   'letsencrypt'),
           ]
           want = [x.strip() for x in os.environ['CASES'].split(',') if x.strip()]
           ids = [c[0] for c in CASES]
