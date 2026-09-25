@@ -3,8 +3,9 @@ name: dev APPS install
 # Installs ONLYOFFICE Docs (dev build), checks the /welcome "Install apps" modal, then installs
 # ONLYOFFICE Apps (ex-DocSpace) on top of it with the 4testing packages/images and checks that
 # Apps is up, Docs survived (port move / data migration) and an editor opens from this Docs.
-# EC2 instances are NOT terminated — they are left for manual checks. Re-run with cleanup=true
-# to terminate everything this workflow created (tag Name=demin_apps-*, DNS records apps-*.<APPS_DNS_ZONE>).
+# Each job terminates its EC2 instance (root EBS volume included) and deletes its DNS record at the end.
+# keep_instances=true leaves them for manual checks; then re-run with cleanup=true to terminate everything
+# this workflow created (tag Name=demin_apps-*, DNS records apps-<case>-<run>.[div.]<APPS_DNS_ZONE>).
 # Cases 13-18: Docs serves HTTPS on 443 (self-signed, wildcard or Let's Encrypt) for a Route53 name created per run,
 # and Apps has to take that certificate over.
 
@@ -17,6 +18,10 @@ on:
       apps_branch:
         description: 'DocSpace-buildtools branch with apps-install.sh'
         default: 'release/v4.0.0'
+      keep_instances:
+        description: 'Leave EC2 instances and DNS records for manual checks (remove later with cleanup=true)'
+        type: boolean
+        default: false
       cleanup:
         description: 'Only terminate EC2 instances left by previous runs, test nothing'
         type: boolean
@@ -238,7 +243,7 @@ jobs:
             --key-name demin \
             --security-groups AllPortsOpened \
             --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_${{ matrix.tag }}}]' \
-            --block-device-mappings '[{"DeviceName":"${{ matrix.device_name }}","Ebs":{"VolumeSize":80,"VolumeType":"gp3"}}]' \
+            --block-device-mappings '[{"DeviceName":"${{ matrix.device_name }}","Ebs":{"VolumeSize":80,"VolumeType":"gp3","DeleteOnTermination":true}}]' \
             --query "Instances[0].InstanceId" --output text)
           echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
           aws ec2 wait instance-running --instance-ids $INSTANCE_ID
@@ -820,7 +825,11 @@ jobs:
                 echo "| HTTPS: LE renewal handed over | $(r $LE_RENEW_OK) | $LE_RENEW_INFO |"
             fi
             echo
-            echo "**Left running for manual checks:** \`ssh $U@$EC2_IP\` · Apps $APPS_URL/ (login \`$APPS_ADMIN_EMAIL\`, password from secret \`APPS_ADMIN_PASSWORD\`) · Docs $DOCS_AFTER_URL/ · instance \`$INSTANCE_ID\`, terminate with cleanup=true"
+            if [ "${{ inputs.keep_instances }}" = "true" ]; then
+              echo "**Left running for manual checks:** \`ssh $U@$EC2_IP\` · Apps $APPS_URL/ (login \`$APPS_ADMIN_EMAIL\`, password from secret \`APPS_ADMIN_PASSWORD\`) · Docs $DOCS_AFTER_URL/ · instance \`$INSTANCE_ID\`, terminate with cleanup=true"
+            else
+              echo "Instance \`$INSTANCE_ID\` is terminated at the end of the job (keep_instances=true leaves it for manual checks)."
+            fi
           } >> $GITHUB_STEP_SUMMARY
           cat $GITHUB_STEP_SUMMARY
 
@@ -838,3 +847,19 @@ jobs:
             [ "$DOCS_SSL" = "letsencrypt" ] && [ "$LE_RENEW_OK" != "true" ] && FAILED="$FAILED LE_RENEW_OK"
           fi
           [ -z "$FAILED" ] || { echo "::error::Failed:$FAILED"; exit 1; }
+
+      # runs even when an earlier step failed or the job was cancelled; the root EBS volume goes with the
+      # instance (DeleteOnTermination above)
+      - name: Delete DNS record
+        if: always() && !inputs.keep_instances && matrix.ssl != 'none' && env.EC2_IP != ''
+        continue-on-error: true
+        run: |
+          ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "$APPS_DNS_ZONE" --query 'HostedZones[0].Id' --output text)
+          aws route53 change-resource-record-sets --hosted-zone-id "$ZONE_ID"             --change-batch "{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":{\"Name\":\"$DOMAIN\",\"Type\":\"A\",\"TTL\":60,\"ResourceRecords\":[{\"Value\":\"$EC2_IP\"}]}}]}"             && echo "Deleted $DOMAIN"
+
+      - name: Delete EC2 Instance
+        if: always() && !inputs.keep_instances && env.INSTANCE_ID != ''
+        run: |
+          aws ec2 terminate-instances --instance-ids "$INSTANCE_ID"
+          aws ec2 wait instance-terminated --instance-ids "$INSTANCE_ID"
+          echo "Terminated $INSTANCE_ID"

@@ -71,7 +71,7 @@ Pre-release builds from S3 dev repo.
 
 
 ### ONLYOFFICE Apps install (up to 18 runners, manual)
-- Install dev Docs, check the `/welcome` "Install apps" modal, install ONLYOFFICE Apps (4testing) on top of it and open a document from Apps in this Docs. Triggered manually via `workflow_dispatch` (`cases`: `all` or case numbers, e.g. `1,7`). EC2 instances are left running for manual checks — re-run with `cleanup=true` to terminate them.
+- Install dev Docs, check the `/welcome` "Install apps" modal, install ONLYOFFICE Apps (4testing) on top of it and open a document from Apps in this Docs. Triggered manually via `workflow_dispatch` (`cases`: `all` or case numbers, e.g. `1,7`). Each job terminates its EC2 instance (with its disk) and deletes its DNS record at the end; `keep_instances=true` leaves them for manual checks — then re-run with `cleanup=true` to remove them.
 
 | Test | Status |
 |------|--------|
