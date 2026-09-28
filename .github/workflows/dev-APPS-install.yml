@@ -35,7 +35,7 @@ env:
   APPS_DNS_ZONE: qa-onlyoffice.net
   # secrets APPS_WILDCARD_CERT/KEY hold a Let's Encrypt *.<this> certificate renewed by hand
   APPS_WILDCARD_DOMAIN: div.qa-onlyoffice.net
-  LE_EMAIL: apps-qa@qa-onlyoffice.net
+  LE_EMAIL: i.demin.test@gmail.com
 
 jobs:
   cleanup:
@@ -159,7 +159,7 @@ jobs:
       DS_BUILD: ${{ vars.ONLYOFFICE_DEV_BUILD }}
       DOCS_PORT: ${{ matrix.docs_port }}
       APPS_BRANCH: ${{ inputs.apps_branch }}
-      APPS_ADMIN_EMAIL: apps-qa@example.com
+      APPS_ADMIN_EMAIL: i.demin.test@gmail.com
       DOCS_SSL: ${{ matrix.ssl }}
     steps:
       - name: Checkout Repository
