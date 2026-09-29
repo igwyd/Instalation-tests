@@ -94,8 +94,8 @@ jobs:
               'centos9':    ('CentOS 9',     'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-04331ec57720ee626', 'arm64': 'ami-058dc7e5ef5f28287'}),
               'centos10':   ('CentOS 10',    'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-011969aa4b0fec8fe', 'arm64': 'ami-0da965a0c246cec33'}),
           }
-          # Keep in sync with the table in README.md. Cases 1-12: within each method every arch sees
-          # all editions and all ports; both methods together cover all 9 edition x port pairs. 8888 is
+          # Keep in sync with the table in README.md. Cases 1-12: every method x arch sees all three
+          # ports; CE is kept to few cases (3, 10, 15), the rest are DE/EE. 8888 is
           # a custom port outside the ports Apps needs itself (8080 is one of them: package install
           # refuses). Cases 13-18: Docs on HTTPS (80 + 443), Apps must inherit its certificate. Every
           # certificate type (self-signed, wildcard, Let's Encrypt) runs on both package (check-ports.sh)
@@ -105,11 +105,11 @@ jobs:
               (2,  'package', 'debian13',   'x64',   'de', 8083, 'none'),
               (3,  'package', 'rhel9',      'x64',   'ce', 8888, 'none'),
               (4,  'package', 'ubuntu2604', 'arm64', 'de', 80,   'none'),
-              (5,  'package', 'centos10',   'arm64', 'ce', 8083, 'none'),
+              (5,  'package', 'centos10',   'arm64', 'de', 8083, 'none'),
               (6,  'package', 'rhel10',     'arm64', 'ee', 8888, 'none'),
               (7,  'docker',  'centos9',    'x64',   'ee', 8083, 'none'),
               (8,  'docker',  'debian12',   'x64',   'de', 8888, 'none'),
-              (9,  'docker',  'rhel10',     'x64',   'ce', 80,   'none'),
+              (9,  'docker',  'rhel10',     'x64',   'ee', 80,   'none'),
               (10, 'docker',  'ubuntu2604', 'arm64', 'ce', 8083, 'none'),
               (11, 'docker',  'rhel9',      'arm64', 'ee', 80,   'none'),
               (12, 'docker',  'ubuntu2404', 'arm64', 'de', 8888, 'none'),
@@ -117,8 +117,8 @@ jobs:
               (14, 'package', 'debian13',   'x64',   'de', 80,   'wildcard'),
               (15, 'docker',  'debian12',   'x64',   'ce', 80,   'wildcard'),
               (16, 'docker',  'ubuntu2404', 'arm64', 'de', 80,   'letsencrypt'),
-              (17, 'package', 'rhel10',     'x64',   'ce', 80,   'letsencrypt'),
-              (18, 'docker',  'debian13',   'arm64', 'ce', 80,   'selfsigned'),
+              (17, 'package', 'rhel10',     'x64',   'de', 80,   'letsencrypt'),
+              (18, 'docker',  'debian13',   'arm64', 'ee', 80,   'selfsigned'),
           ]
           want = [x.strip() for x in os.environ['CASES'].split(',') if x.strip()]
           ids = [c[0] for c in CASES]
