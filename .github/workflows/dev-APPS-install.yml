@@ -97,11 +97,9 @@ jobs:
           # Keep in sync with the table in README.md. Cases 1-12: within each method every arch sees
           # all editions and all ports; both methods together cover all 9 edition x port pairs. 8888 is
           # a custom port outside the ports Apps needs itself (8080 is one of them: package install
-          # refuses). Cases 13-18: Docs on HTTPS (80 + 443), Apps must inherit its certificate. One
-          # self-signed case is enough for the plain file-cert path; wildcard and Let's Encrypt run on both
-          # package (check-ports.sh) and docker (install-Docker.sh), LE also checks the renewal handover.
-          # Docker LE twice: Apps' CE runs the community topology (certbot inside onlyoffice-apps), DE/EE
-          # the standard one (certbot/certbot from apps-ssl-setup) - different code.
+          # refuses). Cases 13-18: Docs on HTTPS (80 + 443), Apps must inherit its certificate. Every
+          # certificate type (self-signed, wildcard, Let's Encrypt) runs on both package (check-ports.sh)
+          # and docker (install-Docker.sh), LE also checks the renewal handover.
           CASES = [
               (1,  'package', 'ubuntu2404', 'x64',   'ee', 80,   'none'),
               (2,  'package', 'debian13',   'x64',   'de', 8083, 'none'),
@@ -120,7 +118,7 @@ jobs:
               (15, 'docker',  'debian12',   'x64',   'ce', 80,   'wildcard'),
               (16, 'docker',  'ubuntu2404', 'arm64', 'de', 80,   'letsencrypt'),
               (17, 'package', 'rhel10',     'x64',   'ce', 80,   'letsencrypt'),
-              (18, 'docker',  'debian13',   'arm64', 'ce', 80,   'letsencrypt'),
+              (18, 'docker',  'debian13',   'arm64', 'ce', 80,   'selfsigned'),
           ]
           want = [x.strip() for x in os.environ['CASES'].split(',') if x.strip()]
           ids = [c[0] for c in CASES]
