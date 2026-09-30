@@ -218,16 +218,9 @@ jobs:
           echo "Healthcheck EE: $HC"
           echo "HEALTHCHECK_EE=$HC" >> $GITHUB_ENV
 
-          VERSION=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "rpm -q --queryformat '%{VERSION}-%{RELEASE}' onlyoffice-documentserver-ee 2>/dev/null || echo 'not-found'")
-          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7"
-          echo "Version EE: installed=$VERSION, expected=$EXPECTED"
-          if [ "$VERSION" = "$EXPECTED" ]; then
-            echo "VERSION_EE_OK=true" >> $GITHUB_ENV
-          else
-            echo "VERSION_EE_OK=false" >> $GITHUB_ENV
-          fi
-          echo "VERSION_EE_ACTUAL=$VERSION" >> $GITHUB_ENV
+          SSH_TARGET=ec2-user@${{ env.EC2_IP }} PKG=onlyoffice-documentserver-ee SUFFIX=EE \
+            EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
+            bash .github/scripts/check-ds-version.sh
 
       - name: Add example host to DS ipfilter
         continue-on-error: true
@@ -350,16 +343,9 @@ jobs:
           echo "Healthcheck DE: $HC"
           echo "HEALTHCHECK_DE=$HC" >> $GITHUB_ENV
 
-          VERSION=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "rpm -q --queryformat '%{VERSION}-%{RELEASE}' onlyoffice-documentserver-de 2>/dev/null || echo 'not-found'")
-          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7"
-          echo "Version DE: installed=$VERSION, expected=$EXPECTED"
-          if [ "$VERSION" = "$EXPECTED" ]; then
-            echo "VERSION_DE_OK=true" >> $GITHUB_ENV
-          else
-            echo "VERSION_DE_OK=false" >> $GITHUB_ENV
-          fi
-          echo "VERSION_DE_ACTUAL=$VERSION" >> $GITHUB_ENV
+          SSH_TARGET=ec2-user@${{ env.EC2_IP }} PKG=onlyoffice-documentserver-de SUFFIX=DE \
+            EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
+            bash .github/scripts/check-ds-version.sh
 
       - name: Add example host to DS ipfilter
         continue-on-error: true
@@ -481,16 +467,9 @@ jobs:
           echo "Healthcheck CE: $HC"
           echo "HEALTHCHECK_CE=$HC" >> $GITHUB_ENV
 
-          VERSION=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "rpm -q --queryformat '%{VERSION}-%{RELEASE}' onlyoffice-documentserver 2>/dev/null || echo 'not-found'")
-          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7"
-          echo "Version CE: installed=$VERSION, expected=$EXPECTED"
-          if [ "$VERSION" = "$EXPECTED" ]; then
-            echo "VERSION_CE_OK=true" >> $GITHUB_ENV
-          else
-            echo "VERSION_CE_OK=false" >> $GITHUB_ENV
-          fi
-          echo "VERSION_CE_ACTUAL=$VERSION" >> $GITHUB_ENV
+          SSH_TARGET=ec2-user@${{ env.EC2_IP }} PKG=onlyoffice-documentserver SUFFIX=CE \
+            EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
+            bash .github/scripts/check-ds-version.sh
 
       - name: Add example host to DS ipfilter
         continue-on-error: true
@@ -608,10 +587,8 @@ jobs:
           echo "Healthcheck EE RELEASE: $HC"
           echo "HEALTHCHECK_EE_RELEASE=$HC" >> $GITHUB_ENV
 
-          VERSION_RELEASE=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "rpm -q --queryformat '%{VERSION}-%{RELEASE}' onlyoffice-documentserver-ee 2>/dev/null || echo 'not-found'")
-          echo "Version EE Release: $VERSION_RELEASE"
-          echo "VERSION_EE_RELEASE_ACTUAL=$VERSION_RELEASE" >> $GITHUB_ENV
+          SSH_TARGET=ec2-user@${{ env.EC2_IP }} PKG=onlyoffice-documentserver-ee SUFFIX=EE_RELEASE \
+            bash .github/scripts/check-ds-version.sh
 
           JWT_ENABLE=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
             "sudo jq -r '.services.CoAuthoring.token.enable.browser // false' /etc/onlyoffice/documentserver/local.json 2>/dev/null || echo 'false'")
@@ -668,16 +645,9 @@ jobs:
           echo "Healthcheck EE after upgrade: $HC"
           echo "HEALTHCHECK_EE_UPGRADE=$HC" >> $GITHUB_ENV
 
-          VERSION=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "rpm -q --queryformat '%{VERSION}-%{RELEASE}' onlyoffice-documentserver-ee 2>/dev/null || echo 'not-found'")
-          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7"
-          echo "Version after upgrade: installed=$VERSION, expected=$EXPECTED"
-          if [ "$VERSION" = "$EXPECTED" ]; then
-            echo "VERSION_EE_UPGRADE_OK=true" >> $GITHUB_ENV
-          else
-            echo "VERSION_EE_UPGRADE_OK=false" >> $GITHUB_ENV
-          fi
-          echo "VERSION_EE_UPGRADE_ACTUAL=$VERSION" >> $GITHUB_ENV
+          SSH_TARGET=ec2-user@${{ env.EC2_IP }} PKG=onlyoffice-documentserver-ee SUFFIX=EE_UPGRADE \
+            EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
+            bash .github/scripts/check-ds-version.sh
 
           JWT_AFTER=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
             "sudo jq -c '{token: .services.CoAuthoring.token, secret: .services.CoAuthoring.secret}' /etc/onlyoffice/documentserver/local.json | md5sum | cut -d' ' -f1")

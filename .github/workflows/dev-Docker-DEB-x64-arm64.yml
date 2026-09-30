@@ -166,16 +166,9 @@ jobs:
       - name: Check version EE
         continue-on-error: true
         run: |
-          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            "sudo docker exec ds-ee-dev dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
-          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
-          echo "Version EE: installed=$VERSION, expected=$EXPECTED"
-          if [ "$VERSION" = "$EXPECTED" ]; then
-            echo "VERSION_EE_OK=true" >> $GITHUB_ENV
-          else
-            echo "VERSION_EE_OK=false" >> $GITHUB_ENV
-          fi
-          echo "VERSION_EE_ACTUAL=$VERSION" >> $GITHUB_ENV
+          SSH_TARGET=ubuntu@${{ env.EC2_IP }} PKG=onlyoffice-documentserver-ee SUFFIX=EE CONTAINER=ds-ee-dev \
+            EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
+            bash .github/scripts/check-ds-version.sh
 
       - name: Start ds-example EE
         continue-on-error: true
@@ -291,16 +284,9 @@ jobs:
       - name: Check version DE
         continue-on-error: true
         run: |
-          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            "sudo docker exec ds-de-dev dpkg-query -W onlyoffice-documentserver-de" | awk '{print $2}')
-          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
-          echo "Version DE: installed=$VERSION, expected=$EXPECTED"
-          if [ "$VERSION" = "$EXPECTED" ]; then
-            echo "VERSION_DE_OK=true" >> $GITHUB_ENV
-          else
-            echo "VERSION_DE_OK=false" >> $GITHUB_ENV
-          fi
-          echo "VERSION_DE_ACTUAL=$VERSION" >> $GITHUB_ENV
+          SSH_TARGET=ubuntu@${{ env.EC2_IP }} PKG=onlyoffice-documentserver-de SUFFIX=DE CONTAINER=ds-de-dev \
+            EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
+            bash .github/scripts/check-ds-version.sh
 
       - name: Start ds-example DE
         continue-on-error: true
@@ -415,16 +401,9 @@ jobs:
       - name: Check version CE
         continue-on-error: true
         run: |
-          VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            "sudo docker exec ds-dev dpkg-query -W onlyoffice-documentserver" | awk '{print $2}')
-          EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
-          echo "Version CE: installed=$VERSION, expected=$EXPECTED"
-          if [ "$VERSION" = "$EXPECTED" ]; then
-            echo "VERSION_CE_OK=true" >> $GITHUB_ENV
-          else
-            echo "VERSION_CE_OK=false" >> $GITHUB_ENV
-          fi
-          echo "VERSION_CE_ACTUAL=$VERSION" >> $GITHUB_ENV
+          SSH_TARGET=ubuntu@${{ env.EC2_IP }} PKG=onlyoffice-documentserver SUFFIX=CE CONTAINER=ds-dev \
+            EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
+            bash .github/scripts/check-ds-version.sh
 
       - name: Start ds-example CE
         continue-on-error: true
