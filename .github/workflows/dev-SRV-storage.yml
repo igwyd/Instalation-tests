@@ -714,13 +714,16 @@ jobs:
           # useDirectStorageUrls=true, so those requests need CORS or the browser blocks them.
           # Per-bucket CORS (mc cors set) is an AIStor/enterprise-only feature — community MinIO
           # only supports cluster-wide CORS via this env var.
-          sudo docker run -d --name minio -p 9000:9000 \
+          # quay.io/minio/* answers 401 since 2026-09 — Chainguard builds community MinIO from source.
+          # Its images are shell-less and non-root: run the server as root (host-owned volume) and
+          # configure mc through MC_HOST_<alias> instead of `mc alias set`.
+          sudo docker run -d --name minio --user 0 -p 9000:9000 \
             -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
             -e "MINIO_API_CORS_ALLOW_ORIGIN=*" \
-            -v /opt/minio/data:/data quay.io/minio/minio server /data
+            -v /opt/minio/data:/data cgr.dev/chainguard/minio server /data
           sleep 15
-          sudo docker run --rm --network host --entrypoint /bin/sh quay.io/minio/mc \
-            -c "mc alias set local http://127.0.0.1:9000 minioadmin minioadmin && mc mb --ignore-existing local/ds-http-minio"
+          sudo docker run --rm --network host -e MC_HOST_local=http://minioadmin:minioadmin@127.0.0.1:9000 \
+            cgr.dev/chainguard/minio-client mb --ignore-existing local/ds-http-minio
           # step is continue-on-error, so print the container state — a dead MinIO otherwise
           # only shows up much later as failing puppeteer tests
           sudo docker ps -a --filter name=minio --format 'minio container: {{.Status}}'
@@ -728,6 +731,11 @@ jobs:
           sudo iptables -t nat -C PREROUTING -p tcp -d ${{ vars.AWS_DEV_SERVER_EC2_IP }} --dport 9000 -j DNAT --to-destination 172.17.0.1:9000 2>/dev/null || \
             sudo iptables -t nat -A PREROUTING -p tcp -d ${{ vars.AWS_DEV_SERVER_EC2_IP }} --dport 9000 -j DNAT --to-destination 172.17.0.1:9000
           EOF
+          # e.g. "minio version RELEASE.2026-09-22T19-25-18Z (commit-id=...)" -> RELEASE.2026-09-22T19-25-18Z
+          MINIO_VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
+            "sudo docker exec minio minio --version" | awk 'NR==1{print $3}')
+          echo "MinIO version: ${MINIO_VERSION:-unknown}"
+          echo "MINIO_VERSION=${MINIO_VERSION}" >> "$GITHUB_ENV"
 
       - name: MINIO_HTTP_FALSE Configure
         continue-on-error: true
@@ -1645,6 +1653,7 @@ jobs:
 
           data = {
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              'minio_version': os.environ.get('MINIO_VERSION', ''),
               's3_false': {
                   'healthy':               b('HEALTHCHECK_AWS_S3_FALSE'),
                   'hc_port': os.environ.get('HC_PORT_AWS_S3_FALSE', ''),
