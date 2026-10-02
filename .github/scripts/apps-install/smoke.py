@@ -8,7 +8,7 @@ LICENSE_REQUIRED (whether a fresh wizard asked for a license, i.e. paid Apps) to
 API facts: DocSpace-server/-client release/v4.0.0 (SettingsController, FirstTimeTenantSettings,
 AuthenticationController, FilesController, EditorController; client createPasswordHash).
 """
-import argparse, hashlib, os, sys
+import argparse, base64, hashlib, html, os, sys
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
 
@@ -95,13 +95,25 @@ with sync_playwright() as pw:
     ctx.add_init_script("window.__docReady = false; window.addEventListener('message', e => {"
                         " if (String(e.data).includes('onDocumentReady')) window.__docReady = true; });")
     page = ctx.new_page()
+
+    def shot():
+        # headless Chromium has no browser UI: draw an address bar with the real page.url above the screenshot
+        img = base64.b64encode(page.screenshot()).decode()
+        bar = ctx.new_page()
+        bar.set_content('<body style="margin:0;font:15px sans-serif">'
+                        '<div style="background:#dee1e6;padding:8px 12px"><div style="background:#fff;'
+                        f'border-radius:16px;padding:6px 14px">{html.escape(page.url)}</div></div>'
+                        f'<img style="display:block" src="data:image/png;base64,{img}"></body>')
+        bar.screenshot(path=f'{a.out}/editor.png', full_page=True)
+        bar.close()
+
     try:
         page.goto(f'{a.url}/doceditor?fileId={file_id}', wait_until='domcontentloaded', timeout=60000)
         frame = page.wait_for_selector('iframe[name="frameEditor"]', timeout=90000)
         src = frame.get_attribute('src') or ''
         page.wait_for_function('window.__docReady === true', timeout=120000)
     except Exception as e:
-        page.screenshot(path=f'{a.out}/editor.png')
+        shot()
         done(False, f'editor did not load: {str(e).splitlines()[0]}')
     # the page is a canvas: a click into it focuses the editor's hidden input, then keys go to the document
     try:
@@ -109,10 +121,18 @@ with sync_playwright() as pw:
         page.keyboard.type('test', delay=100)
         page.wait_for_timeout(2000)  # let the canvas redraw before the screenshot
     except Exception as e:
-        page.screenshot(path=f'{a.out}/editor.png')
+        shot()
         done(False, f'could not type into the editor: {str(e).splitlines()[0]}')
     steps.append("typed 'test'")
-    page.screenshot(path=f'{a.out}/editor.png')
+    # screenshot shows File -> About (Docs edition and version) instead of the document
+    try:
+        ed = page.frame(name='frameEditor')
+        ed.click('a[data-tab="file"]', timeout=15000)
+        ed.click('#fm-btn-about', timeout=15000)
+        page.wait_for_timeout(2000)
+    except Exception as e:
+        steps.append(f'About not opened: {str(e).splitlines()[0]}')
+    shot()
     browser.close()
 
     # the editor must be served by this server (Apps proxies its Docs under /ds-vpath/), not a CDN/other host
