@@ -189,15 +189,17 @@ jobs:
       - name: Resolve edition
         run: |
           case "${{ matrix.edition }}" in
-            ce) SUFFIX="";    TYPE=COMMUNITY;  ADMIN_PANEL=false ;;
-            de) SUFFIX="-de"; TYPE=DEVELOPER;  ADMIN_PANEL=true ;;
-            ee) SUFFIX="-ee"; TYPE=ENTERPRISE; ADMIN_PANEL=true ;;
+            ce) SUFFIX="";    TYPE=COMMUNITY;  ADMIN_PANEL=false; APPS_SCRIPT=apps-install.sh ;;
+            de) SUFFIX="-de"; TYPE=DEVELOPER;  ADMIN_PANEL=true;  APPS_SCRIPT=apps-developer-install.sh ;;
+            ee) SUFFIX="-ee"; TYPE=ENTERPRISE; ADMIN_PANEL=true;  APPS_SCRIPT=apps-enterprise-install.sh ;;
           esac
           {
             echo "DS_PKG=onlyoffice-documentserver${SUFFIX}"
             echo "DS_IMAGE=onlyoffice/4testing-documentserver${SUFFIX}"
             echo "DS_TYPE=${TYPE}"
             echo "EXPECTED_ADMIN_PANEL=${ADMIN_PANEL}"
+            # /welcome is personalised by edition: it offers a per-edition installer script
+            echo "EXPECTED_APPS_SCRIPT=${APPS_SCRIPT}"
             # apps-install.sh must take the Apps edition from the installed Docs: paid Docs -> paid Apps,
             # whose wizard asks for a license
             [ "${{ matrix.edition }}" = "ce" ] && echo "EXPECTED_LICENSE_REQUIRED=false" || echo "EXPECTED_LICENSE_REQUIRED=true"
@@ -478,7 +480,8 @@ jobs:
           platform, admin = attr('data-platform'), attr('data-has-admin-panel')
           placeholders = sorted(set(re.findall(r'\{\{\s*\w+\s*\}\}', page)))
           mode = 'docker' if os.environ['EXPECTED_PLATFORM'] == 'docker' else 'package'
-          cmd = f'curl -O https://download.onlyoffice.com/apps/apps-install.sh && bash apps-install.sh {mode}'
+          script = os.environ['EXPECTED_APPS_SCRIPT']
+          cmd = f'curl -O https://download.onlyoffice.com/apps/{script} && bash {script} {mode}'
           ok = platform == os.environ['EXPECTED_PLATFORM'] and not placeholders and cmd in text
           print(f'data-platform={platform} (expected {os.environ["EXPECTED_PLATFORM"]})')
           print(f'data-has-admin-panel={admin} (expected {os.environ["EXPECTED_ADMIN_PANEL"]})')
@@ -494,7 +497,9 @@ jobs:
       # The published command (checked above) pulls production packages that do not exist yet, so Apps
       # is installed the way its developers test it: apps-install.sh from the release branch plus the
       # 4testing repos (packages) / 4testing- images (docker). The install mode (package|docker) is the
-      # same one the welcome page offers for this platform.
+      # same one the welcome page offers for this platform. The edition is passed explicitly with
+      # --installationtype (community|developer|enterprise, = the Docs edition): published per-edition
+      # scripts only differ by that default, so the one apps-install.sh covers all three.
       - name: Add 4testing repos for Docs and Apps
         if: matrix.method == 'package'
         continue-on-error: true
@@ -527,9 +532,9 @@ jobs:
           DH_SECRET: ${{ secrets.ONLYOFFICE_DOCKERHUB_SECRET }}
         run: |
           if [ "${{ matrix.method }}" = "docker" ]; then
-            ARGS="docker -gb $APPS_BRANCH -s 4testing- -un $(printf %q "$DH_LOGIN") -p $(printf %q "$DH_SECRET")"
+            ARGS="docker -gb $APPS_BRANCH --installationtype ${DS_TYPE,,} -s 4testing- -un $(printf %q "$DH_LOGIN") -p $(printf %q "$DH_SECRET")"
           else
-            ARGS="package -gb $APPS_BRANCH"
+            ARGS="package -gb $APPS_BRANCH --installationtype ${DS_TYPE,,}"
           fi
           # stdin from /dev/null: an unexpected prompt fails fast instead of eating the heredoc; the
           # timeout guards against prompt loops that spin on EOF
