@@ -11,6 +11,7 @@ permissions:
 jobs:
   db-check:
     runs-on: ubuntu-24.04
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -197,7 +198,7 @@ jobs:
       - name: ADD document, dummy_end_points and license for tests
         run: |
           docker exec onlyoffice wget -O /var/www/onlyoffice/documentserver/sample.zip https://nct2.onlyoffice.com/s/y-3qCyC7GkMcYv8
-          docker exec onlyoffice bash -c "apt-get update && apt-get install -y unzip"
+          for i in 1 2 3 4 5; do docker exec onlyoffice bash -c "apt-get update && apt-get install -y unzip" && break; echo "apt retry $i"; sleep 20; done
           docker exec onlyoffice unzip /var/www/onlyoffice/documentserver/sample.zip -d /var/www/onlyoffice/documentserver/
           docker cp performance-test/local-production-linux.json onlyoffice:/etc/onlyoffice/documentserver/local-production-linux.json
           docker exec onlyoffice supervisorctl restart ds:docservice
@@ -220,7 +221,7 @@ jobs:
       - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
-          sudo apt-get install jq -y
+          for i in 1 2 3; do sudo apt-get install jq -y && break; sleep 20; done
 
           echo "-------------healthcheck-------------"
           HEALTHCHECK_RESULT=$(curl -s http://${RUNNER_IP}/healthcheck || echo "error")

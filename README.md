@@ -21,8 +21,6 @@ Everything is scheduled on **Wednesday**. Jobs = GitHub-hosted runners the slot 
 | 13:00 | 16:00 Wed | dev-SRV-dependances | 1 |
 | 13:00 | 16:00 Wed | dev-TLS-dependencies | 1 |
 | 14:00 | 17:00 Wed | dev-DB-check | 10 |
-| 20:00 | 23:00 Wed | Deploy Dashboard | 1 |
-| 21:30 | 00:30 Thu | Deploy Weekly Snapshot | 1 |
 
 Concurrency limit for GitHub-hosted Linux runners is per account plan — 20 on Free, 40 on Pro,
 60 on Team, 500 on Enterprise. Jobs over the limit are queued, not dropped. The 11:00 slot uses
