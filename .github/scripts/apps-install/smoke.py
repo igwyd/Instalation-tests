@@ -108,12 +108,12 @@ with sync_playwright() as pw:
         bar.screenshot(path=f'{a.out}/editor.png', full_page=True)
         bar.close()
 
-    # Apps edition: Settings -> Payments says "You are using ONLYOFFICE DocSpace <Edition>" (not exposed elsewhere)
+    # Apps edition: Settings -> Payments says "You are using ONLYOFFICE Apps <Edition>" (раньше DocSpace) (not exposed elsewhere)
     try:
         pay = ctx.new_page()
         pay.goto(f'{a.url}/portal-settings/payments/portal-payments', wait_until='domcontentloaded', timeout=60000)
         pay.wait_for_function("/You are using/i.test(document.body.innerText)", timeout=60000)
-        m = re.search(r'You are using\s+ONLYOFFICE\s+DocSpace\s+(\w+)', pay.inner_text('body'), re.I)
+        m = re.search(r'You are using\s+ONLYOFFICE\s+(?:Apps|DocSpace)\s+(\w+)', pay.inner_text('body'), re.I)
         edition = m.group(1) if m else 'not found'
         pay.screenshot(path=f'{a.out}/payments.png')
         pay.close()
@@ -144,8 +144,7 @@ with sync_playwright() as pw:
     # screenshot shows File -> About (Docs edition and version) instead of the document
     try:
         ed = page.frame(name='frameEditor')
-        ed.click('a[data-tab="file"]', timeout=15000)
-        ed.click('#fm-btn-about', timeout=15000)
+        ed.click('#left-btn-about', timeout=15000)
         page.wait_for_timeout(2000)
     except Exception as e:
         steps.append(f'About not opened: {str(e).splitlines()[0]}')

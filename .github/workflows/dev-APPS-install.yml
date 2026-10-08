@@ -221,7 +221,7 @@ jobs:
         run: |
           for v in DOCS_BEFORE_OK WELCOME_OK WELCOME_ADMIN_PANEL_OK APPS_INSTALL_OK APPS_UP \
                    DOCS_AFTER_OK DOCS_PORT_OK DOCS_SAME_OK SMOKE_OK APPS_EDITION_OK \
-                   HTTPS_DETECTED_OK HTTPS_CERT_SAME_OK HTTPS_REDIRECT_OK DOCS_DEMOTED_OK LE_RENEW_OK; do
+                   HTTPS_DETECTED_OK HTTPS_CERT_SAME_OK HTTPS_REDIRECT_OK DOCS_DEMOTED_OK LE_RENEW_OK WILDCARD_NOTE; do
             echo "$v=false" >> "$GITHUB_ENV"
           done
           for v in WELCOME_PLATFORM WELCOME_ADMIN_PANEL WELCOME_CMD APPS_INSTALL_RC DOCS_PORT_AFTER \
@@ -552,6 +552,21 @@ jobs:
           echo "APPS_INSTALL_RC=$RC" >> $GITHUB_ENV
           [ "$RC" = "0" ] && echo "APPS_INSTALL_OK=true" >> $GITHUB_ENV || echo "::error::apps-install.sh exited with $RC"
 
+      # Behind a wildcard certificate the installer cannot know the portal host: it keeps the internal portal
+      # address and asks to run apps-ssl-setup -f <domain> <crt> <key> afterwards (DocSpace-buildtools 335a60ab)
+      - name: Set portal domain behind wildcard certificate
+        if: matrix.ssl == 'wildcard'
+        continue-on-error: true
+        run: |
+          if ssh $SSH_OPTS $U@$EC2_IP "grep -q 'cannot be determined' /opt/apps-test/apps-install.out"; then
+            echo "WILDCARD_NOTE=true" >> $GITHUB_ENV
+            CERTS=/etc/ssl/apps-test
+            [ "${{ matrix.method }}" = "docker" ] && CERTS=/app/onlyoffice/DocumentServer/data/certs
+            ssh $SSH_OPTS $U@$EC2_IP "sudo apps-ssl-setup -f $DOMAIN $CERTS/tls.crt $CERTS/tls.key"
+          else
+            echo "installer found the host name behind the wildcard itself"
+          fi
+
       - name: Wait for Apps
         continue-on-error: true
         run: |
@@ -618,7 +633,11 @@ jobs:
           GOT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -oP 'is serving HTTPS for \K[^;[:space:]]+' /opt/apps-test/apps-install.out | head -1" || true)
           echo "installer inherited HTTPS for: ${GOT:-nothing} (expected $DOMAIN)"
           echo "HTTPS_DETECTED_INFO=${GOT:-not detected}" >> $GITHUB_ENV
-          [ "$GOT" = "$DOMAIN" ] && echo "HTTPS_DETECTED_OK=true" >> $GITHUB_ENV
+          # wildcard: either the installer resolved the host behind it, or it printed the "cannot be determined" note
+          # (the domain is then set by Set portal domain behind wildcard certificate)
+          if [ "$GOT" = "$DOMAIN" ] || { [ "$DOCS_SSL" = "wildcard" ] && [ "$WILDCARD_NOTE" = "true" ]; }; then
+            echo "HTTPS_DETECTED_OK=true" >> $GITHUB_ENV
+          fi
 
           # 2. Apps serves 443 with the very certificate Docs had - except Docker + Let's Encrypt, where Apps
           # requests its own for the same domain (a copy would have nothing to renew it): there the served
