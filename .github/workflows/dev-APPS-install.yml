@@ -224,7 +224,7 @@ jobs:
                    HTTPS_DETECTED_OK HTTPS_CERT_SAME_OK HTTPS_REDIRECT_OK DOCS_DEMOTED_OK LE_RENEW_OK WILDCARD_NOTE; do
             echo "$v=false" >> "$GITHUB_ENV"
           done
-          for v in WELCOME_PLATFORM WELCOME_ADMIN_PANEL WELCOME_CMD APPS_INSTALL_RC DOCS_PORT_AFTER \
+          for v in WELCOME_PLATFORM WELCOME_ADMIN_PANEL WELCOME_CMD WELCOME_EXPECTED APPS_INSTALL_RC DOCS_PORT_AFTER \
                    DOCS_AFTER_URL DOCS_SAME_INFO APPS_INSTALL_TYPE DOCS_PKGTYPE_BEFORE DOCS_PKGTYPE_AFTER APPS_UI_EDITION APPS_EDITION_INFO SMOKE_INFO LICENSE_REQUIRED \
                    DOCS_CERT_BEFORE DOCS_CERT_AFTER HTTPS_REDIRECT_INFO DOCS_DEMOTED_INFO LE_RENEW_INFO HTTPS_DETECTED_INFO; do
             echo "$v=not set" >> "$GITHUB_ENV"
@@ -805,7 +805,7 @@ jobs:
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
               'case': int(e('CASE')), 'method': e('METHOD'), 'os_name': e('OS_NAME'), 'arch': e('ARCH'),
               'edition': e('EDITION'), 'docs_port': e('DOCS_PORT'), 'docs_port_after': e('DOCS_PORT_AFTER'),
-              'docs_before_ok': b('DOCS_BEFORE_OK'), 'welcome_ok': b('WELCOME_OK'),
+              'docs_before_ok': b('DOCS_BEFORE_OK'), 'welcome_ok': b('WELCOME_OK'), 'welcome_cmd': e('WELCOME_CMD', ''), 'welcome_expected': e('WELCOME_EXPECTED', ''),
               'apps_install_ok': b('APPS_INSTALL_OK'), 'apps_up': b('APPS_UP'),
               'docs_after_ok': b('DOCS_AFTER_OK'),
               # docker keeps its published port, only packages promise the 80 -> 8083 move
@@ -842,7 +842,7 @@ jobs:
             echo "| Check | Result | Details |"
             echo "|---|---|---|"
             echo "| Docs installed | $(r $DOCS_BEFORE_OK) | $DS_TYPE, $DOCS_URL_BEFORE/healthcheck |"
-            echo "| Welcome page | $(r $WELCOME_OK) | data-platform=\`$WELCOME_PLATFORM\` (expected \`$EXPECTED_PLATFORM\`), command: \`$WELCOME_CMD\` |"
+            echo "| Welcome page | $(r $WELCOME_OK) | data-platform=\`$WELCOME_PLATFORM\` (expected \`$EXPECTED_PLATFORM\`), command: \`$WELCOME_CMD\` (expected \`$WELCOME_EXPECTED\`) |"
             echo "| Welcome admin panel flag | $(r $WELCOME_ADMIN_PANEL_OK) | data-has-admin-panel=\`$WELCOME_ADMIN_PANEL\` (expected \`$EXPECTED_ADMIN_PANEL\`) |"
             echo "| Apps install | $(r $APPS_INSTALL_OK) | exit code $APPS_INSTALL_RC |"
             echo "| Apps is up | $(r $APPS_UP) | $APPS_URL/ |"

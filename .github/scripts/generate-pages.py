@@ -795,7 +795,9 @@ def apps_body():
             f'<td>{escape(d.get("os_name", ""))}</td><td>{escape(d.get("arch", ""))}</td>'
             f'<td>{escape(str(d.get("edition", "")).upper())}</td>'
             f'<td>{escape(str(d.get("docs_port", "")))} → {escape(str(d.get("docs_port_after", "")))}</td>'
-            + ok("docs_before_ok") + ok("welcome_ok") + ok("apps_install_ok") + ok("apps_up")
+            + ok("docs_before_ok")
+            + f'<td class="{status(d.get("welcome_ok"))}" title="{escape("В окне: " + d.get("welcome_cmd", "") + chr(10) + "Ожидалось: " + d.get("welcome_expected", ""))}">'
+            f'{"✅" if d.get("welcome_ok") else "❌"}</td>' + ok("apps_install_ok") + ok("apps_up")
             + ok("docs_after_ok") + ok("docs_port_ok")
             + f'<td class="{status(d.get("docs_same_ok"))}" title="{escape(d.get("docs_same_info", ""))}">'
             f'{"✅" if d.get("docs_same_ok") else "❌"}</td>'

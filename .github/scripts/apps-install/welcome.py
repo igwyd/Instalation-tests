@@ -38,4 +38,4 @@ print(f'command in the pop-up: {cmd}\nexpected:              {expected}' + (f'\n
 with open(os.environ['GITHUB_ENV'], 'a') as f:
     f.write(f'WELCOME_OK={str(ok).lower()}\nWELCOME_PLATFORM={platform}\nWELCOME_ADMIN_PANEL={admin}\n')
     f.write(f'WELCOME_ADMIN_PANEL_OK={str(admin == os.environ["EXPECTED_ADMIN_PANEL"]).lower()}\n')
-    f.write(f'WELCOME_CMD={cmd}\n')
+    f.write(f'WELCOME_CMD={cmd}\nWELCOME_EXPECTED={expected}\n')
