@@ -47,6 +47,10 @@ nav.breadcrumb a { color: #cae8ff; text-decoration: none; }
 nav.breadcrumb a:hover { text-decoration: underline; }
 nav.breadcrumb span { color: #cae8ff; opacity: 0.6; margin: 0 6px; }
 main { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+main:has(.apps-table) { max-width: 1560px; }
+.apps-table th, .apps-table td { padding: 6px 7px; }
+.apps-table th[title] { cursor: help; text-decoration: underline dotted #8c959f; text-underline-offset: 3px; }
+.apps-table td.date { white-space: nowrap; }
 section { background: white; border: 1px solid #d0d7de; border-radius: 6px; margin-bottom: 24px; }
 .section-header { padding: 12px 16px; border-bottom: 1px solid #d0d7de; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .section-header h2 { font-size: 16px; font-weight: 600; }
@@ -795,17 +799,35 @@ def apps_body():
             + ok("docs_after_ok") + ok("docs_port_ok")
             + f'<td class="{status(d.get("docs_same_ok"))}" title="{escape(d.get("docs_same_info", ""))}">'
             f'{"✅" if d.get("docs_same_ok") else "❌"}</td>'
-            + ok("apps_edition_ok") + td_https(d) + smoke_td
-            + f'<td class="date">{escape(d.get("run_date", ""))}</td></tr>'
+            + f'<td class="{status(d.get("apps_edition_ok"))}" title="{escape(d.get("apps_edition_info", ""))}">'
+            f'{"✅" if d.get("apps_edition_ok") else "❌"}</td>' + td_https(d) + smoke_td
+            + f'<td class="date">{escape(d.get("run_date", "").replace(" UTC", ""))}</td></tr>'
         )
     if not rows:
         return '<div class="placeholder"><p>No data yet</p></div>\n'
-    return ('<table><thead><tr>'
-            '<th>#</th><th>Method</th><th>OS</th><th>Arch</th><th>Docs</th><th>Docs port</th>'
-            '<th>Docs installed</th><th>Welcome</th><th>Apps install</th><th>Apps up</th>'
-            '<th>Docs alive</th><th>Port moved</th><th>Same Docs</th><th>Edition</th><th>HTTPS takeover</th>'
-            '<th>Editor + typing</th><th>Run</th>'
-            '</tr></thead><tbody>' + '\n'.join(rows) + '</tbody></table>\n')
+    # (header, tooltip) — hover text explains exactly what each check verifies
+    cols = [
+        ("#", "Номер кейса из таблицы в README / CLAUDE.md"),
+        ("Method", "package — Docs и Apps ставятся пакетами (apt/dnf); docker — контейнерами"),
+        ("OS", "ОС тестового инстанса AWS EC2"),
+        ("Arch", "Архитектура инстанса: x64 (t3.xlarge) или arm64 (t4g.xlarge)"),
+        ("Docs", "Редакция Docs (CE/DE/EE), которую ставят первой. Apps должен взять ту же редакцию"),
+        ("Docs port", "Порт Docs до установки Apps → после. Для пакетов Apps переносит Docs с 80 на 8083 (освобождает 80 под свой openresty), другие порты остаются"),
+        ("Docs installed", "Docs установлен через OneClickInstall-Docs (нужной редакции и порта) и отвечает на /healthcheck ДО установки Apps"),
+        ("Welcome", "Страница /welcome/ Docs: data-platform = linux/docker, нет неподставленных {{...}}, в HTML есть команда установки Apps с нужным скриптом для редакции (CE apps-install.sh, DE apps-developer-install.sh, EE apps-enterprise-install.sh)"),
+        ("Apps install", "Установщик Apps (apps-install.sh, 4testing-сборка) завершился с кодом 0"),
+        ("Apps up", "Apps реально поднялся: API /api/2.0/settings отвечает (установщик может написать «Thank you» при неработающем Apps)"),
+        ("Docs alive", "Docs после установки Apps жив: /healthcheck = true (пакеты — на порту из ds.conf; docker — на опубликованном порту или через /ds-vpath/)"),
+        ("Port moved", "Только для package: порт Docs после установки Apps совпал с ожидаемым (80 → 8083, иначе без изменений). Для docker не проверяется — всегда ✅"),
+        ("Same Docs", "Apps «усыновил» тот же Docs, а не поставил второй: sha256 JWT-секрета до и после совпал; для docker ещё образ контейнера Docs остался тем же (не заменён другим)"),
+        ("Edition", "Редакция Docs и Apps совпала с заказанной. Docs: packageType из /info/info.json (0 CE, 1 EE, 2 DE) до и после установки Apps. Apps: редакция на странице Settings → Payments («You are using ONLYOFFICE DocSpace …», для DE/EE); для CE — мастер не просит лицензию. Docker — ещё INSTALLATION_TYPE в .env. Детали — в подсказке ячейки"),
+        ("HTTPS takeover", "Только для HTTPS-кейсов (13–18): Apps нашёл Docs на HTTPS и забрал его сертификат (тот же отпечаток на 443), http→https редирект работает, Docs переведён на HTTP, для letsencrypt — продление (certbot --dry-run + weekly-cron). Тип сертификата — справа; детали — в подсказке ячейки"),
+        ("Editor + typing", "E2E в Chromium: мастер Apps → логин → создание smoke.docx → редактор открылся (onDocumentReady, iframe с того же хоста) → ввод слова «test». Клик по OK раскрывает скриншот редактора"),
+        ("Run", "Дата и время завершения прогона (UTC)"),
+    ]
+    thead = ''.join(f'<th title="{escape(t)}">{h}</th>' if t else f'<th>{h}</th>' for h, t in cols)
+    return (f'<table class="apps-table"><thead><tr>{thead}</tr></thead><tbody>'
+            + '\n'.join(rows) + '</tbody></table>\n')
 
 
 def tls_body(data):

@@ -4,11 +4,12 @@ Docs installed on this server (Apps serves it under /ds-vpath/, the version is r
 
 Password comes from env APPS_ADMIN_PASSWORD (never printed); APPS_LICENSE_KEY (the EE or DE license,
 picked by the workflow) is uploaded when the wizard demands a license. Writes SMOKE_OK / SMOKE_INFO and
-LICENSE_REQUIRED (whether a fresh wizard asked for a license, i.e. paid Apps) to GITHUB_ENV.
+LICENSE_REQUIRED (whether a fresh wizard asked for a license, i.e. paid Apps) and APPS_UI_EDITION
+(the edition named on Settings -> Payments) to GITHUB_ENV.
 API facts: DocSpace-server/-client release/v4.0.0 (SettingsController, FirstTimeTenantSettings,
 AuthenticationController, FilesController, EditorController; client createPasswordHash).
 """
-import argparse, base64, hashlib, html, os, sys
+import argparse, base64, hashlib, html, os, re, sys
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
 
@@ -106,6 +107,22 @@ with sync_playwright() as pw:
                         f'<img style="display:block" src="data:image/png;base64,{img}"></body>')
         bar.screenshot(path=f'{a.out}/editor.png', full_page=True)
         bar.close()
+
+    # Apps edition: Settings -> Payments says "You are using ONLYOFFICE DocSpace <Edition>" (not exposed elsewhere)
+    try:
+        pay = ctx.new_page()
+        pay.goto(f'{a.url}/portal-settings/payments/portal-payments', wait_until='domcontentloaded', timeout=60000)
+        pay.wait_for_function("/You are using/i.test(document.body.innerText)", timeout=60000)
+        m = re.search(r'You are using\s+ONLYOFFICE\s+DocSpace\s+(\w+)', pay.inner_text('body'), re.I)
+        edition = m.group(1) if m else 'not found'
+        pay.screenshot(path=f'{a.out}/payments.png')
+        pay.close()
+    except Exception as e:
+        edition = 'not found'
+        print(f'Payments page: {str(e).splitlines()[0]}')
+    print(f'Apps edition on the Payments page: {edition}')
+    set_env(APPS_UI_EDITION=edition)
+    steps.append(f'Apps edition {edition}')
 
     try:
         page.goto(f'{a.url}/doceditor?fileId={file_id}', wait_until='domcontentloaded', timeout=60000)
