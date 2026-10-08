@@ -469,31 +469,17 @@ jobs:
           echo "Docs packageType before Apps: ${PKGTYPE:-not found} (expected $EXPECTED_PKGTYPE)"
           echo "DOCS_PKGTYPE_BEFORE=${PKGTYPE:-not found}" >> $GITHUB_ENV
 
+      - name: Setup Playwright
+        continue-on-error: true
+        run: |
+          pip install --quiet playwright
+          python3 -m playwright install --with-deps chromium
+
+      # as a user does: open /welcome, press "Install free apps", read the command from the pop-up
       - name: Check welcome page
         continue-on-error: true
         run: |
-          mkdir -p out
-          curl -sL $CURL_TLS --max-time 20 "$DOCS_URL_BEFORE/welcome/" -o out/welcome.html
-          python3 - << 'PYEOF'
-          import html, os, re
-          page = open('out/welcome.html', encoding='utf-8', errors='replace').read()
-          text = html.unescape(page)
-          attr = lambda n: (re.search(rf'<html[^>]*\b{n}="([^"]*)"', page) or [None, 'missing'])[1]
-          platform, admin = attr('data-platform'), attr('data-has-admin-panel')
-          placeholders = sorted(set(re.findall(r'\{\{\s*\w+\s*\}\}', page)))
-          mode = 'docker' if os.environ['EXPECTED_PLATFORM'] == 'docker' else 'package'
-          script = os.environ['EXPECTED_APPS_SCRIPT']
-          cmd = f'curl -O https://download.onlyoffice.com/apps/{script} && bash {script} {mode}'
-          ok = platform == os.environ['EXPECTED_PLATFORM'] and not placeholders and cmd in text
-          print(f'data-platform={platform} (expected {os.environ["EXPECTED_PLATFORM"]})')
-          print(f'data-has-admin-panel={admin} (expected {os.environ["EXPECTED_ADMIN_PANEL"]})')
-          print(f'unsubstituted placeholders: {placeholders or "none"}')
-          print(f'command present: {cmd in text} -> {cmd}')
-          with open(os.environ['GITHUB_ENV'], 'a') as f:
-              f.write(f'WELCOME_OK={str(ok).lower()}\nWELCOME_PLATFORM={platform}\nWELCOME_ADMIN_PANEL={admin}\n')
-              f.write(f'WELCOME_ADMIN_PANEL_OK={str(admin == os.environ["EXPECTED_ADMIN_PANEL"]).lower()}\n')
-              f.write(f'WELCOME_CMD={cmd if cmd in text else "not found"}\n')
-          PYEOF
+          python3 .github/scripts/apps-install/welcome.py "$DOCS_URL_BEFORE" out $( [ "$DOCS_SSL" = "selfsigned" ] && echo insecure )
 
       # ==================== Apps ====================
       # The published command (checked above) pulls production packages that do not exist yet, so Apps
@@ -725,12 +711,6 @@ jobs:
             echo "$INFO"
             echo "LE_RENEW_INFO=$INFO" >> $GITHUB_ENV
           fi
-
-      - name: Setup Playwright
-        continue-on-error: true
-        run: |
-          pip install --quiet playwright
-          python3 -m playwright install --with-deps chromium
 
       - name: Smoke - wizard, create a document, open it in the editor
         continue-on-error: true
