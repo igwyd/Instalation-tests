@@ -143,14 +143,9 @@ jobs:
       - name: Check DS default services EE
         continue-on-error: true
         run: |
-          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo docker exec ds-ee-dev supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice|ds:adminpanel' || true)
-          if [ -z "$UNEXPECTED" ]; then
-            echo "SERVICES_EE_OK=true" >> $GITHUB_ENV
-          else
-            echo "Unexpected running services after EE install: $UNEXPECTED"
-            echo "SERVICES_EE_OK=false" >> $GITHUB_ENV
-          fi
+          SSH_TARGET=ec2-user@${{ env.EC2_IP }} SUFFIX=EE VERSION="${{ vars.ONLYOFFICE_DEV_VERSION }}" \
+            CONTAINER=ds-ee-dev \
+            bash .github/scripts/check-ds-services.sh
 
       - name: Check healthcheck EE
         continue-on-error: true
@@ -261,14 +256,9 @@ jobs:
       - name: Check DS default services DE
         continue-on-error: true
         run: |
-          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo docker exec ds-de-dev supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice|ds:adminpanel' || true)
-          if [ -z "$UNEXPECTED" ]; then
-            echo "SERVICES_DE_OK=true" >> $GITHUB_ENV
-          else
-            echo "Unexpected running services after DE install: $UNEXPECTED"
-            echo "SERVICES_DE_OK=false" >> $GITHUB_ENV
-          fi
+          SSH_TARGET=ec2-user@${{ env.EC2_IP }} SUFFIX=DE VERSION="${{ vars.ONLYOFFICE_DEV_VERSION }}" \
+            CONTAINER=ds-de-dev \
+            bash .github/scripts/check-ds-services.sh
 
       - name: Check healthcheck DE
         continue-on-error: true
@@ -378,14 +368,9 @@ jobs:
       - name: Check DS default services CE
         continue-on-error: true
         run: |
-          UNEXPECTED=$(ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo docker exec ds-dev supervisorctl status all" | grep RUNNING | grep -vE 'ds:converter|ds:docservice' || true)
-          if [ -z "$UNEXPECTED" ]; then
-            echo "SERVICES_CE_OK=true" >> $GITHUB_ENV
-          else
-            echo "Unexpected running services after CE install: $UNEXPECTED"
-            echo "SERVICES_CE_OK=false" >> $GITHUB_ENV
-          fi
+          SSH_TARGET=ec2-user@${{ env.EC2_IP }} SUFFIX=CE VERSION="${{ vars.ONLYOFFICE_DEV_VERSION }}" \
+            CONTAINER=ds-dev \
+            bash .github/scripts/check-ds-services.sh
 
       - name: Check healthcheck CE
         continue-on-error: true
@@ -620,6 +605,7 @@ jobs:
                   'version_ok':       b('VERSION_EE_OK'),
                   'version_actual':   s('VERSION_EE_ACTUAL'),
                   'services_ok':      b('SERVICES_EE_OK'),
+                  'services_text': s('SERVICES_EE_TEXT'),
                   'puppeteer_failed':      n('PUPPETEER_EE_FAILED'),
                   'puppeteer_ok':          n('PUPPETEER_EE_OK'),
                   'puppeteer_total':       n('PUPPETEER_EE_TOTAL'),
@@ -635,6 +621,7 @@ jobs:
                   'version_ok':            b('VERSION_DE_OK'),
                   'version_actual':        s('VERSION_DE_ACTUAL'),
                   'services_ok':           b('SERVICES_DE_OK'),
+                  'services_text': s('SERVICES_DE_TEXT'),
                   'puppeteer_failed':      n('PUPPETEER_DE_FAILED'),
                   'puppeteer_ok':          n('PUPPETEER_DE_OK'),
                   'puppeteer_total':       n('PUPPETEER_DE_TOTAL'),
@@ -650,6 +637,7 @@ jobs:
                   'version_ok':            b('VERSION_CE_OK'),
                   'version_actual':        s('VERSION_CE_ACTUAL'),
                   'services_ok':           b('SERVICES_CE_OK'),
+                  'services_text': s('SERVICES_CE_TEXT'),
                   'puppeteer_failed':      n('PUPPETEER_CE_FAILED'),
                   'puppeteer_ok':          n('PUPPETEER_CE_OK'),
                   'puppeteer_total':       n('PUPPETEER_CE_TOTAL'),

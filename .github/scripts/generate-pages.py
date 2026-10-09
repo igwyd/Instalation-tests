@@ -193,9 +193,7 @@ def pkg_table(data, arch_label):
     else:
         for key, label in [("ee", "EE"), ("de", "DE"), ("ce", "CE")]:
             ed = data.get(key, {})
-            svc_ok = ed.get("services_ok", False)
-            svc_cell = (f'<td class="{status(svc_ok)}">'
-                        f'SVC: {"✅ OK" if svc_ok else "❌ FAILED"}</td>')
+            svc_cell = td_svc(ed)
             rows.append(
                 f'<tr><td>{label}</td>'
                 + td_hc(ed.get("healthy", False), ed.get("hc_port"))
@@ -255,9 +253,7 @@ def docker_table(data, arch_label):
     else:
         for key, label in [("ee", "EE"), ("de", "DE"), ("ce", "CE")]:
             ed = data.get(key, {})
-            svc_ok = ed.get("services_ok", False)
-            svc_cell = (f'<td class="{status(svc_ok)}">'
-                        f'SVC: {"✅ OK" if svc_ok else "❌ FAILED"}</td>')
+            svc_cell = td_svc(ed)
             rows.append(
                 f'<tr><td>{label}</td>'
                 + td_hc(ed.get("healthy", False), ed.get("hc_port"))
@@ -280,7 +276,10 @@ def td_svc(data):
     if data is None:
         return '<td class="na">—</td>'
     v = data.get("services_ok", False)
-    return f'<td class="{status(v)}">SVC: {"✅ OK" if v else "❌ FAILED"}</td>'
+    # per-service states (see check-ds-services.sh) as a hover tooltip
+    text = (data.get("services_text") or "").strip()
+    tip = f' title="{escape(text, quote=True)}"' if text and text != "not set" else ""
+    return f'<td class="{status(v)}"{tip}>SVC: {"✅ OK" if v else "❌ FAILED"}</td>'
 
 
 def badge_link(workflow_file, label):
