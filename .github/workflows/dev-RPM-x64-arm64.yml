@@ -123,6 +123,14 @@ jobs:
       - name: Wait for instance to reboot after upgrade
         run: sleep 180
 
+      - name: Set DS package URLs
+        run: |
+          # the dev package itself comes straight from the S3 build artifacts (the yum dev repo is updated with a delay);
+          # the dev repo is still added so that any dependencies published there can be resolved
+          [ "${{ matrix.arch }}" = "x64" ] && RPM_ARCH=x86_64 || RPM_ARCH=aarch64
+          echo "DS_URL_BASE=https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/server/linux/rhel" >> $GITHUB_ENV
+          echo "DS_FILE_TAIL=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7.$RPM_ARCH.rpm" >> $GITHUB_ENV
+
       - name: Install ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
@@ -162,8 +170,9 @@ jobs:
           sudo rpm -i https://sourceforge.net/projects/mscorefonts2/files/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm
 
           sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_DEV_VERSION }}.repo
-
-          sudo yum install onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
+          curl -fL --retry 5 --retry-delay 10 -o /tmp/ds.rpm ${{ env.DS_URL_BASE }}/onlyoffice-documentserver-ee-${{ env.DS_FILE_TAIL }}
+          sudo dnf install /tmp/ds.rpm -y
+          rm -f /tmp/ds.rpm
 
           sudo service nginx start
           sudo systemctl enable nginx
@@ -291,7 +300,9 @@ jobs:
       - name: Install ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
-          sudo dnf install onlyoffice-documentserver-de-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
+          curl -fL --retry 5 --retry-delay 10 -o /tmp/ds.rpm ${{ env.DS_URL_BASE }}/onlyoffice-documentserver-de-${{ env.DS_FILE_TAIL }}
+          sudo dnf install /tmp/ds.rpm -y
+          rm -f /tmp/ds.rpm
           sudo service nginx start
           sudo systemctl enable nginx
           printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
@@ -409,7 +420,9 @@ jobs:
       - name: Install ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
-          sudo dnf install onlyoffice-documentserver-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
+          curl -fL --retry 5 --retry-delay 10 -o /tmp/ds.rpm ${{ env.DS_URL_BASE }}/onlyoffice-documentserver-${{ env.DS_FILE_TAIL }}
+          sudo dnf install /tmp/ds.rpm -y
+          rm -f /tmp/ds.rpm
           sudo service nginx start
           sudo systemctl enable nginx
           printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nguest\nguest\n' | sudo documentserver-configure.sh --wopienabled true
@@ -590,7 +603,9 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ec2-user@${{ env.EC2_IP }} << EOF
           sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-${{ vars.ONLYOFFICE_DEV_VERSION }}.repo
-          sudo yum upgrade onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7 -y
+          curl -fL --retry 5 --retry-delay 10 -o /tmp/ds.rpm ${{ env.DS_URL_BASE }}/onlyoffice-documentserver-ee-${{ env.DS_FILE_TAIL }}
+          sudo dnf install /tmp/ds.rpm -y
+          rm -f /tmp/ds.rpm
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE DEV and JWT has not been modified

@@ -330,14 +330,15 @@ jobs:
         run: |
           ssh $SSH_OPTS $U@$EC2_IP << EOF
           set -x
+          # straight from the S3 build artifacts: the apt/yum dev repo is updated with a delay
           if [ "${{ matrix.os_type }}" = "deb" ]; then
-            echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable $DS_VERSION" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
-            sudo apt-get update
-            apt-get download $DS_PKG=$DS_VERSION-$DS_BUILD
+            F=${DS_PKG}_$DS_VERSION-${DS_BUILD}_\$(dpkg --print-architecture).deb
+            DIR=debian
           else
-            sudo dnf config-manager --add-repo https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/centos/onlyoffice-dev-$DS_VERSION.repo
-            sudo dnf download --destdir "\$HOME" $DS_PKG-$DS_VERSION-$DS_BUILD.el7.\$(uname -m)
+            F=$DS_PKG-$DS_VERSION-$DS_BUILD.el7.\$(uname -m).rpm
+            DIR=rhel
           fi
+          curl -fL --retry 5 --retry-delay 10 -o "\$HOME/\$F" "https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/server/linux/\$DIR/\$F"
           PKG=\$(ls "\$HOME"/${DS_PKG}[_-]$DS_VERSION*)
           echo "Downloaded package: \$PKG"
           cd OneClickInstall-Docs

@@ -123,6 +123,14 @@ jobs:
       - name: Wait for instance to reboot after upgrade
         run: sleep 180
 
+      - name: Set DS package URLs
+        run: |
+          # the dev package itself comes straight from the S3 build artifacts (the apt dev repo is updated with a delay);
+          # the dev repo is still added so that any dependencies published there can be resolved
+          [ "${{ matrix.arch }}" = "x64" ] && DEB_ARCH=amd64 || DEB_ARCH=arm64
+          echo "DS_URL_BASE=https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/server/linux/debian" >> $GITHUB_ENV
+          echo "DS_FILE_TAIL=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}_$DEB_ARCH.deb" >> $GITHUB_ENV
+
       - name: Install ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
@@ -151,7 +159,9 @@ jobs:
           echo onlyoffice-documentserver-ee onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
           echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_DEV_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
           sudo apt-get update
-          sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }} -y
+          curl -fL --retry 5 --retry-delay 10 -o /tmp/ds.deb ${{ env.DS_URL_BASE }}/onlyoffice-documentserver-ee_${{ env.DS_FILE_TAIL }}
+          sudo apt-get install /tmp/ds.deb -y
+          rm -f /tmp/ds.deb
           EOF
 
 
@@ -271,7 +281,9 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ubuntu@${{ env.EC2_IP }} << EOF
           echo onlyoffice-documentserver-de onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
           echo onlyoffice-documentserver-de onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
-          sudo apt-get install onlyoffice-documentserver-de=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }} -y
+          curl -fL --retry 5 --retry-delay 10 -o /tmp/ds.deb ${{ env.DS_URL_BASE }}/onlyoffice-documentserver-de_${{ env.DS_FILE_TAIL }}
+          sudo apt-get install /tmp/ds.deb -y
+          rm -f /tmp/ds.deb
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
@@ -387,7 +399,9 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ubuntu@${{ env.EC2_IP }} << EOF
           echo onlyoffice-documentserver onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
           echo onlyoffice-documentserver onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
-          sudo apt-get install onlyoffice-documentserver=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }} -y
+          curl -fL --retry 5 --retry-delay 10 -o /tmp/ds.deb ${{ env.DS_URL_BASE }}/onlyoffice-documentserver_${{ env.DS_FILE_TAIL }}
+          sudo apt-get install /tmp/ds.deb -y
+          rm -f /tmp/ds.deb
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
@@ -563,7 +577,9 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ubuntu@${{ env.EC2_IP }} << EOF
           echo "deb [trusted=yes] https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/repo/debian stable ${{ vars.ONLYOFFICE_DEV_VERSION }}" | sudo tee /etc/apt/sources.list.d/onlyoffice-dev.list
           sudo apt-get update
-          sudo apt-get install onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }} -y
+          curl -fL --retry 5 --retry-delay 10 -o /tmp/ds.deb ${{ env.DS_URL_BASE }}/onlyoffice-documentserver-ee_${{ env.DS_FILE_TAIL }}
+          sudo apt-get install /tmp/ds.deb -y
+          rm -f /tmp/ds.deb
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs EE DEV and JWT has not been modified

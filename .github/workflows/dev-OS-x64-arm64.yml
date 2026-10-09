@@ -401,9 +401,10 @@ jobs:
           ls OneClickInstall-Docs
           EOF
 
-      # The dev repo is only used to download the exact dev build (VERSION-BUILD from vars),
-      # which is then handed to docs-install.sh via --packagepath — clean install of the
-      # pinned dev version, no release install/upgrade.
+      # The exact dev build (VERSION-BUILD from vars) is downloaded straight from the S3 build artifacts
+      # (the apt/yum dev repo is updated with a delay) and handed to docs-install.sh via --packagepath —
+      # clean install of the pinned dev version, no release install/upgrade. The dev repo is still added,
+      # so that any dependencies published there can be resolved during the install.
       - name: Add dev repo
         continue-on-error: true
         run: |
@@ -422,10 +423,13 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << EOF
           rm -f "\$HOME"/onlyoffice-documentserver-ee*
           if [ "${{ matrix.os_type }}" = "deb" ]; then
-            apt-get download onlyoffice-documentserver-ee=${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}
+            F=onlyoffice-documentserver-ee_${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}_\$(dpkg --print-architecture).deb
+            DIR=debian
           else
-            sudo dnf download --destdir "\$HOME" onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7.\$(uname -m)
+            F=onlyoffice-documentserver-ee-${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}.el7.\$(uname -m).rpm
+            DIR=rhel
           fi
+          curl -fL --retry 5 --retry-delay 10 -o "\$HOME/\$F" "https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/server/linux/\$DIR/\$F"
           PKG=\$(ls "\$HOME"/onlyoffice-documentserver-ee*)
           echo "Downloaded package: \$PKG"
           cd OneClickInstall-Docs
