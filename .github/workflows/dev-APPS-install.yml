@@ -483,11 +483,9 @@ jobs:
 
       # ==================== Apps ====================
       # The published command (checked above) pulls production packages that do not exist yet, so Apps
-      # is installed the way its developers test it: apps-install.sh from the release branch plus the
-      # 4testing repos (packages) / 4testing- images (docker). The install mode (package|docker) is the
-      # same one the welcome page offers for this platform. The edition is passed explicitly with
-      # --installationtype (community|developer|enterprise, = the Docs edition): published per-edition
-      # scripts only differ by that default, so the one apps-install.sh covers all three.
+      # is installed with the very script the welcome page offers (download.onlyoffice.com/apps/<per-edition
+      # script>, mode package|docker) plus -gb <branch> and the 4testing repos (packages) / 4testing- images
+      # (docker): the script only picks the installers from that branch, the edition comes from its default.
       - name: Add 4testing repos for Docs and Apps
         if: matrix.method == 'package'
         continue-on-error: true
@@ -520,23 +518,23 @@ jobs:
           DH_SECRET: ${{ secrets.ONLYOFFICE_DOCKERHUB_SECRET }}
         run: |
           if [ "${{ matrix.method }}" = "docker" ]; then
-            ARGS="docker -gb $APPS_BRANCH --installationtype ${DS_TYPE,,} -s 4testing- -un $(printf %q "$DH_LOGIN") -p $(printf %q "$DH_SECRET")"
+            ARGS="docker -gb $APPS_BRANCH -s 4testing- -un $(printf %q "$DH_LOGIN") -p $(printf %q "$DH_SECRET")"
           else
-            ARGS="package -gb $APPS_BRANCH --installationtype ${DS_TYPE,,}"
+            ARGS="package -gb $APPS_BRANCH"
           fi
           # stdin from /dev/null: an unexpected prompt fails fast instead of eating the heredoc; the
           # timeout guards against prompt loops that spin on EOF
-          ssh $SSH_OPTS $U@$EC2_IP "sudo env ARGS=$(printf %q "$ARGS") BRANCH=$APPS_BRANCH bash -s" << 'EOF'
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env ARGS=$(printf %q "$ARGS") SCRIPT=$EXPECTED_APPS_SCRIPT bash -s" << 'EOF'
           mkdir -p /opt/apps-test && cd /opt/apps-test
-          curl -fsSLO "https://raw.githubusercontent.com/ONLYOFFICE/DocSpace-buildtools/refs/heads/${BRANCH}/install/OneClickInstall/apps-install.sh"
-          timeout 5400 bash apps-install.sh $ARGS < /dev/null > apps-install.out 2>&1
+          curl -fsSLO "https://download.onlyoffice.com/apps/${SCRIPT}"
+          timeout 5400 bash $SCRIPT $ARGS < /dev/null > apps-install.out 2>&1
           echo $? > apps-install.rc
           EOF
           RC=$(ssh $SSH_OPTS $U@$EC2_IP 'cat /opt/apps-test/apps-install.rc')
           ssh $SSH_OPTS $U@$EC2_IP 'tail -n 60 /opt/apps-test/apps-install.out'
-          echo "apps-install.sh exit code: $RC"
+          echo "Apps installer exit code: $RC"
           echo "APPS_INSTALL_RC=$RC" >> $GITHUB_ENV
-          [ "$RC" = "0" ] && echo "APPS_INSTALL_OK=true" >> $GITHUB_ENV || echo "::error::apps-install.sh exited with $RC"
+          [ "$RC" = "0" ] && echo "APPS_INSTALL_OK=true" >> $GITHUB_ENV || echo "::error::Apps installer exited with $RC"
 
       # Behind a wildcard certificate the installer cannot know the portal host: it keeps the internal portal
       # address and asks to run apps-ssl-setup -f <domain> <crt> <key> afterwards (DocSpace-buildtools 335a60ab)
