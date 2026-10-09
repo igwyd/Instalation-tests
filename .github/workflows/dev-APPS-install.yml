@@ -537,17 +537,19 @@ jobs:
           echo "APPS_INSTALL_RC=$RC" >> $GITHUB_ENV
           [ "$RC" = "0" ] && echo "APPS_INSTALL_OK=true" >> $GITHUB_ENV || echo "::error::Apps installer exited with $RC"
 
-      # Behind a wildcard certificate the installer cannot know the portal host: it keeps the internal portal
-      # address and asks to run apps-ssl-setup -f <domain> <crt> <key> afterwards (DocSpace-buildtools 335a60ab)
+      # Behind a wildcard certificate the installer cannot know the portal host: it either prints "cannot be determined"
+      # and keeps the internal portal address, or silently picks the wildcard's base domain (div.<zone> instead of the
+      # host). Either way the user has to run apps-ssl-setup -f <domain> <crt> <key> afterwards (DocSpace-buildtools
+      # 335a60ab), so it runs whenever the installer did not end up with exactly our host.
       - name: Set portal domain behind wildcard certificate
         if: matrix.ssl == 'wildcard'
         continue-on-error: true
         run: |
-          if ssh $SSH_OPTS $U@$EC2_IP "grep -q 'cannot be determined' /opt/apps-test/apps-install.out"; then
-            echo "WILDCARD_NOTE=true" >> $GITHUB_ENV
+          GOT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -oP 'is serving HTTPS for \K[^;[:space:]]+' /opt/apps-test/apps-install.out | head -1" || true)
+          if ssh $SSH_OPTS $U@$EC2_IP "grep -q 'cannot be determined' /opt/apps-test/apps-install.out" || [ "$GOT" != "$DOMAIN" ]; then
             CERTS=/etc/ssl/apps-test
             [ "${{ matrix.method }}" = "docker" ] && CERTS=/app/onlyoffice/DocumentServer/data/certs
-            ssh $SSH_OPTS $U@$EC2_IP "sudo apps-ssl-setup -f $DOMAIN $CERTS/tls.crt $CERTS/tls.key"
+            ssh $SSH_OPTS $U@$EC2_IP "sudo apps-ssl-setup -f $DOMAIN $CERTS/tls.crt $CERTS/tls.key" && echo "WILDCARD_NOTE=true" >> $GITHUB_ENV
           else
             echo "installer found the host name behind the wildcard itself"
           fi
