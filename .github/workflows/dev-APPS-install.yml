@@ -8,12 +8,13 @@ name: dev APPS install
 # this workflow created (tag Name=demin_apps-*, DNS records apps-<case>-<run>.[div.]<APPS_DNS_ZONE>).
 # Cases 13-18: Docs serves HTTPS on 443 (self-signed, wildcard or Let's Encrypt) for a Route53 name created per run,
 # and Apps has to take that certificate over.
+# Case 19: a license is put into Docs right after its install; the Apps wizard must then not ask for one.
 
 on:
   workflow_dispatch:
     inputs:
       cases:
-        description: '"all" or comma list of case numbers from the table in README (1-18)'
+        description: '"all" or comma list of case numbers from the table in README (1-19)'
         default: 'all'
       apps_branch:
         description: 'DocSpace-buildtools branch with apps-install.sh'
@@ -119,7 +120,11 @@ jobs:
               (16, 'docker',  'ubuntu2404', 'arm64', 'de', 80,   'letsencrypt'),
               (17, 'package', 'rhel10',     'x64',   'de', 80,   'letsencrypt'),
               (18, 'docker',  'debian13',   'arm64', 'ee', 80,   'selfsigned'),
+              (19, 'package', 'debian12',   'arm64', 'ee', 7070, 'none'),
           ]
+          # Cases where a license is added to Docs right after its install (value: which Apps license secret).
+          # Apps EE has to accept the DE license, and its wizard must then not ask for a license at all.
+          DOCS_LICENSE = {19: 'de'}
           want = [x.strip() for x in os.environ['CASES'].split(',') if x.strip()]
           ids = [c[0] for c in CASES]
           if want != ['all']:
@@ -137,7 +142,8 @@ jobs:
                   'ssh_user': user, 'device_name': device, 'ami': ami[arch], 'arch': arch,
                   'instance_type': 't3.xlarge' if arch == 'x64' else 't4g.xlarge',
                   'edition': edition, 'docs_port': str(port), 'ssl': ssl,
-                  'tag': f'apps-{cid}-{method}-{os_key}-{arch}-{edition}-{port}' + ('' if ssl == 'none' else f'-{ssl}'),
+                  'docs_license': DOCS_LICENSE.get(cid, 'none'),
+                  'tag': f'apps-{cid}-{method}-{os_key}-{arch}-{edition}-{port}' + ('' if ssl == 'none' else f'-{ssl}') + (f'-doclic-{DOCS_LICENSE[cid]}' if cid in DOCS_LICENSE else ''),
               })
           print('matrix=' + json.dumps({'include': include}))
           PYEOF
@@ -145,7 +151,7 @@ jobs:
   test:
     needs: prepare
     runs-on: ubuntu-24.04
-    name: "#${{ matrix.case }} ${{ matrix.method }} ${{ matrix.os_name }} ${{ matrix.arch }} ${{ matrix.edition }} docs:${{ matrix.docs_port }}${{ matrix.ssl != 'none' && format(' {0}', matrix.ssl) || '' }}"
+    name: "#${{ matrix.case }} ${{ matrix.method }} ${{ matrix.os_name }} ${{ matrix.arch }} ${{ matrix.edition }} docs:${{ matrix.docs_port }}${{ matrix.ssl != 'none' && format(' {0}', matrix.ssl) || '' }}${{ matrix.docs_license != 'none' && format(' docs-license:{0}', matrix.docs_license) || '' }}"
     timeout-minutes: 240
     strategy:
       fail-fast: false
@@ -159,6 +165,7 @@ jobs:
       APPS_BRANCH: ${{ inputs.apps_branch }}
       APPS_ADMIN_EMAIL: i.demin.test@gmail.com
       DOCS_SSL: ${{ matrix.ssl }}
+      DOCS_LICENSE: ${{ matrix.docs_license }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -170,11 +177,15 @@ jobs:
           DH_SECRET: ${{ secrets.ONLYOFFICE_DOCKERHUB_SECRET }}
           WC_CERT: ${{ secrets.APPS_WILDCARD_CERT }}
           WC_KEY: ${{ secrets.APPS_WILDCARD_KEY }}
+          DOCS_LIC_DE: ${{ secrets.APPS_LICENSE_DE }}
         run: |
           # the repo is public: the Apps admin password must come from a secret, never be printed
           [ -n "$APPS_ADMIN_PASSWORD" ] || { echo "::error::secret APPS_ADMIN_PASSWORD is not set"; exit 1; }
           if [ "${{ matrix.method }}" = "docker" ]; then
             [ -n "$DH_LOGIN" ] && [ -n "$DH_SECRET" ] || { echo "::error::ONLYOFFICE_DOCKERHUB_LOGIN / ONLYOFFICE_DOCKERHUB_SECRET are not set"; exit 1; }
+          fi
+          if [ "$DOCS_LICENSE" = "de" ]; then
+            [ -n "$DOCS_LIC_DE" ] || { echo "::error::secret APPS_LICENSE_DE is not set"; exit 1; }
           fi
           # the wildcard cert is renewed by hand: say so plainly instead of every HTTPS check going red
           if [ "${{ matrix.ssl }}" = "wildcard" ]; then
@@ -225,7 +236,7 @@ jobs:
             echo "$v=false" >> "$GITHUB_ENV"
           done
           for v in WELCOME_PLATFORM WELCOME_ADMIN_PANEL WELCOME_CMD WELCOME_EXPECTED APPS_INSTALL_RC DOCS_PORT_AFTER \
-                   DOCS_AFTER_URL DOCS_SAME_INFO APPS_INSTALL_TYPE DOCS_PKGTYPE_BEFORE DOCS_PKGTYPE_AFTER APPS_UI_EDITION APPS_EDITION_INFO SMOKE_INFO LICENSE_REQUIRED \
+                   DOCS_AFTER_URL DOCS_SAME_INFO APPS_INSTALL_TYPE DOCS_PKGTYPE_BEFORE DOCS_PKGTYPE_AFTER APPS_UI_EDITION APPS_EDITION_INFO SMOKE_INFO LICENSE_REQUIRED DOCS_LICENSE_INFO \
                    DOCS_CERT_BEFORE DOCS_CERT_AFTER HTTPS_REDIRECT_INFO DOCS_DEMOTED_INFO LE_RENEW_INFO HTTPS_DETECTED_INFO; do
             echo "$v=not set" >> "$GITHUB_ENV"
           done
@@ -469,6 +480,27 @@ jobs:
           PKGTYPE=$(echo "$INFO_JSON" | jq -r 'first(.. | objects | select(has("packageType"))) | .packageType' 2>/dev/null)
           echo "Docs packageType before Apps: ${PKGTYPE:-not found} (expected $EXPECTED_PKGTYPE)"
           echo "DOCS_PKGTYPE_BEFORE=${PKGTYPE:-not found}" >> $GITHUB_ENV
+
+      # Case 19: the license goes into Docs now, before Apps exists. Apps has to pick it up from this Docs, so its
+      # wizard must not ask for one (checked in "Check Apps edition matches Docs"). licenseInfo is only printed:
+      # a wrong license makes the wizard ask for one, which fails the case anyway.
+      - name: Add license to Docs
+        if: matrix.docs_license != 'none'
+        continue-on-error: true
+        env:
+          DOCS_LIC_DE: ${{ secrets.APPS_LICENSE_DE }}
+        run: |
+          printf '%s\n' "$DOCS_LIC_DE" | ssh $SSH_OPTS $U@$EC2_IP 'sudo tee /var/www/onlyoffice/Data/license.lic >/dev/null'
+          ssh $SSH_OPTS $U@$EC2_IP 'sudo chown ds:ds /var/www/onlyoffice/Data/license.lic && sudo chmod 640 /var/www/onlyoffice/Data/license.lic && sudo systemctl restart ds-docservice ds-converter'
+          for i in $(seq 1 30); do
+            HC=$(curl -s --max-time 5 "$DOCS_URL_BEFORE/healthcheck" || true)
+            [ "$HC" = "true" ] && break
+            sleep 10
+          done
+          [ "$HC" = "true" ] || echo "::error::Docs healthcheck is not true after the license restart"
+          INFO=$(ssh $SSH_OPTS $U@$EC2_IP 'curl -s http://127.0.0.1:8000/info/info.json' | jq -c '.licenseInfo // "none"')
+          echo "Docs licenseInfo: $INFO"
+          echo "DOCS_LICENSE_INFO=${INFO:0:300}" >> $GITHUB_ENV
 
       - name: Setup Playwright
         continue-on-error: true
@@ -718,7 +750,8 @@ jobs:
         env:
           APPS_ADMIN_PASSWORD: ${{ secrets.APPS_ADMIN_PASSWORD }}
           # TEMP: the EE license is used for every edition; once uploaded to Apps it licenses its Docs too (CE wizard never asks)
-          APPS_LICENSE_KEY: ${{ secrets.APPS_LICENSE_EE }}
+          # Not given when Docs got its license beforehand: if the wizard asks anyway, the smoke fails instead of papering over it
+          APPS_LICENSE_KEY: ${{ matrix.docs_license == 'none' && secrets.APPS_LICENSE_EE || '' }}
         run: |
           python3 .github/scripts/apps-install/smoke.py \
             --url "$APPS_URL" $( [ "$DOCS_SSL" = "selfsigned" ] && echo --insecure ) \
@@ -743,7 +776,9 @@ jobs:
           if [ "${{ matrix.method }}" = "docker" ]; then
             [ "${APPS_INSTALL_TYPE,,}" = "${DS_TYPE,,}" ] || OK=false
           fi
-          INFO="Docs packageType $DOCS_PKGTYPE_BEFORE -> $DOCS_PKGTYPE_AFTER (expected $EXPECTED_PKGTYPE); Apps Payments page: ${APPS_UI_EDITION} (expected $EXPECTED_APPS_UI); wizard asks license: $LICENSE_REQUIRED; .env INSTALLATION_TYPE: $APPS_INSTALL_TYPE"
+          # license added to Docs beforehand: the Apps wizard must take it from there and not ask
+          [ "$DOCS_LICENSE" = "none" ] || [ "$LICENSE_REQUIRED" = "false" ] || OK=false
+          INFO="Docs packageType $DOCS_PKGTYPE_BEFORE -> $DOCS_PKGTYPE_AFTER (expected $EXPECTED_PKGTYPE); Apps Payments page: ${APPS_UI_EDITION} (expected $EXPECTED_APPS_UI); wizard asks license: $LICENSE_REQUIRED (Docs license added beforehand: $DOCS_LICENSE, $DOCS_LICENSE_INFO); .env INSTALLATION_TYPE: $APPS_INSTALL_TYPE"
           echo "$INFO"
           echo "APPS_EDITION_INFO=$INFO" >> $GITHUB_ENV
           echo "APPS_EDITION_OK=$OK" >> $GITHUB_ENV
@@ -815,7 +850,7 @@ jobs:
               'apps_edition_ok': b('APPS_EDITION_OK'), 'apps_edition_info': e('APPS_EDITION_INFO', ''),
               'smoke_ok': b('SMOKE_OK'), 'smoke_info': e('SMOKE_INFO', ''),
               'screenshot': e('SHOT', ''),
-              'ssl': e('SSL'),
+              'ssl': e('SSL'), 'docs_license': e('DOCS_LICENSE', 'none'),
           }
           if e('SSL') != 'none':
               checks = ['HTTPS_DETECTED_OK', 'HTTPS_CERT_SAME_OK', 'HTTPS_REDIRECT_OK', 'DOCS_DEMOTED_OK']

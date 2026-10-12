@@ -792,7 +792,8 @@ def apps_body():
         rows.append(
             f'<tr><td>{d.get("case")}</td><td>{escape(d.get("method", ""))}</td>'
             f'<td>{escape(d.get("os_name", ""))}</td><td>{escape(d.get("arch", ""))}</td>'
-            f'<td>{escape(str(d.get("edition", "")).upper())}</td>'
+            f'<td>{escape(str(d.get("edition", "")).upper())}'
+            f'{" + " + escape(d["docs_license"].upper()) + " lic" if d.get("docs_license", "none") != "none" else ""}</td>'
             f'<td>{escape(str(d.get("docs_port", "")))} → {escape(str(d.get("docs_port_after", "")))}</td>'
             + ok("docs_before_ok")
             + f'<td class="{status(d.get("welcome_ok"))}" title="{escape("В окне: " + d.get("welcome_cmd", "") + chr(10) + "Ожидалось: " + d.get("welcome_expected", ""))}">'
@@ -821,7 +822,7 @@ def apps_body():
         ("Docs alive", "Docs после установки Apps жив: /healthcheck = true (пакеты — на порту из ds.conf; docker — на опубликованном порту или через /ds-vpath/)"),
         ("Port moved", "Только для package: порт Docs после установки Apps совпал с ожидаемым (80 → 8083, иначе без изменений). Для docker не проверяется — всегда ✅"),
         ("Same Docs", "Apps «усыновил» тот же Docs, а не поставил второй: sha256 JWT-секрета до и после совпал; для docker ещё образ контейнера Docs остался тем же (не заменён другим)"),
-        ("Edition", "Редакция Docs и Apps совпала с заказанной. Docs: packageType из /info/info.json (0 CE, 1 EE, 2 DE) до и после установки Apps. Apps: редакция на странице Settings → Payments («You are using ONLYOFFICE DocSpace …», для DE/EE); для CE — мастер не просит лицензию. Docker — ещё INSTALLATION_TYPE в .env. Детали — в подсказке ячейки"),
+        ("Edition", "Редакция Docs и Apps совпала с заказанной. Docs: packageType из /info/info.json (0 CE, 1 EE, 2 DE) до и после установки Apps. Apps: редакция на странице Settings → Payments («You are using ONLYOFFICE DocSpace …», для DE/EE); для CE — мастер не просит лицензию (так же для кейсов, где лицензия добавлена в Docs заранее, напр. 19: мастер Apps не должен её просить). Docker — ещё INSTALLATION_TYPE в .env. Детали — в подсказке ячейки"),
         ("HTTPS takeover", "Только для HTTPS-кейсов (13–18): Apps нашёл Docs на HTTPS и забрал его сертификат (тот же отпечаток на 443), http→https редирект работает, Docs переведён на HTTP, для letsencrypt — продление (certbot --dry-run + weekly-cron). Тип сертификата — справа; детали — в подсказке ячейки"),
         ("Editor + typing", "E2E в Chromium: мастер Apps → логин → создание smoke.docx → редактор открылся (onDocumentReady, iframe с того же хоста) → ввод слова «test». Клик по OK раскрывает скриншот редактора"),
         ("Run", "Дата и время завершения прогона (UTC)"),
