@@ -717,8 +717,8 @@ jobs:
         continue-on-error: true
         env:
           APPS_ADMIN_PASSWORD: ${{ secrets.APPS_ADMIN_PASSWORD }}
-          # Apps EE/DE licenses are different files; once uploaded to Apps they license its Docs too
-          APPS_LICENSE_KEY: ${{ matrix.edition == 'ee' && secrets.APPS_LICENSE_EE || matrix.edition == 'de' && secrets.APPS_LICENSE_DE || '' }}
+          # TEMP: the EE license is used for every edition; once uploaded to Apps it licenses its Docs too (CE wizard never asks)
+          APPS_LICENSE_KEY: ${{ secrets.APPS_LICENSE_EE }}
         run: |
           python3 .github/scripts/apps-install/smoke.py \
             --url "$APPS_URL" $( [ "$DOCS_SSL" = "selfsigned" ] && echo --insecure ) \
