@@ -96,9 +96,9 @@ jobs:
               'centos10':   ('CentOS 10',    'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-011969aa4b0fec8fe', 'arm64': 'ami-0da965a0c246cec33'}),
           }
           # Keep in sync with the table in README.md. Cases 1-12: every method x arch sees all three
-          # ports; CE is kept to few cases (3, 10, 15), the rest are DE/EE. 8888 is
-          # a custom port outside the ports Apps needs itself (8080 is one of them: package install
-          # refuses). Cases 13-18: Docs on HTTPS (80 + 443), Apps must inherit its certificate. Every
+          # ports; CE is kept to few cases (3, 10, 15), the rest are DE/EE. 7070 is a custom port that
+          # Apps leaves alone; 8888 is moved to 8083 by the package install (expected, see
+          # EXPECTED_DOCS_PORT_AFTER); 8080 is one of the ports Apps needs itself (package install refuses). Cases 13-18: Docs on HTTPS (80 + 443), Apps must inherit its certificate. Every
           # certificate type (self-signed, wildcard, Let's Encrypt) runs on both package (check-ports.sh)
           # and docker (install-Docker.sh), LE also checks the renewal handover.
           CASES = [
@@ -107,7 +107,7 @@ jobs:
               (3,  'package', 'rhel9',      'x64',   'ce', 8888, 'none'),
               (4,  'package', 'ubuntu2604', 'arm64', 'de', 80,   'none'),
               (5,  'package', 'centos10',   'arm64', 'de', 8083, 'none'),
-              (6,  'package', 'rhel10',     'arm64', 'ee', 8888, 'none'),
+              (6,  'package', 'rhel10',     'arm64', 'ee', 7070, 'none'),
               (7,  'docker',  'centos9',    'x64',   'ee', 8083, 'none'),
               (8,  'docker',  'debian12',   'x64',   'de', 8888, 'none'),
               (9,  'docker',  'rhel10',     'x64',   'ee', 80,   'none'),
@@ -217,8 +217,8 @@ jobs:
             # says "You are using ONLYOFFICE DocSpace <Edition>"; CE has no paid edition, its wizard asks no license
             echo "EXPECTED_APPS_UI=${TYPE,,}"
             [ "${{ matrix.method }}" = "docker" ] && echo "EXPECTED_PLATFORM=docker" || echo "EXPECTED_PLATFORM=linux"
-            # packages: Apps needs port 80, so a Docs sitting on 80 is moved to 8083; any other port stays
-            [ "$DOCS_PORT" = "80" ] && echo "EXPECTED_DOCS_PORT_AFTER=8083" || echo "EXPECTED_DOCS_PORT_AFTER=$DOCS_PORT"
+            # packages: Apps needs port 80 and moves a Docs sitting on 80 or 8888 to 8083; any other port (8083, 7070) stays
+            case "$DOCS_PORT" in 80|8888) echo "EXPECTED_DOCS_PORT_AFTER=8083" ;; *) echo "EXPECTED_DOCS_PORT_AFTER=$DOCS_PORT" ;; esac
             # HTTPS cases: a fresh name per run keeps clear of Let's Encrypt's 5-certs-per-name-per-week limit;
             # curl/browser skip verification only for the self-signed cert, a Let's Encrypt one must validate
             if [ "$DOCS_SSL" != "none" ]; then

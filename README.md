@@ -75,7 +75,7 @@ Pre-release builds from S3 dev repo.
 |------|--------|
 | dev-APPS-install | [![dev-APPS-install](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-APPS-install.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-APPS-install.yml) |
 
-Cases 1–12: within each method every architecture gets all three Docs ports; CE is kept to a few cases (3, 10, 15), the rest are DE/EE. Port 8888 stands in for "any custom port" (8080 is among the ports Apps needs itself).
+Cases 1–12: within each method every architecture gets all three Docs ports; CE is kept to a few cases (3, 10, 15), the rest are DE/EE. Ports 8888 and 7070 stand in for "any custom port": package install of Apps moves Docs from 80 and 8888 to 8083 and leaves 8083 and 7070 alone (8080 is among the ports Apps needs itself).
 
 | # | Method | OS | Arch | Docs edition | Docs port | Docs HTTPS |
 |---|--------|----|------|--------------|-----------|------------|
@@ -84,7 +84,7 @@ Cases 1–12: within each method every architecture gets all three Docs ports; C
 | 3 | package | RHEL 9 | x64 | CE | 8888 | — |
 | 4 | package | Ubuntu 26.04 | arm64 | DE | 80 | — |
 | 5 | package | CentOS 10 | arm64 | DE | 8083 | — |
-| 6 | package | RHEL 10 | arm64 | EE | 8888 | — |
+| 6 | package | RHEL 10 | arm64 | EE | 7070 | — |
 | 7 | docker | CentOS 9 | x64 | EE | 8083 | — |
 | 8 | docker | Debian 12 | x64 | DE | 8888 | — |
 | 9 | docker | RHEL 10 | x64 | EE | 80 | — |
