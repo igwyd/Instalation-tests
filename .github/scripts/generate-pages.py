@@ -179,7 +179,7 @@ def td_ds_errors(data):
             f'<pre class="dslog">{escape(text)}</pre></details></td>')
 
 
-def pkg_table(data, arch_label):
+def pkg_table(data, arch_label, upgrade=True):
     run_date = (data or {}).get("run_date", "")
     date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
 
@@ -188,8 +188,9 @@ def pkg_table(data, arch_label):
         for label in ["EE", "DE", "CE"]:
             rows.append(f'<tr><td>{label}</td>'
                         + '<td class="na">—</td>' * 5 + '</tr>')
-        rows.append('<tr><td>EE Release</td>' + '<td class="na">—</td>' * 5 + '</tr>')
-        rows.append('<tr><td>EE Upgrade</td>' + '<td class="na">—</td>' * 5 + '</tr>')
+        if upgrade:
+            rows.append('<tr><td>EE Release</td>' + '<td class="na">—</td>' * 5 + '</tr>')
+            rows.append('<tr><td>EE Upgrade</td>' + '<td class="na">—</td>' * 5 + '</tr>')
     else:
         for key, label in [("ee", "EE"), ("de", "DE"), ("ce", "CE")]:
             ed = data.get(key, {})
@@ -204,38 +205,39 @@ def pkg_table(data, arch_label):
                 + '</tr>'
             )
 
-        ug = data.get("ee_upgrade", {})
+        ug = data.get("ee_upgrade", {}) if upgrade else None
 
-        ver_rel = ug.get("version_release_actual", "?") or "?"
-        if ver_rel in ("not set", "not-found"):
-            ver_rel = "?"
-        jwt_rel = ug.get("jwt_ee_release_exists", False)
-        hc_rel  = ug.get("healthy_release", False)
-        rows.append(
-            f'<tr><td>EE Release</td>'
-            + td_hc(hc_rel, ug.get("hc_port_release"))
-            + f'<td>{escape(ver_rel)}</td>'
-            + f'<td class="{status(jwt_rel)}">JWT: {"✅ YES" if jwt_rel else "❌ FAIL"}</td>'
-            + '<td class="na">—</td>'
-            + '<td class="na">—</td>'
-            + '</tr>'
-        )
+        if upgrade:
+            ver_rel = ug.get("version_release_actual", "?") or "?"
+            if ver_rel in ("not set", "not-found"):
+                ver_rel = "?"
+            jwt_rel = ug.get("jwt_ee_release_exists", False)
+            hc_rel  = ug.get("healthy_release", False)
+            rows.append(
+                f'<tr><td>EE Release</td>'
+                + td_hc(hc_rel, ug.get("hc_port_release"))
+                + f'<td>{escape(ver_rel)}</td>'
+                + f'<td class="{status(jwt_rel)}">JWT: {"✅ YES" if jwt_rel else "❌ FAIL"}</td>'
+                + '<td class="na">—</td>'
+                + '<td class="na">—</td>'
+                + '</tr>'
+            )
 
-        hc_upg   = ug.get("healthy_upgrade", False)
-        jwt_match = ug.get("jwt_match", False)
-        rows.append(
-            f'<tr><td>EE Upgrade</td>'
-            + td_hc(hc_upg, ug.get("hc_port_upgrade"))
-            + td_version(ug)
-            + f'<td class="{status(jwt_match)}">JWT: {"✅ MATCH" if jwt_match else "❌ FAIL"}</td>'
-            + td_ppt_breakdown(ug)
-            + td_ds_errors(ug)
-            + '</tr>'
-        )
+            hc_upg   = ug.get("healthy_upgrade", False)
+            jwt_match = ug.get("jwt_match", False)
+            rows.append(
+                f'<tr><td>EE Upgrade</td>'
+                + td_hc(hc_upg, ug.get("hc_port_upgrade"))
+                + td_version(ug)
+                + f'<td class="{status(jwt_match)}">JWT: {"✅ MATCH" if jwt_match else "❌ FAIL"}</td>'
+                + td_ppt_breakdown(ug)
+                + td_ds_errors(ug)
+                + '</tr>'
+            )
 
     thead = ('<thead><tr>'
              '<th>Edition</th><th>Healthcheck</th><th>Version</th>'
-             '<th>SVC/JWT</th><th>Puppeteer (=0)</th><th>DS Log Errors</th>'
+             f'<th>{"SVC/JWT" if upgrade else "SVC"}</th><th>Puppeteer (=0)</th><th>DS Log Errors</th>'
              '</tr></thead>')
     return (f'<h3>{arch_label}{date_part}</h3>\n'
             f'<table>{thead}<tbody>' + '\n'.join(rows) + '</tbody></table>\n')
@@ -759,7 +761,18 @@ def generate_release():
         + '</tbody></table>\n'
     )
 
-    body = (section("K8s EKS arm64", "release-K8s-EKS-arm64.yml", "release-K8s-EKS-arm64", k8s_body)
+    def rel(f):
+        return load(f"release-{f}.json")
+    deb_body        = pkg_table(rel("deb-x64"), "x64", False) + pkg_table(rel("deb-arm64"), "arm64", False)
+    rpm_body        = pkg_table(rel("rpm-x64"), "x64", False) + pkg_table(rel("rpm-arm64"), "arm64", False)
+    docker_deb_body = docker_table(rel("docker-deb-x64"), "x64") + docker_table(rel("docker-deb-arm64"), "arm64")
+    docker_rpm_body = docker_table(rel("docker-rpm-x64"), "x64") + docker_table(rel("docker-rpm-arm64"), "arm64")
+
+    body = (section("DEB Packages (Ubuntu 24.04)", "release-DEB-x64-arm64.yml", "release-DEB-x64-arm64", deb_body)
+            + section("RPM Packages (CentOS 9)", "release-RPM-x64-arm64.yml", "release-RPM-x64-arm64", rpm_body)
+            + section("Docker DEB (Ubuntu 24.04)", "release-Docker-DEB-x64-arm64.yml", "release-Docker-DEB-x64-arm64", docker_deb_body)
+            + section("Docker RPM (CentOS 9)", "release-Docker-RPM-x64-arm64.yml", "release-Docker-RPM-x64-arm64", docker_rpm_body)
+            + section("K8s EKS arm64", "release-K8s-EKS-arm64.yml", "release-K8s-EKS-arm64", k8s_body)
             + section("Apps install (on top of Docs)", "release-APPS-install.yml", "release-APPS-install", apps_body("release-apps-")))
     write("release.html", page_html("RELEASE — ONLYOFFICE Docs Test Results", body, breadcrumb("RELEASE")))
 

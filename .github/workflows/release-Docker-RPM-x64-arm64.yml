@@ -147,6 +147,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_EE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck EE: $HC"
           echo "HEALTHCHECK_EE=$HC" >> $GITHUB_ENV
 
@@ -266,6 +268,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_DE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck DE: $HC"
           echo "HEALTHCHECK_DE=$HC" >> $GITHUB_ENV
 
@@ -384,6 +388,8 @@ jobs:
         continue-on-error: true
         run: |
           HC=$(curl -s "http://${{ env.EC2_IP }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT_CE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck CE: $HC"
           echo "HEALTHCHECK_CE=$HC" >> $GITHUB_ENV
 
@@ -525,6 +531,82 @@ jobs:
           if [ "$FAILED" -eq 1 ]; then
             exit 1
           fi
+
+      - name: Save results
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p .github/workflow-results
+          python3 - << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+
+          def b(v):   return os.environ.get(v, 'false') == 'true'
+          def n(v):   return int(os.environ.get(v, '0') or '0')
+          def s(v):   return os.environ.get(v, 'not set')
+          def ok(E):  # the same conditions as Final check (DS log errors are information only)
+              return (b(f'HEALTHCHECK_{E}') and b(f'VERSION_{E}_OK') and b(f'SERVICES_{E}_OK')
+                      and n(f'PUPPETEER_{E}_FAILED') == 0 and n(f'PUPPETEER_{E}_TOTAL') > 0)
+
+          data = {
+              'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              'ee': {
+                  'healthy':          b('HEALTHCHECK_EE'),
+                  'hc_port':          os.environ.get('HC_PORT_EE', ''),
+                  'version_ok':       b('VERSION_EE_OK'),
+                  'version_actual':   s('VERSION_EE_ACTUAL'),
+                  'services_ok':      b('SERVICES_EE_OK'),
+                  'services_text':    s('SERVICES_EE_TEXT'),
+                  'puppeteer_failed':      n('PUPPETEER_EE_FAILED'),
+                  'puppeteer_ok':          n('PUPPETEER_EE_OK'),
+                  'puppeteer_total':       n('PUPPETEER_EE_TOTAL'),
+                  'puppeteer_api_failed':  n('PUPPETEER_EE_API_FAILED'),
+                  'puppeteer_wopi_failed': n('PUPPETEER_EE_WOPI_FAILED'),
+                  'ds_log_errors':         n('DS_LOG_ERRORS_EE'),
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_EE_TEXT', ''),
+                  'conclusion': 'success' if ok('EE') else 'failure',
+              },
+              'de': {
+                  'healthy':          b('HEALTHCHECK_DE'),
+                  'hc_port':          os.environ.get('HC_PORT_DE', ''),
+                  'version_ok':       b('VERSION_DE_OK'),
+                  'version_actual':   s('VERSION_DE_ACTUAL'),
+                  'services_ok':      b('SERVICES_DE_OK'),
+                  'services_text':    s('SERVICES_DE_TEXT'),
+                  'puppeteer_failed':      n('PUPPETEER_DE_FAILED'),
+                  'puppeteer_ok':          n('PUPPETEER_DE_OK'),
+                  'puppeteer_total':       n('PUPPETEER_DE_TOTAL'),
+                  'puppeteer_api_failed':  n('PUPPETEER_DE_API_FAILED'),
+                  'puppeteer_wopi_failed': n('PUPPETEER_DE_WOPI_FAILED'),
+                  'ds_log_errors':         n('DS_LOG_ERRORS_DE'),
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_DE_TEXT', ''),
+                  'conclusion': 'success' if ok('DE') else 'failure',
+              },
+              'ce': {
+                  'healthy':          b('HEALTHCHECK_CE'),
+                  'hc_port':          os.environ.get('HC_PORT_CE', ''),
+                  'version_ok':       b('VERSION_CE_OK'),
+                  'version_actual':   s('VERSION_CE_ACTUAL'),
+                  'services_ok':      b('SERVICES_CE_OK'),
+                  'services_text':    s('SERVICES_CE_TEXT'),
+                  'puppeteer_failed':      n('PUPPETEER_CE_FAILED'),
+                  'puppeteer_ok':          n('PUPPETEER_CE_OK'),
+                  'puppeteer_total':       n('PUPPETEER_CE_TOTAL'),
+                  'puppeteer_api_failed':  n('PUPPETEER_CE_API_FAILED'),
+                  'puppeteer_wopi_failed': n('PUPPETEER_CE_WOPI_FAILED'),
+                  'ds_log_errors':         n('DS_LOG_ERRORS_CE'),
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_CE_TEXT', ''),
+                  'conclusion': 'success' if ok('CE') else 'failure',
+              },
+              'conclusion': 'success' if all(ok(E) for E in ('EE', 'DE', 'CE')) else 'failure',
+          }
+          path = '.github/workflow-results/release-docker-rpm-${{ matrix.arch }}.json'
+          with open(path, 'w') as f:
+              json.dump(data, f, indent=2)
+          print(f'Saved: {path}')
+          PYEOF
+
+          aws s3 cp .github/workflow-results/release-docker-rpm-${{ matrix.arch }}.json             s3://${{ vars.DASHBOARD_BUCKET_NAME }}/results/release-docker-rpm-${{ matrix.arch }}.json             --region ${{ vars.DASHBOARD_BUCKET_REGION }}
 
       - name: Delete EC2 Instance
         if: always()
