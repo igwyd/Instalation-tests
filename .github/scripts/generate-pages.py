@@ -759,7 +759,8 @@ def generate_release():
         + '</tbody></table>\n'
     )
 
-    body = section("K8s EKS arm64", "release-K8s-EKS-arm64.yml", "release-K8s-EKS-arm64", k8s_body)
+    body = (section("K8s EKS arm64", "release-K8s-EKS-arm64.yml", "release-K8s-EKS-arm64", k8s_body)
+            + section("Apps install (on top of Docs)", "release-APPS-install.yml", "release-APPS-install", apps_body("release-apps-")))
     write("release.html", page_html("RELEASE — ONLYOFFICE Docs Test Results", body, breadcrumb("RELEASE")))
 
 
@@ -772,10 +773,11 @@ def td_https(d):
             f'{"✅" if v else "❌"} {escape(ssl)}</td>')
 
 
-def apps_body():
-    # one JSON per case (dev-apps-<case>.json): the workflow is manual and may run only some cases
-    files = sorted((f for f in os.listdir(RESULTS_DIR) if f.startswith("dev-apps-") and f.endswith(".json")),
-                   key=lambda f: int(f[9:-5]) if f[9:-5].isdigit() else 0) if os.path.isdir(RESULTS_DIR) else []
+def apps_body(prefix="dev-apps-"):
+    # one JSON per case (<prefix><case>.json): the workflow is manual and may run only some cases
+    n = len(prefix)
+    files = sorted((f for f in os.listdir(RESULTS_DIR) if f.startswith(prefix) and f.endswith(".json")),
+                   key=lambda f: int(f[n:-5]) if f[n:-5].isdigit() else 0) if os.path.isdir(RESULTS_DIR) else []
     rows = []
     for f in files:
         d = load(f)

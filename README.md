@@ -122,6 +122,13 @@ Official public repos. Triggered manually via `workflow_dispatch`.
 | release-Docker-DEB | [![release-Docker-DEB](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-x64-arm64.yml) |
 | release-Docker-RPM | [![release-Docker-RPM](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-RPM-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-RPM-x64-arm64.yml) |
 
+### ONLYOFFICE Apps install (up to 18 runners, manual)
+- The release flow as a user does it: Docs from the published per-edition script (`docs-enterprise-install.sh`, `docs-developer-install.sh`, `docs-install.sh` for CE; official release packages / images, `--docsport`), then the command from the `/welcome` "Install apps" pop-up is run as written — no test branch, no 4testing repos or images. Checks are the same as in dev-APPS-install, including the HTTPS takeover (Route53 records `rapps-<case>-<run>`, same certificates), and results go to the release dashboard. Cases 1–18 are the same as in the dev table above, except 19. Triggered manually (`cases`, `keep_instances`, `cleanup`).
+
+| Test | Status |
+|------|--------|
+| release-APPS-install | [![release-APPS-install](https://github.com/igwyd/Instalation-tests/actions/workflows/release-APPS-install.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/release-APPS-install.yml) |
+
 ## Other
 
 | Test | Status |

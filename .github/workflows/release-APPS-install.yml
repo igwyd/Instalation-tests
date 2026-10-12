@@ -1,0 +1,848 @@
+name: release APPS install
+
+# The release flow as a user does it, with nothing from the test infrastructure: Docs comes from the published
+# per-edition script (download.onlyoffice.com/docs/docs-enterprise-install.sh, docs-developer-install.sh,
+# docs-install.sh for CE), the /welcome "Install apps" pop-up is opened, and the command written there
+# (curl -O https://download.onlyoffice.com/apps/<script> && bash <script> <package|docker>) is run as it stands -
+# no -gb branch, no 4testing repos or images, no local scripts, no dev packages. Then the same checks as in
+# dev-APPS-install: Apps is up, Docs survived, the editor opens a document, and for cases 13-18 Docs' HTTPS
+# certificate is taken over. Results go to S3 as results/release-apps-<case>.json for the dashboard.
+# Each job terminates its EC2 instance (root EBS volume included) and deletes its DNS record at the end;
+# keep_instances=true leaves them for manual checks, then re-run with cleanup=true to terminate everything this
+# workflow created (tag Name=demin_release-apps-*, DNS records rapps-<case>-<run>.[div.]<APPS_DNS_ZONE>).
+
+on:
+  workflow_dispatch:
+    inputs:
+      cases:
+        description: '"all" or comma list of case numbers from the table in README (1-18)'
+        default: 'all'
+      keep_instances:
+        description: 'Leave EC2 instances and DNS records for manual checks (remove later with cleanup=true)'
+        type: boolean
+        default: false
+      cleanup:
+        description: 'Only terminate EC2 instances left by previous runs, test nothing'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  # Route53 zone for the HTTPS cases; Let's Encrypt refuses *.amazonaws.com, so the EC2 public DNS name won't do
+  APPS_DNS_ZONE: qa-onlyoffice.net
+  # secrets APPS_WILDCARD_CERT/KEY hold a Let's Encrypt *.<this> certificate renewed by hand
+  APPS_WILDCARD_DOMAIN: div.qa-onlyoffice.net
+  LE_EMAIL: i.demin.test@gmail.com
+
+jobs:
+  cleanup:
+    if: ${{ inputs.cleanup }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Terminate EC2 instances left by previous runs
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          IDS=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=demin_release-apps-*" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+            --query "Reservations[].Instances[].InstanceId" --output text)
+          [ -z "$IDS" ] && { echo "Nothing to terminate"; exit 0; }
+          echo "Terminating: $IDS"
+          aws ec2 terminate-instances --instance-ids $IDS
+
+      - name: Delete DNS records left by previous runs
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "$APPS_DNS_ZONE" --query 'HostedZones[0].Id' --output text)
+          aws route53 list-resource-record-sets --hosted-zone-id "$ZONE_ID" \
+            --query "ResourceRecordSets[?Type=='A' && starts_with(Name, 'rapps-')]" --output json > rr.json
+          # the zone is shared: only names this workflow creates, rapps-<case>-<run>.[div.]<zone> (dev uses apps-)
+          python3 -c "import json, re, os; z = re.escape(os.environ['APPS_DNS_ZONE']); rr = [x for x in json.load(open('rr.json')) if re.fullmatch(rf'rapps-\d+-\d+\.(div\.)?{z}\.', x['Name'])]; print(len(rr)); json.dump({'Changes': [{'Action': 'DELETE', 'ResourceRecordSet': x} for x in rr]}, open('batch.json', 'w'))" > count
+          [ "$(cat count)" = "0" ] && { echo "No DNS records to delete"; exit 0; }
+          jq -r '.Changes[].ResourceRecordSet.Name' batch.json
+          aws route53 change-resource-record-sets --hosted-zone-id "$ZONE_ID" --change-batch file://batch.json
+
+  prepare:
+    if: ${{ !inputs.cleanup }}
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Build matrix
+        id: matrix
+        env:
+          CASES: ${{ inputs.cases }}
+        run: |
+          python3 - << 'PYEOF' >> "$GITHUB_OUTPUT"
+          import json, os, sys
+          # os key: name, package type, ssh user, root device, AMI per arch
+          OS = {
+              'ubuntu2404': ('Ubuntu 24.04', 'deb', 'ubuntu',   '/dev/sda1', {'x64': 'ami-0b6c6ebed2801a5cb', 'arm64': 'ami-0a7a4e87939439934'}),
+              'ubuntu2604': ('Ubuntu 26.04', 'deb', 'ubuntu',   '/dev/sda1', {'x64': 'ami-091138d0f0d41ff90', 'arm64': 'ami-07ad186bc37b8dac4'}),
+              'debian12':   ('Debian 12',    'deb', 'admin',    '/dev/xvda', {'x64': 'ami-095f312bef9bfe5b1', 'arm64': 'ami-04308cee1a3c8bb1c'}),
+              'debian13':   ('Debian 13',    'deb', 'admin',    '/dev/xvda', {'x64': 'ami-023a5c1706f994759', 'arm64': 'ami-040945d6282a26609'}),
+              'rhel9':      ('RHEL 9',       'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-0d8d3b1122e36c000', 'arm64': 'ami-0734d5fad59e3ba53'}),
+              'rhel10':     ('RHEL 10',      'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-0ad50334604831820', 'arm64': 'ami-02d5b54ba15715d30'}),
+              'centos9':    ('CentOS 9',     'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-04331ec57720ee626', 'arm64': 'ami-058dc7e5ef5f28287'}),
+              'centos10':   ('CentOS 10',    'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-011969aa4b0fec8fe', 'arm64': 'ami-0da965a0c246cec33'}),
+          }
+          # The same cases 1-18 as in dev-APPS-install (keep in sync with the table in README.md). Cases 1-12: every method x arch sees all three
+          # ports; CE is kept to few cases (3, 10, 15), the rest are DE/EE. 7070 is a custom port that
+          # Apps leaves alone; 8888 is moved to 8083 by the package install (expected, see
+          # EXPECTED_DOCS_PORT_AFTER); 8080 is one of the ports Apps needs itself (package install refuses). Cases 13-18: Docs on HTTPS (80 + 443), Apps must inherit its certificate. Every
+          # certificate type (self-signed, wildcard, Let's Encrypt) runs on both package (check-ports.sh)
+          # and docker (install-Docker.sh), LE also checks the renewal handover.
+          CASES = [
+              (1,  'package', 'ubuntu2404', 'x64',   'ee', 80,   'none'),
+              (2,  'package', 'debian13',   'x64',   'de', 8083, 'none'),
+              (3,  'package', 'rhel9',      'x64',   'ce', 8888, 'none'),
+              (4,  'package', 'ubuntu2604', 'arm64', 'de', 80,   'none'),
+              (5,  'package', 'centos10',   'arm64', 'de', 8083, 'none'),
+              (6,  'package', 'rhel10',     'arm64', 'ee', 7070, 'none'),
+              (7,  'docker',  'centos9',    'x64',   'ee', 8083, 'none'),
+              (8,  'docker',  'debian12',   'x64',   'de', 8888, 'none'),
+              (9,  'docker',  'rhel10',     'x64',   'ee', 80,   'none'),
+              (10, 'docker',  'ubuntu2604', 'arm64', 'ce', 8083, 'none'),
+              (11, 'docker',  'rhel9',      'arm64', 'ee', 80,   'none'),
+              (12, 'docker',  'ubuntu2404', 'arm64', 'de', 8888, 'none'),
+              (13, 'package', 'rhel9',      'arm64', 'ee', 80,   'selfsigned'),
+              (14, 'package', 'debian13',   'x64',   'de', 80,   'wildcard'),
+              (15, 'docker',  'debian12',   'x64',   'ce', 80,   'wildcard'),
+              (16, 'docker',  'ubuntu2404', 'arm64', 'de', 80,   'letsencrypt'),
+              (17, 'package', 'rhel10',     'x64',   'de', 80,   'letsencrypt'),
+              (18, 'docker',  'debian13',   'arm64', 'ee', 80,   'selfsigned'),
+          ]
+          want = [x.strip() for x in os.environ['CASES'].split(',') if x.strip()]
+          ids = [c[0] for c in CASES]
+          if want != ['all']:
+              bad = [x for x in want if not x.isdigit() or int(x) not in ids]
+              if bad or not want:
+                  sys.exit(f'cases: bad value(s) {bad or want}, allowed: all or {ids}')
+              ids = sorted({int(x) for x in want})
+          include = []
+          for cid, method, os_key, arch, edition, port, ssl in CASES:
+              if cid not in ids:
+                  continue
+              name, os_type, user, device, ami = OS[os_key]
+              include.append({
+                  'case': cid, 'method': method, 'os_key': os_key, 'os_name': name, 'os_type': os_type,
+                  'ssh_user': user, 'device_name': device, 'ami': ami[arch], 'arch': arch,
+                  'instance_type': 't3.xlarge' if arch == 'x64' else 't4g.xlarge',
+                  'edition': edition, 'docs_port': str(port), 'ssl': ssl,
+                  'tag': f'release-apps-{cid}-{method}-{os_key}-{arch}-{edition}-{port}' + ('' if ssl == 'none' else f'-{ssl}'),
+              })
+          print('matrix=' + json.dumps({'include': include}))
+          PYEOF
+
+  test:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    name: "#${{ matrix.case }} ${{ matrix.method }} ${{ matrix.os_name }} ${{ matrix.arch }} ${{ matrix.edition }} docs:${{ matrix.docs_port }}${{ matrix.ssl != 'none' && format(' {0}', matrix.ssl) || '' }}"
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    env:
+      SSH_OPTS: -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=20
+      U: ${{ matrix.ssh_user }}
+      # Docs is the latest release; Apps has to talk to the same version (X.Y.Z, matched as a substring of X.Y.Z.BUILD)
+      DS_VERSION: ${{ vars.ONLYOFFICE_RELEASE_VERSION }}
+      DOCS_PORT: ${{ matrix.docs_port }}
+      APPS_ADMIN_EMAIL: i.demin.test@gmail.com
+      DOCS_SSL: ${{ matrix.ssl }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Check required secrets
+        env:
+          APPS_ADMIN_PASSWORD: ${{ secrets.APPS_ADMIN_PASSWORD }}
+          WC_CERT: ${{ secrets.APPS_WILDCARD_CERT }}
+          WC_KEY: ${{ secrets.APPS_WILDCARD_KEY }}
+        run: |
+          # the repo is public: the Apps admin password must come from a secret, never be printed
+          [ -n "$APPS_ADMIN_PASSWORD" ] || { echo "::error::secret APPS_ADMIN_PASSWORD is not set"; exit 1; }
+          # without it the smoke would match any Docs version
+          [ -n "$DS_VERSION" ] || { echo "::error::variable ONLYOFFICE_RELEASE_VERSION is not set"; exit 1; }
+          # the wildcard cert is renewed by hand: say so plainly instead of every HTTPS check going red
+          if [ "${{ matrix.ssl }}" = "wildcard" ]; then
+            [ -n "$WC_CERT" ] && [ -n "$WC_KEY" ] || { echo "::error::APPS_WILDCARD_CERT / APPS_WILDCARD_KEY are not set"; exit 1; }
+            printf '%s\n' "$WC_CERT" > /tmp/wc.crt
+            openssl x509 -noout -subject -ext subjectAltName -enddate -in /tmp/wc.crt
+            END=$(openssl x509 -noout -enddate -in /tmp/wc.crt | cut -d= -f2)
+            openssl x509 -noout -checkend 0 -in /tmp/wc.crt || { echo "::error::APPS_WILDCARD_CERT expired on $END, renew it"; exit 1; }
+            openssl x509 -noout -checkend $((14 * 86400)) -in /tmp/wc.crt || echo "::warning::APPS_WILDCARD_CERT expires on $END, renew it soon"
+          fi
+
+      - name: Resolve edition
+        run: |
+          case "${{ matrix.edition }}" in
+            ce) DOCS_SCRIPT=docs-install.sh;            TYPE=COMMUNITY;  ADMIN_PANEL=false; APPS_SCRIPT=apps-install.sh;            PKGTYPE=0 ;;
+            de) DOCS_SCRIPT=docs-developer-install.sh;  TYPE=DEVELOPER;  ADMIN_PANEL=true;  APPS_SCRIPT=apps-developer-install.sh;  PKGTYPE=2 ;;
+            ee) DOCS_SCRIPT=docs-enterprise-install.sh; TYPE=ENTERPRISE; ADMIN_PANEL=true;  APPS_SCRIPT=apps-enterprise-install.sh; PKGTYPE=1 ;;
+          esac
+          {
+            # the published per-edition Docs installer, as in the docs
+            echo "DOCS_SCRIPT=${DOCS_SCRIPT}"
+            echo "DS_TYPE=${TYPE}"
+            # info.json packageType of Docs: 0 CE, 1 EE, 2 DE
+            echo "EXPECTED_PKGTYPE=${PKGTYPE}"
+            echo "EXPECTED_ADMIN_PANEL=${ADMIN_PANEL}"
+            # /welcome is personalised by edition: it offers a per-edition installer script
+            echo "EXPECTED_APPS_SCRIPT=${APPS_SCRIPT}"
+            # apps-install.sh must take the Apps edition from the installed Docs: Settings -> Payments of Apps
+            # says "You are using ONLYOFFICE DocSpace <Edition>"; CE has no paid edition, its wizard asks no license
+            echo "EXPECTED_APPS_UI=${TYPE,,}"
+            [ "${{ matrix.method }}" = "docker" ] && echo "EXPECTED_PLATFORM=docker" || echo "EXPECTED_PLATFORM=linux"
+            # packages: Apps needs port 80 and moves a Docs sitting on 80 or 8888 to 8083; any other port (8083, 7070) stays
+            case "$DOCS_PORT" in 80|8888) echo "EXPECTED_DOCS_PORT_AFTER=8083" ;; *) echo "EXPECTED_DOCS_PORT_AFTER=$DOCS_PORT" ;; esac
+            # HTTPS cases: a fresh name per run keeps clear of Let's Encrypt's 5-certs-per-name-per-week limit;
+            # curl/browser skip verification only for the self-signed cert, a Let's Encrypt one must validate
+            if [ "$DOCS_SSL" != "none" ]; then
+              [ "$DOCS_SSL" = "wildcard" ] && PARENT=$APPS_WILDCARD_DOMAIN || PARENT=$APPS_DNS_ZONE
+              echo "DOMAIN=rapps-${{ matrix.case }}-${{ github.run_number }}.$PARENT"
+              [ "$DOCS_SSL" = "selfsigned" ] && echo "CURL_TLS=-k" || echo "CURL_TLS="
+            fi
+            echo "EXPECTED_DS_VERSION=${DS_VERSION%-*}"
+          } >> "$GITHUB_ENV"
+
+      - name: Initialize check defaults
+        run: |
+          for v in DOCS_BEFORE_OK WELCOME_OK WELCOME_ADMIN_PANEL_OK APPS_INSTALL_OK APPS_UP \
+                   DOCS_AFTER_OK DOCS_PORT_OK DOCS_SAME_OK SMOKE_OK APPS_EDITION_OK \
+                   HTTPS_DETECTED_OK HTTPS_CERT_SAME_OK HTTPS_REDIRECT_OK DOCS_DEMOTED_OK LE_RENEW_OK WILDCARD_NOTE; do
+            echo "$v=false" >> "$GITHUB_ENV"
+          done
+          for v in WELCOME_PLATFORM WELCOME_ADMIN_PANEL WELCOME_CMD WELCOME_EXPECTED APPS_INSTALL_RC DOCS_PORT_AFTER \
+                   DOCS_AFTER_URL DOCS_SAME_INFO APPS_INSTALL_TYPE DOCS_PKGTYPE_BEFORE DOCS_PKGTYPE_AFTER APPS_UI_EDITION APPS_EDITION_INFO SMOKE_INFO LICENSE_REQUIRED \
+                   DOCS_CERT_BEFORE DOCS_CERT_AFTER HTTPS_REDIRECT_INFO DOCS_DEMOTED_INFO LE_RENEW_INFO HTTPS_DETECTED_INFO; do
+            echo "$v=not set" >> "$GITHUB_ENV"
+          done
+
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-east-1
+
+      # Apps' hardware check wants 4 cores, 8000+ MB RAM and 40 GB free disk on top of Docs (t3/t4g.xlarge)
+      - name: Create EC2 Instance
+        run: |
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id ${{ matrix.ami }} \
+            --instance-type ${{ matrix.instance_type }} \
+            --key-name demin \
+            --security-groups AllPortsOpened \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=demin_${{ matrix.tag }}}]' \
+            --block-device-mappings '[{"DeviceName":"${{ matrix.device_name }}","Ebs":{"VolumeSize":80,"VolumeType":"gp3","DeleteOnTermination":true}}]' \
+            --query "Instances[0].InstanceId" --output text)
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+          aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+
+      - name: Get EC2 Public IP
+        run: |
+          IP=$(aws ec2 describe-instances --instance-ids ${{ env.INSTANCE_ID }} \
+            --query "Reservations[].Instances[].PublicIpAddress" --output text)
+          echo "EC2 Public IP: $IP"
+          echo "EC2_IP=$IP" >> $GITHUB_ENV
+          # plain cases talk to the IP; HTTPS cases to the domain (Docs before, Apps after, which takes 443 over)
+          if [ "$DOCS_SSL" = "none" ]; then
+            echo "DOCS_URL_BEFORE=http://$IP:$DOCS_PORT" >> $GITHUB_ENV
+            echo "APPS_URL=http://$IP" >> $GITHUB_ENV
+          else
+            echo "DOCS_URL_BEFORE=https://$DOMAIN" >> $GITHUB_ENV
+            echo "APPS_URL=https://$DOMAIN" >> $GITHUB_ENV
+          fi
+
+      # created before the SSH wait/upgrade/reboot, so the name has long resolved by the time Let's Encrypt asks
+      - name: Create DNS record
+        if: matrix.ssl != 'none'
+        run: |
+          ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "$APPS_DNS_ZONE" --query 'HostedZones[0].Id' --output text)
+          CHANGE=$(aws route53 change-resource-record-sets --hosted-zone-id "$ZONE_ID" --query 'ChangeInfo.Id' --output text \
+            --change-batch "{\"Changes\":[{\"Action\":\"UPSERT\",\"ResourceRecordSet\":{\"Name\":\"$DOMAIN\",\"Type\":\"A\",\"TTL\":60,\"ResourceRecords\":[{\"Value\":\"$EC2_IP\"}]}}]}")
+          aws route53 wait resource-record-sets-changed --id "$CHANGE"
+          echo "$DOMAIN -> $EC2_IP"
+
+      - name: Wait for SSH to be Ready
+        run: sleep 120
+
+      - name: Add SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+      - name: Upgrade packages
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP << 'EOF'
+          if command -v apt-get &>/dev/null; then
+            for i in 1 2 3; do
+              sudo apt-get update && sudo apt-get upgrade -y && break
+              [ $i -lt 3 ] && { echo "Attempt $i failed, retrying in 30s..."; sleep 30; }
+            done
+          else
+            sudo dnf -y clean all && sudo dnf -y update --nobest --skip-broken
+          fi
+          EOF
+
+      - name: Reboot EC2 Instance
+        run: aws ec2 reboot-instances --instance-ids ${{ env.INSTANCE_ID }}
+
+      - name: Wait for instance to reboot after upgrade
+        run: sleep 180
+
+      # CentOS AMIs ship an active firewalld; not part of what we test, so open the ports up front
+      - name: Open firewall ports
+        if: matrix.os_type == 'rpm'
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env P=$DOCS_PORT bash -s" << 'EOF'
+          systemctl is-active --quiet firewalld || { echo "firewalld is not active"; exit 0; }
+          for p in 80 443 8083 $P; do firewall-cmd --zone=public --add-port=$p/tcp --permanent; done
+          firewall-cmd --reload
+          EOF
+
+      # the published per-edition script, as in the docs; the answer "n" is its question about installing in Docker
+      - name: Install Docs package (release)
+        if: matrix.method == 'package'
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP << EOF
+          mkdir -p ~/docs-install && cd ~/docs-install
+          curl -fsSLO https://download.onlyoffice.com/docs/$DOCS_SCRIPT
+          printf "n\n" | sudo bash $DOCS_SCRIPT --docsport $DOCS_PORT
+          EOF
+
+      # The same steps as the package's own documentserver-letsencrypt.sh: ds-ssl.conf.tmpl becomes ds.conf,
+      # keeping secure_link_secret. Let's Encrypt is that script itself (certbot from EPEL on RPM).
+      # No server_name is set for the file certs, as a user wouldn't either: Apps falls back to the cert's CN.
+      - name: Enable HTTPS on Docs package
+        if: matrix.method == 'package' && matrix.ssl != 'none'
+        continue-on-error: true
+        env:
+          WC_CERT: ${{ secrets.APPS_WILDCARD_CERT }}
+          WC_KEY: ${{ secrets.APPS_WILDCARD_KEY }}
+        run: |
+          if [ "$DOCS_SSL" = "wildcard" ]; then
+            printf '%s\n' "$WC_CERT" | ssh $SSH_OPTS $U@$EC2_IP 'sudo mkdir -p /etc/ssl/apps-test && sudo tee /etc/ssl/apps-test/tls.crt >/dev/null'
+            printf '%s\n' "$WC_KEY" | ssh $SSH_OPTS $U@$EC2_IP 'sudo sh -c "umask 077; cat > /etc/ssl/apps-test/tls.key"'
+          fi
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env D=$DOMAIN MODE=$DOCS_SSL EMAIL=$LE_EMAIL bash -s" << 'EOF'
+          set -ex
+          NG=/etc/onlyoffice/documentserver/nginx
+          if [ "$MODE" = "letsencrypt" ]; then
+            # only certbot itself: whatever else documentserver-letsencrypt.sh needs is the package's
+            # business - installing it here would hide a packaging bug
+            if ! command -v certbot >/dev/null; then
+              if command -v apt-get >/dev/null; then
+                apt-get install -y certbot
+              else
+                dnf install -y "https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(rpm -E %rhel).noarch.rpm"
+                dnf install -y certbot
+              fi
+            fi
+            documentserver-letsencrypt.sh "$EMAIL" "$D"
+          else
+            mkdir -p /etc/ssl/apps-test
+            [ "$MODE" = "selfsigned" ] && openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=$D" -addext "subjectAltName=DNS:$D" \
+              -keyout /etc/ssl/apps-test/tls.key -out /etc/ssl/apps-test/tls.crt
+            SECRET=$(grep -oP '(?<=secure_link_secret ).*(?=;)' $NG/ds.conf | head -1)
+            cp -f $NG/ds-ssl.conf.tmpl $NG/ds.conf
+            sed -i -e "s|^[[:space:]]*set[[:space:]]\+\$secure_link_secret[[:space:]]\+.*;|set \$secure_link_secret $SECRET;|" \
+              -e "s|{{SSL_CERTIFICATE_PATH}}|/etc/ssl/apps-test/tls.crt|g" \
+              -e "s|{{SSL_KEY_PATH}}|/etc/ssl/apps-test/tls.key|g" $NG/ds.conf
+            nginx -t && systemctl reload nginx
+          fi
+          grep -nE 'listen|ssl_certificate|server_name' $NG/ds.conf
+          EOF
+
+      # The Docs image turns HTTPS on by itself when data/certs holds tls.crt + tls.key (no server_name then,
+      # so Apps has to take the domain from the cert's SAN)
+      - name: Prepare certificate for Docs in Docker
+        if: matrix.method == 'docker' && (matrix.ssl == 'selfsigned' || matrix.ssl == 'wildcard')
+        continue-on-error: true
+        env:
+          WC_CERT: ${{ secrets.APPS_WILDCARD_CERT }}
+          WC_KEY: ${{ secrets.APPS_WILDCARD_KEY }}
+        run: |
+          CERTS=/app/onlyoffice/DocumentServer/data/certs
+          ssh $SSH_OPTS $U@$EC2_IP "sudo mkdir -p $CERTS"
+          if [ "$DOCS_SSL" = "wildcard" ]; then
+            printf '%s\n' "$WC_CERT" | ssh $SSH_OPTS $U@$EC2_IP "sudo tee $CERTS/tls.crt >/dev/null"
+            printf '%s\n' "$WC_KEY" | ssh $SSH_OPTS $U@$EC2_IP "sudo sh -c 'umask 077; cat > $CERTS/tls.key'"
+          else
+            ssh $SSH_OPTS $U@$EC2_IP "sudo openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj /CN=$DOMAIN \
+              -addext subjectAltName=DNS:$DOMAIN -keyout $CERTS/tls.key -out $CERTS/tls.crt"
+          fi
+
+      # Minimal RHEL 10 AMIs lack the netfilter kernel modules for the running kernel, so dnf satisfies
+      # docker's kmod deps with kernel-debug-modules* and dockerd fails to start (same as dev-OS)
+      - name: Preinstall kernel netfilter modules on RHEL 10
+        if: matrix.method == 'docker' && matrix.os_key == 'rhel10'
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP 'sudo dnf install -y kernel-modules-"$(uname -r)" kernel-modules-extra-"$(uname -r)"'
+
+      - name: Install Docs in Docker (release)
+        if: matrix.method == 'docker'
+        continue-on-error: true
+        run: |
+          [ "$DOCS_SSL" = "letsencrypt" ] && LE_ARGS="--letsencryptdomain $DOMAIN --letsencryptmail $LE_EMAIL" || LE_ARGS=""
+          ssh $SSH_OPTS $U@$EC2_IP << EOF
+          mkdir -p ~/docs-install && cd ~/docs-install
+          curl -fsSLO https://download.onlyoffice.com/docs/$DOCS_SCRIPT
+          printf "y\n" | sudo bash $DOCS_SCRIPT --docsport $DOCS_PORT $LE_ARGS
+          EOF
+
+      - name: Wait for Docs healthcheck
+        continue-on-error: true
+        run: |
+          for i in $(seq 1 60); do
+            HC=$(curl -s $CURL_TLS --max-time 5 "$DOCS_URL_BEFORE/healthcheck" || true)
+            [ "$HC" = "true" ] && break
+            sleep 10
+          done
+          [ "$HC" = "true" ] || { echo "::error::Docs healthcheck $DOCS_URL_BEFORE/healthcheck is not true after 10 min"; exit 0; }
+          echo "Docs is up: $DOCS_URL_BEFORE"
+          if [ "$DOCS_SSL" != "none" ]; then
+            # the certificate Docs serves now, to compare with the one Apps serves after the takeover
+            FP=$(echo | openssl s_client -connect "$EC2_IP:443" -servername "$DOMAIN" 2>/dev/null | openssl x509 -noout -fingerprint -sha256 | cut -d= -f2)
+            echo "Docs certificate sha256: $FP"
+            echo "DOCS_CERT_BEFORE=${FP:-none}" >> $GITHUB_ENV
+            [ -n "$FP" ] || { echo "::error::Docs does not serve a certificate on 443"; exit 0; }
+          fi
+          echo "DOCS_BEFORE_OK=true" >> $GITHUB_ENV
+
+      # Fingerprint of this Docs to prove later that Apps kept it instead of deploying another one:
+      # sha256 of the JWT secret (never the secret itself — public repo) and, for Docker, the image.
+      - name: Record Docs fingerprint
+        continue-on-error: true
+        run: |
+          if [ "${{ matrix.method }}" = "package" ]; then
+            LOCAL_JSON=$(ssh $SSH_OPTS $U@$EC2_IP 'sudo cat /etc/onlyoffice/documentserver/local.json')
+            INFO_JSON=$(ssh $SSH_OPTS $U@$EC2_IP 'curl -s http://127.0.0.1:8000/info/info.json')
+          else
+            C=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps --format '{{.Names}} {{.Image}}' | awk '\$2 ~ /documentserver/ {print \$1; exit}'")
+            LOCAL_JSON=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C cat /etc/onlyoffice/documentserver/local.json")
+            INFO_JSON=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C curl -s http://127.0.0.1/info/info.json")
+            IMAGE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker inspect -f '{{.Config.Image}}' $C")
+            echo "DS container before: $C ($IMAGE)"
+            echo "DS_IMAGE_BEFORE=$IMAGE" >> $GITHUB_ENV
+          fi
+          JWT_SHA=$(echo "$LOCAL_JSON" | jq -r '.services.CoAuthoring.secret.inbox.string // empty' | sha256sum | cut -c1-16)
+          echo "JWT secret sha256 (prefix): $JWT_SHA"
+          echo "JWT_SHA_BEFORE=$JWT_SHA" >> $GITHUB_ENV
+          PKGTYPE=$(echo "$INFO_JSON" | jq -r 'first(.. | objects | select(has("packageType"))) | .packageType' 2>/dev/null)
+          echo "Docs packageType before Apps: ${PKGTYPE:-not found} (expected $EXPECTED_PKGTYPE)"
+          echo "DOCS_PKGTYPE_BEFORE=${PKGTYPE:-not found}" >> $GITHUB_ENV
+
+      - name: Setup Playwright
+        continue-on-error: true
+        run: |
+          pip install --quiet playwright
+          python3 -m playwright install --with-deps chromium
+
+      # as a user does: open /welcome, press "Install free apps", read the command from the pop-up
+      - name: Check welcome page
+        continue-on-error: true
+        run: |
+          python3 .github/scripts/apps-install/welcome.py "$DOCS_URL_BEFORE" out $( [ "$DOCS_SSL" = "selfsigned" ] && echo insecure )
+
+      # The command from the pop-up, as written (curl -O ... && bash <script> <package|docker>), run as root from an
+      # empty directory. Nothing is added: no branch, no 4testing repos/images, no Docker Hub login. stdin is
+      # /dev/null so an unexpected prompt fails fast; the timeout guards against prompt loops that spin on EOF.
+      - name: Install Apps (command from the welcome page)
+        continue-on-error: true
+        timeout-minutes: 100
+        run: |
+          case "$WELCOME_CMD" in
+            "curl -O https://download.onlyoffice.com/apps/"*) ;;
+            *) echo "::error::no usable command from the welcome page: $WELCOME_CMD"; exit 1 ;;
+          esac
+          echo "Running: $WELCOME_CMD"
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env CMD=$(printf %q "$WELCOME_CMD") bash -s" << 'EOF'
+          mkdir -p /opt/apps-test && cd /opt/apps-test
+          timeout 5400 bash -c "$CMD" < /dev/null > apps-install.out 2>&1
+          echo $? > apps-install.rc
+          EOF
+          RC=$(ssh $SSH_OPTS $U@$EC2_IP 'cat /opt/apps-test/apps-install.rc')
+          ssh $SSH_OPTS $U@$EC2_IP 'tail -n 60 /opt/apps-test/apps-install.out'
+          echo "Apps installer exit code: $RC"
+          echo "APPS_INSTALL_RC=$RC" >> $GITHUB_ENV
+          [ "$RC" = "0" ] && echo "APPS_INSTALL_OK=true" >> $GITHUB_ENV || echo "::error::Apps installer exited with $RC"
+
+      # Behind a wildcard certificate the installer cannot know the portal host: it either prints "cannot be determined"
+      # and keeps the internal portal address, or silently picks the wildcard's base domain (div.<zone> instead of the
+      # host). Either way the user has to run apps-ssl-setup -f <domain> <crt> <key> afterwards (DocSpace-buildtools
+      # 335a60ab), so it runs whenever the installer did not end up with exactly our host.
+      - name: Set portal domain behind wildcard certificate
+        if: matrix.ssl == 'wildcard'
+        continue-on-error: true
+        run: |
+          GOT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -oP 'is serving HTTPS for \K[^;[:space:]]+' /opt/apps-test/apps-install.out | head -1" || true)
+          if ssh $SSH_OPTS $U@$EC2_IP "grep -q 'cannot be determined' /opt/apps-test/apps-install.out" || [ "$GOT" != "$DOMAIN" ]; then
+            CERTS=/etc/ssl/apps-test
+            [ "${{ matrix.method }}" = "docker" ] && CERTS=/app/onlyoffice/DocumentServer/data/certs
+            ssh $SSH_OPTS $U@$EC2_IP "sudo apps-ssl-setup -f $DOMAIN $CERTS/tls.crt $CERTS/tls.key" && echo "WILDCARD_NOTE=true" >> $GITHUB_ENV
+          else
+            echo "installer found the host name behind the wildcard itself"
+          fi
+
+      - name: Wait for Apps
+        continue-on-error: true
+        run: |
+          # Apps answers on port 80 with its own API; /api/2.0/settings is public on a fresh portal
+          for i in $(seq 1 90); do
+            CODE=$(curl -s $CURL_TLS -o /tmp/settings.json -w '%{http_code}' --max-time 10 "$APPS_URL/api/2.0/settings" || true)
+            if [ "$CODE" = "200" ] && jq -e '.response' /tmp/settings.json >/dev/null 2>&1; then
+              echo "APPS_UP=true" >> $GITHUB_ENV; echo "Apps API is up"; exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::Apps API $APPS_URL/api/2.0/settings is not up after 30 min (last code $CODE)"
+
+      - name: Check Docs after Apps install
+        continue-on-error: true
+        run: |
+          if [ "${{ matrix.method }}" = "package" ]; then
+            PORT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -oP '^\s*listen\s+(\S*:)?\K\d+' /etc/onlyoffice/documentserver/nginx/ds.conf | head -1")
+            URL="http://$EC2_IP:$PORT"
+            LOCAL_JSON=$(ssh $SSH_OPTS $U@$EC2_IP 'sudo cat /etc/onlyoffice/documentserver/local.json')
+            INFO_JSON=$(ssh $SSH_OPTS $U@$EC2_IP 'curl -s http://127.0.0.1:8000/info/info.json')
+            SAME_EXTRA=true; INFO=""
+          else
+            C=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps --format '{{.Names}} {{.Image}}' | awk '\$2 ~ /documentserver/ {print \$1; exit}'")
+            echo "DS container after: $C"
+            ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}'"
+            PORT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker port $C 80/tcp 2>/dev/null | head -1 | awk -F: '{print \$NF}'")
+            # Apps may stop publishing Docs directly and proxy it under /ds-vpath/ instead
+            if [ -n "$PORT" ]; then URL="http://$EC2_IP:$PORT"; else PORT="none"; URL="http://$EC2_IP/ds-vpath"; fi
+            LOCAL_JSON=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C cat /etc/onlyoffice/documentserver/local.json")
+            INFO_JSON=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C curl -s http://127.0.0.1/info/info.json")
+            IMAGE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker inspect -f '{{.Config.Image}}' $C")
+            # .env lines are indented (spaces before INSTALLATION_TYPE=) and the value may be quoted
+            TYPE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -hoP '^\s*INSTALLATION_TYPE=\K.*' /app/onlyoffice/.env 2>/dev/null | head -1" || true)
+            TYPE=${TYPE//[\"\']/}
+            echo "APPS_INSTALL_TYPE=${TYPE:-not found}" >> $GITHUB_ENV
+            echo "image $DS_IMAGE_BEFORE -> $IMAGE"
+            [ "$IMAGE" = "$DS_IMAGE_BEFORE" ] && SAME_EXTRA=true || SAME_EXTRA=false
+            INFO=", image $( [ "$IMAGE" = "$DS_IMAGE_BEFORE" ] && echo same || echo changed )"
+          fi
+          # HTTPS cases: Docs is demoted to plain HTTP on loopback, reachable only through Apps
+          [ "$DOCS_SSL" != "none" ] && URL="$APPS_URL/ds-vpath"
+          HC=$(curl -s $CURL_TLS --max-time 10 "$URL/healthcheck" || true)
+          JWT_SHA=$(echo "$LOCAL_JSON" | jq -r '.services.CoAuthoring.secret.inbox.string // empty' | sha256sum | cut -c1-16)
+          echo "Docs after: $URL healthcheck=$HC, JWT sha $JWT_SHA_BEFORE -> $JWT_SHA"
+          PKGTYPE=$(echo "$INFO_JSON" | jq -r 'first(.. | objects | select(has("packageType"))) | .packageType' 2>/dev/null)
+          echo "Docs packageType after Apps: ${PKGTYPE:-not found} (expected $EXPECTED_PKGTYPE)"
+          echo "DOCS_PKGTYPE_AFTER=${PKGTYPE:-not found}" >> $GITHUB_ENV
+          {
+            echo "DOCS_PORT_AFTER=$PORT"
+            echo "DOCS_AFTER_URL=$URL"
+            [ "$HC" = "true" ] && echo "DOCS_AFTER_OK=true"
+            [ "$PORT" = "$EXPECTED_DOCS_PORT_AFTER" ] && echo "DOCS_PORT_OK=true"
+            [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] && [ "$SAME_EXTRA" = "true" ] && echo "DOCS_SAME_OK=true"
+            echo "DOCS_SAME_INFO=JWT $( [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] && echo same || echo changed )$INFO"
+          } >> $GITHUB_ENV
+
+      - name: Check HTTPS takeover
+        if: matrix.ssl != 'none'
+        continue-on-error: true
+        run: |
+          # 1. the installer saw Docs' HTTPS (check-ports.sh / install-Docker.sh print this on detection)
+          # (the domain it picked matters: with no server_name it comes from the cert's CN/SAN)
+          GOT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -oP 'is serving HTTPS for \K[^;[:space:]]+' /opt/apps-test/apps-install.out | head -1" || true)
+          echo "installer inherited HTTPS for: ${GOT:-nothing} (expected $DOMAIN)"
+          echo "HTTPS_DETECTED_INFO=${GOT:-not detected}" >> $GITHUB_ENV
+          # wildcard: either the installer resolved the host behind it, or it printed the "cannot be determined" note
+          # (the domain is then set by Set portal domain behind wildcard certificate)
+          if [ "$GOT" = "$DOMAIN" ] || { [ "$DOCS_SSL" = "wildcard" ] && [ "$WILDCARD_NOTE" = "true" ]; }; then
+            echo "HTTPS_DETECTED_OK=true" >> $GITHUB_ENV
+          fi
+
+          # 2. Apps serves 443 with the very certificate Docs had - except Docker + Let's Encrypt, where Apps
+          # requests its own for the same domain (a copy would have nothing to renew it): there the served
+          # cert only has to validate for the domain
+          FP=$(echo | openssl s_client -connect "$EC2_IP:443" -servername "$DOMAIN" 2>/dev/null | openssl x509 -noout -fingerprint -sha256 | cut -d= -f2)
+          echo "certificate sha256: Docs before $DOCS_CERT_BEFORE, Apps now ${FP:-none}"
+          echo "DOCS_CERT_AFTER=${FP:-none}" >> $GITHUB_ENV
+          if [ "$DOCS_SSL" = "letsencrypt" ] && [ "${{ matrix.method }}" = "docker" ]; then
+            curl -s -o /dev/null --max-time 10 "https://$DOMAIN/" && echo "HTTPS_CERT_SAME_OK=true" >> $GITHUB_ENV \
+              || echo "::error::https://$DOMAIN/ does not present a valid certificate"
+          else
+            [ -n "$FP" ] && [ "$FP" = "$DOCS_CERT_BEFORE" ] && echo "HTTPS_CERT_SAME_OK=true" >> $GITHUB_ENV
+          fi
+
+          # 3. plain HTTP redirects to HTTPS on the same domain
+          R=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 10 "http://$DOMAIN/" || true)
+          echo "http://$DOMAIN/ -> $R"
+          echo "HTTPS_REDIRECT_INFO=$R" >> $GITHUB_ENV
+          [[ "$R" =~ ^30[1278]\ https://$DOMAIN(/|$) ]] && echo "HTTPS_REDIRECT_OK=true" >> $GITHUB_ENV
+
+          # 4. Docs no longer does TLS itself
+          if [ "${{ matrix.method }}" = "package" ]; then
+            ssh $SSH_OPTS $U@$EC2_IP "sudo grep -nE 'listen|ssl_certificate' /etc/onlyoffice/documentserver/nginx/ds.conf" || true
+            SSL_LINES=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -cE '^\s*listen\s+\S*443|ssl_certificate' /etc/onlyoffice/documentserver/nginx/ds.conf" || true)
+            BAK=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -f /etc/onlyoffice/documentserver/nginx/ds.conf.ssl.bak && echo yes || echo no")
+            INFO="ds.conf TLS lines: ${SSL_LINES:-?}, ds.conf.ssl.bak: $BAK"
+            [ "$SSL_LINES" = "0" ] && [ "$BAK" = "yes" ] && OK=true || OK=false
+          else
+            C=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps --format '{{.Names}} {{.Image}}' | awk '\$2 ~ /documentserver/ {print \$1; exit}'")
+            SSL_LINES=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C sh -c \"grep -cE '^\s*listen\s+\S*443|ssl_certificate' /etc/onlyoffice/documentserver/nginx/ds.conf\"" || true)
+            P443=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker port $C 443/tcp 2>/dev/null" || true)
+            INFO="container $C ds.conf TLS lines: ${SSL_LINES:-?}, publishes 443: ${P443:-no}"
+            [ "$SSL_LINES" = "0" ] && [ -z "$P443" ] && OK=true || OK=false
+          fi
+          echo "$INFO"
+          echo "DOCS_DEMOTED_INFO=$INFO" >> $GITHUB_ENV
+          echo "DOCS_DEMOTED_OK=$OK" >> $GITHUB_ENV
+
+          # 5. Let's Encrypt: renewal handed over to Apps. Packages: certbot on the host, Docs' own renew cron
+          # removed. Docker standard (DE/EE): apps-ssl-setup puts a weekly cron that runs certbot/certbot in
+          # docker - run that very command as --dry-run. Docker community (CE): certbot lives inside
+          # onlyoffice-apps; the Docs container never counts, what it renews doesn't reach Apps.
+          # A passing dry run is not enough: something has to fire it. product-ssl-setup / apps-ssl-setup
+          # both schedule /etc/cron.weekly/<product>-renew-letsencrypt, so that file and a running cron daemon
+          # (minimal RHEL AMIs may lack cronie) are required too.
+          if [ "$DOCS_SSL" = "letsencrypt" ]; then
+            CROND=$(ssh $SSH_OPTS $U@$EC2_IP "systemctl is-active crond cron 2>/dev/null | grep -qx active && echo active || echo inactive")
+            if [ "${{ matrix.method }}" = "package" ]; then
+              ssh $SSH_OPTS $U@$EC2_IP "sudo certbot renew --dry-run --cert-name $DOMAIN" > /tmp/renew.log 2>&1 && RENEW=ok || RENEW=failed
+              CRON=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -f /etc/cron.d/letsencrypt && echo present || echo removed")
+              WEEKLY=$(ssh $SSH_OPTS $U@$EC2_IP "ls /etc/cron.weekly/*-renew-letsencrypt 2>/dev/null | head -1" || true)
+              INFO="renew --dry-run $RENEW, scheduled by ${WEEKLY:-nothing}, cron daemon $CROND, Docs cron $CRON"
+              [ "$RENEW" = "ok" ] && [ "$CRON" = "removed" ] && [ -n "$WEEKLY" ] && [ "$CROND" = "active" ] \
+                && echo "LE_RENEW_OK=true" >> $GITHUB_ENV
+            else
+              ssh $SSH_OPTS $U@$EC2_IP "sudo env DS=$C bash -s" > /tmp/renew.log 2>&1 << 'EOF' || true
+          CRON=$(ls /etc/cron.weekly/*-renew-letsencrypt 2>/dev/null | head -1)
+          if [ -n "$CRON" ]; then
+            echo "WHERE=$CRON"
+            CMD=$(sed -n '/docker run/,/certbot renew/p' "$CRON" | sed 's/--force-renewal/--dry-run/; s/2>&1 | tee.*//')
+            echo "+ $CMD"
+            bash -c "$CMD" && echo "RENEW=ok" || echo "RENEW=failed"
+            exit
+          fi
+          for c in $(docker ps --format '{{.Names}}'); do
+            [ "$c" = "$DS" ] && continue
+            if docker exec "$c" sh -c 'ls /etc/letsencrypt/renewal/*.conf' >/dev/null 2>&1; then
+              echo "WHERE=container $c"
+              docker exec "$c" certbot renew --dry-run && echo "RENEW=ok" || echo "RENEW=failed"
+              exit
+            fi
+          done
+          echo "WHERE=none"
+          echo "RENEW=not configured anywhere"
+          EOF
+              WHERE=$(grep -oP '^WHERE=\K.*' /tmp/renew.log | tail -1)
+              RENEW=$(grep -oP '^RENEW=\K.*' /tmp/renew.log | tail -1)
+              INFO="renewal: ${WHERE:-?}, renew --dry-run ${RENEW:-?}, cron daemon $CROND"
+              # a host cron file needs the host cron daemon; renewal inside a container is on its own
+              if [ "$RENEW" = "ok" ] && { [[ "$WHERE" != /etc/cron.weekly/* ]] || [ "$CROND" = "active" ]; }; then
+                echo "LE_RENEW_OK=true" >> $GITHUB_ENV
+              fi
+            fi
+            tail -n 20 /tmp/renew.log
+            echo "$INFO"
+            echo "LE_RENEW_INFO=$INFO" >> $GITHUB_ENV
+          fi
+
+      - name: Smoke - wizard, create a document, open it in the editor
+        continue-on-error: true
+        env:
+          APPS_ADMIN_PASSWORD: ${{ secrets.APPS_ADMIN_PASSWORD }}
+          # any DE/EE license is accepted by Apps and Docs; once uploaded to Apps it licenses its Docs too (CE wizard never asks)
+          APPS_LICENSE_KEY: ${{ secrets.APPS_LICENSE_EE }}
+        run: |
+          python3 .github/scripts/apps-install/smoke.py \
+            --url "$APPS_URL" $( [ "$DOCS_SSL" = "selfsigned" ] && echo --insecure ) \
+            --email "$APPS_ADMIN_EMAIL" \
+            --expected-version "$EXPECTED_DS_VERSION" \
+            --out out
+
+      - name: Check Apps edition matches Docs
+        continue-on-error: true
+        run: |
+          # Docs: packageType from info.json (0 CE, 1 EE, 2 DE) before and after Apps; Apps: the edition named on
+          # Settings -> Payments (smoke step); CE has no such edition, there only the wizard must not ask a license.
+          # A DE or EE license is accepted by any paid Docs/Apps, so the license itself says nothing about the edition.
+          OK=true
+          [ "$DOCS_PKGTYPE_BEFORE" = "$EXPECTED_PKGTYPE" ] || OK=false
+          [ "$DOCS_PKGTYPE_AFTER" = "$EXPECTED_PKGTYPE" ] || OK=false
+          if [ "${{ matrix.edition }}" = "ce" ]; then
+            [ "$LICENSE_REQUIRED" = "false" ] || OK=false
+          else
+            [ "${APPS_UI_EDITION,,}" = "$EXPECTED_APPS_UI" ] || OK=false
+          fi
+          if [ "${{ matrix.method }}" = "docker" ]; then
+            [ "${APPS_INSTALL_TYPE,,}" = "${DS_TYPE,,}" ] || OK=false
+          fi
+          INFO="Docs packageType $DOCS_PKGTYPE_BEFORE -> $DOCS_PKGTYPE_AFTER (expected $EXPECTED_PKGTYPE); Apps Payments page: ${APPS_UI_EDITION} (expected $EXPECTED_APPS_UI); wizard asks license: $LICENSE_REQUIRED; .env INSTALLATION_TYPE: $APPS_INSTALL_TYPE"
+          echo "$INFO"
+          echo "APPS_EDITION_INFO=$INFO" >> $GITHUB_ENV
+          echo "APPS_EDITION_OK=$OK" >> $GITHUB_ENV
+
+      - name: Collect logs
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p out
+          # what the installer's "OK"/"Thank you" does not tell: failed units, container states and logs
+          ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -s' > out/diagnostics.txt 2>&1 << 'EOF' || true
+          echo "### listening ports"; ss -lntp
+          echo "### failed systemd units"; systemctl --failed --no-pager
+          for u in $(systemctl list-units --failed --plain --no-legend | awk '{print $1}'); do
+            echo "### journal $u"; journalctl -u "$u" -n 80 --no-pager
+          done
+          if command -v docker >/dev/null; then
+            echo "### docker ps -a"; docker ps -a --format 'table {{.Names}}	{{.Image}}	{{.Status}}	{{.Ports}}'
+            for c in $(docker ps -a --format '{{.Names}}'); do echo "### docker logs $c"; docker logs --tail 80 "$c" 2>&1; done
+          fi
+          echo "### openresty/nginx configs with ssl"; grep -rlE 'listen\s+\S*443|ssl_certificate' /etc/openresty /etc/nginx 2>/dev/null
+          EOF
+          ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -c "cd /opt/apps-test 2>/dev/null && tar czf - apps-install.out OneClick*.log 2>/dev/null"' > out/apps-install-logs.tar.gz || true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.tag }}
+          path: out/
+          if-no-files-found: ignore
+
+      # the screenshot goes to screenshots/ at the bucket root, not results/: the dashboard deploy syncs
+      # _site with --content-type text/html, which would break a png copied through it
+      - name: Save results
+        if: always()
+        continue-on-error: true
+        env:
+          CASE: ${{ matrix.case }}
+          METHOD: ${{ matrix.method }}
+          SSL: ${{ matrix.ssl }}
+          OS_NAME: ${{ matrix.os_name }}
+          ARCH: ${{ matrix.arch }}
+          EDITION: ${{ matrix.edition }}
+          BUCKET: ${{ vars.DASHBOARD_BUCKET_NAME }}
+          REGION: ${{ vars.DASHBOARD_BUCKET_REGION }}
+        run: |
+          SHOT=""
+          if [ -f out/editor.png ]; then
+            aws s3 cp out/editor.png "s3://$BUCKET/screenshots/release-apps-$CASE.png" --region "$REGION" \
+              --content-type image/png --cache-control "no-cache" && SHOT="/screenshots/release-apps-$CASE.png"
+          fi
+          export SHOT
+          python3 - << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+          e = os.environ.get
+          b = lambda v: e(v) == 'true'
+          data = {
+              'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              'case': int(e('CASE')), 'method': e('METHOD'), 'os_name': e('OS_NAME'), 'arch': e('ARCH'),
+              'edition': e('EDITION'), 'docs_port': e('DOCS_PORT'), 'docs_port_after': e('DOCS_PORT_AFTER'),
+              'docs_before_ok': b('DOCS_BEFORE_OK'), 'welcome_ok': b('WELCOME_OK'), 'welcome_cmd': e('WELCOME_CMD', ''), 'welcome_expected': e('WELCOME_EXPECTED', ''),
+              'apps_install_ok': b('APPS_INSTALL_OK'), 'apps_up': b('APPS_UP'),
+              'docs_after_ok': b('DOCS_AFTER_OK'),
+              # docker keeps its published port, only packages promise the 80 -> 8083 move
+              'docs_port_ok': b('DOCS_PORT_OK') or e('METHOD') == 'docker',
+              'docs_same_ok': b('DOCS_SAME_OK'), 'docs_same_info': e('DOCS_SAME_INFO', ''),
+              'apps_edition_ok': b('APPS_EDITION_OK'), 'apps_edition_info': e('APPS_EDITION_INFO', ''),
+              'smoke_ok': b('SMOKE_OK'), 'smoke_info': e('SMOKE_INFO', ''),
+              'screenshot': e('SHOT', ''),
+              'ssl': e('SSL'),
+          }
+          if e('SSL') != 'none':
+              checks = ['HTTPS_DETECTED_OK', 'HTTPS_CERT_SAME_OK', 'HTTPS_REDIRECT_OK', 'DOCS_DEMOTED_OK']
+              if e('SSL') == 'letsencrypt':
+                  checks.append('LE_RENEW_OK')
+              data['https_ok'] = all(b(c) for c in checks)
+              data['https_info'] = '; '.join([
+                  f"detected for {e('HTTPS_DETECTED_INFO', '')}",
+                  f"cert same {b('HTTPS_CERT_SAME_OK')}",
+                  f"redirect {e('HTTPS_REDIRECT_INFO', '')}",
+                  e('DOCS_DEMOTED_INFO', ''),
+              ] + ([e('LE_RENEW_INFO', '')] if 'LE_RENEW_OK' in checks else []))
+          with open(f"release-apps-{data['case']}.json", 'w') as f:
+              json.dump(data, f, indent=2)
+          PYEOF
+          aws s3 cp "release-apps-$CASE.json" "s3://$BUCKET/results/release-apps-$CASE.json" --region "$REGION"
+
+      - name: Final check
+        if: always()
+        run: |
+          r() { [ "$1" = "true" ] && echo "✅" || echo "❌"; }
+          {
+            echo "### #${{ matrix.case }} · ${{ matrix.method }} · ${{ matrix.os_name }} ${{ matrix.arch }} · Docs ${{ matrix.edition }} on :$DOCS_PORT$( [ "$DOCS_SSL" != "none" ] && echo " + HTTPS ($DOCS_SSL, $DOMAIN)" ) (release)"
+            echo
+            echo "| Check | Result | Details |"
+            echo "|---|---|---|"
+            echo "| Docs installed | $(r $DOCS_BEFORE_OK) | $DS_TYPE, $DOCS_URL_BEFORE/healthcheck |"
+            echo "| Welcome page | $(r $WELCOME_OK) | data-platform=\`$WELCOME_PLATFORM\` (expected \`$EXPECTED_PLATFORM\`), command: \`$WELCOME_CMD\` (expected \`$WELCOME_EXPECTED\`) |"
+            echo "| Welcome admin panel flag | $(r $WELCOME_ADMIN_PANEL_OK) | data-has-admin-panel=\`$WELCOME_ADMIN_PANEL\` (expected \`$EXPECTED_ADMIN_PANEL\`) |"
+            echo "| Apps install | $(r $APPS_INSTALL_OK) | exit code $APPS_INSTALL_RC |"
+            echo "| Apps is up | $(r $APPS_UP) | $APPS_URL/ |"
+            echo "| Docs alive after | $(r $DOCS_AFTER_OK) | $DOCS_AFTER_URL/healthcheck |"
+            if [ "${{ matrix.method }}" = "package" ]; then
+              echo "| Docs port after | $(r $DOCS_PORT_OK) | $DOCS_PORT → $DOCS_PORT_AFTER (expected $EXPECTED_DOCS_PORT_AFTER) |"
+            else
+              echo "| Docs port after | ➖ | $DOCS_PORT → $DOCS_PORT_AFTER (docker: not checked, Apps may proxy Docs under /ds-vpath/) |"
+            fi
+            echo "| Same Docs kept | $(r $DOCS_SAME_OK) | $DOCS_SAME_INFO |"
+            echo "| Apps edition = Docs edition | $(r $APPS_EDITION_OK) | $APPS_EDITION_INFO |"
+            echo "| Smoke: document opens in this Docs | $(r $SMOKE_OK) | $SMOKE_INFO |"
+            if [ "$DOCS_SSL" != "none" ]; then
+              echo "| HTTPS: installer detected it | $(r $HTTPS_DETECTED_OK) | inherited for \`$HTTPS_DETECTED_INFO\` (expected \`$DOMAIN\`) |"
+              echo "| HTTPS: Apps serves the same cert (Docker+LE: its own valid one) | $(r $HTTPS_CERT_SAME_OK) | Docs \`$DOCS_CERT_BEFORE\` → Apps \`$DOCS_CERT_AFTER\` |"
+              echo "| HTTPS: HTTP redirects to HTTPS | $(r $HTTPS_REDIRECT_OK) | http://$DOMAIN/ → $HTTPS_REDIRECT_INFO |"
+              echo "| HTTPS: Docs demoted to HTTP | $(r $DOCS_DEMOTED_OK) | $DOCS_DEMOTED_INFO |"
+              [ "$DOCS_SSL" = "letsencrypt" ] && \
+                echo "| HTTPS: LE renewal handed over | $(r $LE_RENEW_OK) | $LE_RENEW_INFO |"
+            fi
+            echo
+            if [ "${{ inputs.keep_instances }}" = "true" ]; then
+              echo "**Left running for manual checks:** \`ssh $U@$EC2_IP\` · Apps $APPS_URL/ (login \`$APPS_ADMIN_EMAIL\`, password from secret \`APPS_ADMIN_PASSWORD\`) · Docs $DOCS_AFTER_URL/ · instance \`$INSTANCE_ID\`, terminate with cleanup=true"
+            else
+              echo "Instance \`$INSTANCE_ID\` is terminated at the end of the job (keep_instances=true leaves it for manual checks)."
+            fi
+          } >> $GITHUB_STEP_SUMMARY
+          cat $GITHUB_STEP_SUMMARY
+
+          FAILED=""
+          for v in DOCS_BEFORE_OK WELCOME_OK APPS_INSTALL_OK APPS_UP DOCS_AFTER_OK APPS_EDITION_OK SMOKE_OK; do
+            [ "${!v}" = "true" ] || FAILED="$FAILED $v"
+          done
+          # port move and "same Docs" apply to what the installers promise; failing them is a real bug
+          [ "${{ matrix.method }}" = "package" ] && [ "$DOCS_PORT_OK" != "true" ] && FAILED="$FAILED DOCS_PORT_OK"
+          [ "$DOCS_SAME_OK" = "true" ] || FAILED="$FAILED DOCS_SAME_OK"
+          if [ "$DOCS_SSL" != "none" ]; then
+            for v in HTTPS_DETECTED_OK HTTPS_CERT_SAME_OK HTTPS_REDIRECT_OK DOCS_DEMOTED_OK; do
+              [ "${!v}" = "true" ] || FAILED="$FAILED $v"
+            done
+            [ "$DOCS_SSL" = "letsencrypt" ] && [ "$LE_RENEW_OK" != "true" ] && FAILED="$FAILED LE_RENEW_OK"
+          fi
+          [ -z "$FAILED" ] || { echo "::error::Failed:$FAILED"; exit 1; }
+
+      # runs even when an earlier step failed or the job was cancelled; the root EBS volume goes with the
+      # instance (DeleteOnTermination above)
+      - name: Delete DNS record
+        if: always() && !inputs.keep_instances && matrix.ssl != 'none' && env.EC2_IP != ''
+        continue-on-error: true
+        run: |
+          ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "$APPS_DNS_ZONE" --query 'HostedZones[0].Id' --output text)
+          aws route53 change-resource-record-sets --hosted-zone-id "$ZONE_ID"             --change-batch "{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":{\"Name\":\"$DOMAIN\",\"Type\":\"A\",\"TTL\":60,\"ResourceRecords\":[{\"Value\":\"$EC2_IP\"}]}}]}"             && echo "Deleted $DOMAIN"
+
+      - name: Delete EC2 Instance
+        if: always() && !inputs.keep_instances && env.INSTANCE_ID != ''
+        run: |
+          aws ec2 terminate-instances --instance-ids "$INSTANCE_ID"
+          aws ec2 wait instance-terminated --instance-ids "$INSTANCE_ID"
+          echo "Terminated $INSTANCE_ID"
