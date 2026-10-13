@@ -190,7 +190,7 @@ def pkg_table(data, arch_label, upgrade=True):
                         + '<td class="na">—</td>' * 5 + '</tr>')
         if upgrade:
             rows.append('<tr><td>EE Release</td>' + '<td class="na">—</td>' * 5 + '</tr>')
-            rows.append('<tr><td>EE Upgrade</td>' + '<td class="na">—</td>' * 5 + '</tr>')
+            rows.append('<tr><td>EE Upgrade</td>' + '<td class="na">—</td>' * (6 if tags else 5) + '</tr>')
     else:
         for key, label in [("ee", "EE"), ("de", "DE"), ("ce", "CE")]:
             ed = data.get(key, {})
@@ -243,7 +243,7 @@ def pkg_table(data, arch_label, upgrade=True):
             f'<table>{thead}<tbody>' + '\n'.join(rows) + '</tbody></table>\n')
 
 
-def docker_table(data, arch_label):
+def docker_table(data, arch_label, tags=False):
     run_date = (data or {}).get("run_date", "")
     date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
 
@@ -263,15 +263,27 @@ def docker_table(data, arch_label):
                 + svc_cell
                 + td_ppt_breakdown(ed)
                 + td_ds_errors(ed)
+                + (td_tags(ed) if tags else '')
                 + '</tr>'
             )
 
     thead = ('<thead><tr>'
              '<th>Edition</th><th>Healthcheck</th><th>Version</th>'
              '<th>SVC</th><th>Puppeteer (=0)</th><th>DS Log Errors</th>'
+             + ('<th>Hub tags</th>' if tags else '') +
              '</tr></thead>')
     return (f'<h3>{arch_label}{date_part}</h3>\n'
             f'<table>{thead}<tbody>' + '\n'.join(rows) + '</tbody></table>\n')
+
+
+def td_tags(data):
+    # Docker Hub: latest / X.Y / X.Y.Z / X.Y.Z.BUILD — один образ (check-docker-tags.sh); старые JSON без ключа — «—»
+    if "tags_ok" not in data:
+        return '<td class="na">—</td>'
+    v = data["tags_ok"]
+    text = (data.get("tags_text") or "").strip()
+    tip = f' title="{escape(text, quote=True)}"' if text else ""
+    return f'<td class="{status(v)}"{tip}>{"✅ OK" if v else "❌ FAILED"}</td>'
 
 
 def td_svc(data):
@@ -761,7 +773,7 @@ def generate_release():
         return load(f"release-{f}.json")
     deb_body        = pkg_table(rel("deb-x64"), "x64", False) + pkg_table(rel("deb-arm64"), "arm64", False)
     rpm_body        = pkg_table(rel("rpm-x64"), "x64", False) + pkg_table(rel("rpm-arm64"), "arm64", False)
-    docker_deb_body = docker_table(rel("docker-deb-x64"), "x64") + docker_table(rel("docker-deb-arm64"), "arm64")
+    docker_deb_body = docker_table(rel("docker-deb-x64"), "x64", True) + docker_table(rel("docker-deb-arm64"), "arm64", True)
 
     body = (section("DEB Packages (Ubuntu 24.04)", "release-DEB-x64-arm64.yml", "release-DEB-x64-arm64", deb_body)
             + section("RPM Packages (CentOS 9)", "release-RPM-x64-arm64.yml", "release-RPM-x64-arm64", rpm_body)
