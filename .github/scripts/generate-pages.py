@@ -472,7 +472,7 @@ def generate_main():
         '<a class="card card-release" href="release.html">\n'
         '  <div class="card-label">Official releases</div>\n'
         '  <div class="card-title">RELEASE</div>\n'
-        '  <div class="card-desc">DEB, RPM, Docker DEB, Docker RPM, K8s EKS arm64</div>\n'
+        '  <div class="card-desc">DEB, RPM, Docker DEB, K8s EKS arm64</div>\n'
         '  <div class="card-arrow">Open →</div>\n'
         '</a>\n'
         '<a class="card card-common" href="common.html">\n'
@@ -543,8 +543,6 @@ def generate_dev():
     rpm_arm64      = load("dev-rpm-arm64.json")
     docker_deb_x64   = load("dev-docker-deb-x64.json")
     docker_deb_arm64 = load("dev-docker-deb-arm64.json")
-    docker_rpm_x64   = load("dev-docker-rpm-x64.json")
-    docker_rpm_arm64 = load("dev-docker-rpm-arm64.json")
     db_data        = {key: load(f"dev-db-{key}.json") for _, key in DBS}
     server_checks  = load("dev-srv-storage.json")
     dep_checks     = load("dev-srv-dependances.json")
@@ -553,7 +551,6 @@ def generate_dev():
     deb_body        = pkg_table(deb_x64, "x64") + pkg_table(deb_arm64, "arm64")
     rpm_body        = pkg_table(rpm_x64, "x64") + pkg_table(rpm_arm64, "arm64")
     docker_deb_body = docker_table(docker_deb_x64, "x64") + docker_table(docker_deb_arm64, "arm64")
-    docker_rpm_body = docker_table(docker_rpm_x64, "x64") + docker_table(docker_rpm_arm64, "arm64")
 
     # DB section body
     db_run_date = next((db_data[k].get("run_date", "") for _, k in DBS if db_data.get(k)), "")
@@ -717,7 +714,6 @@ def generate_dev():
         section("DEB Packages (Ubuntu 24.04)", "dev-DEB-x64-arm64.yml", "dev-DEB-x64-arm64", deb_body)
         + section("RPM Packages (CentOS 9)", "dev-RPM-x64-arm64.yml", "dev-RPM-x64-arm64", rpm_body)
         + section("Docker DEB (Ubuntu 24.04)", "dev-Docker-DEB-x64-arm64.yml", "dev-Docker-DEB-x64-arm64", docker_deb_body)
-        + section("Docker RPM (CentOS 9)", "dev-Docker-RPM-x64-arm64.yml", "dev-Docker-RPM-x64-arm64", docker_rpm_body)
         + section("OS Tests (OneClickInstall)", "dev-OS-x64-arm64.yml", "dev-OS-x64-arm64", os_body, os_run_date)
         + section("Database Tests", "dev-DB-check.yml", "dev-DB-check", db_body, db_run_date)
         + section("SRV Storage (S3, MinIO, Azure)", "dev-SRV-storage.yml", "dev SRV storage", server_body)
@@ -766,12 +762,10 @@ def generate_release():
     deb_body        = pkg_table(rel("deb-x64"), "x64", False) + pkg_table(rel("deb-arm64"), "arm64", False)
     rpm_body        = pkg_table(rel("rpm-x64"), "x64", False) + pkg_table(rel("rpm-arm64"), "arm64", False)
     docker_deb_body = docker_table(rel("docker-deb-x64"), "x64") + docker_table(rel("docker-deb-arm64"), "arm64")
-    docker_rpm_body = docker_table(rel("docker-rpm-x64"), "x64") + docker_table(rel("docker-rpm-arm64"), "arm64")
 
     body = (section("DEB Packages (Ubuntu 24.04)", "release-DEB-x64-arm64.yml", "release-DEB-x64-arm64", deb_body)
             + section("RPM Packages (CentOS 9)", "release-RPM-x64-arm64.yml", "release-RPM-x64-arm64", rpm_body)
             + section("Docker DEB (Ubuntu 24.04)", "release-Docker-DEB-x64-arm64.yml", "release-Docker-DEB-x64-arm64", docker_deb_body)
-            + section("Docker RPM (CentOS 9)", "release-Docker-RPM-x64-arm64.yml", "release-Docker-RPM-x64-arm64", docker_rpm_body)
             + section("K8s EKS arm64", "release-K8s-EKS-arm64.yml", "release-K8s-EKS-arm64", k8s_body)
             + section("Apps install (on top of Docs)", "release-APPS-install.yml", "release-APPS-install", apps_body("release-apps-")))
     write("release.html", page_html("RELEASE — ONLYOFFICE Docs Test Results", body, breadcrumb("RELEASE")))

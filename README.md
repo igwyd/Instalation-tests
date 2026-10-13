@@ -16,7 +16,6 @@ Everything is scheduled on **Wednesday**. Jobs = GitHub-hosted runners the slot 
 | 11:00 | 14:00 Wed | dev-RPM | 2 |
 | 11:00 | 14:00 Wed | dev-OS | 14 |
 | 13:00 | 16:00 Wed | dev-Docker-DEB | 2 |
-| 13:00 | 16:00 Wed | dev-Docker-RPM | 2 |
 | 13:00 | 16:00 Wed | dev-SRV-storage | 1 |
 | 13:00 | 16:00 Wed | dev-SRV-dependances | 1 |
 | 13:00 | 16:00 Wed | dev-TLS-dependencies | 1 |
@@ -47,7 +46,6 @@ Pre-release builds from S3 dev repo.
 | Test | x64/arm64 |
 |------|-----------|
 | dev-Docker-DEB (Ubuntu 24.04) | [![dev-Docker-DEB](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-DEB-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-DEB-x64-arm64.yml) |
-| dev-Docker-RPM (CentOS 9) | [![dev-Docker-RPM](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-RPM-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-Docker-RPM-x64-arm64.yml) |
 
 
 ### Server checks (3 runners at the same time)
@@ -120,7 +118,6 @@ Official public repos. Triggered manually via `workflow_dispatch`.
 | Test | x64/arm64 |
 |------|-----------|
 | release-Docker-DEB | [![release-Docker-DEB](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-x64-arm64.yml) |
-| release-Docker-RPM | [![release-Docker-RPM](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-RPM-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-RPM-x64-arm64.yml) |
 
 ### ONLYOFFICE Apps install (up to 19 runners, manual)
 - The release flow as a user does it: Docs from the published per-edition script (`docs-enterprise-install.sh`, `docs-developer-install.sh`, `docs-install.sh` for CE; official release packages / images, `--docsport`), then the command from the `/welcome` "Install apps" pop-up is run as written — no test branch, no 4testing repos or images. Checks are the same as in dev-APPS-install, including the HTTPS takeover (Route53 records `rapps-<case>-<run>`, same certificates), and results go to the release dashboard. Cases 1–19 are the same as in the dev table above (case 19 — a DE license put into Docs before Apps — is expected to fail on Debian arm64 until Apps supports it, and stays for the future). Triggered manually (`cases`, `keep_instances`, `cleanup`).
