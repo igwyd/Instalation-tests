@@ -1,0 +1,376 @@
+name: dev K8s EKS Docs arm64
+
+on:
+  workflow_dispatch:
+    inputs:
+      delete_cluster:
+        description: 'Delete the EKS cluster at the end (default: keep it; delete manually with eksctl delete cluster)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  check-k8s-eks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CLUSTER_NAME: onlyoffice-k8s-dev-${{ github.run_id }}
+      AWS_REGION: us-east-1
+      IMAGES_TAG: ${{ vars.K8S_DEV_DOCS_IMAGES_TAG }}
+      K8S_BRANCH: ${{ vars.K8S_DEV_DOCS_BRANCH }}
+      HELM_CHART_VERSION: ${{ vars.K8S_DEV_DOCS_HELM_CHART_VERSION }}
+      HELM_CHART: ${{ vars.K8S_DEV_DOCS_HELM_CHART }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Check variables
+        run: |
+          for V in IMAGES_TAG K8S_BRANCH HELM_CHART HELM_CHART_VERSION; do
+            [ -n "${!V}" ] || { echo "::error::repository variable for $V is not set (K8S_DEV_DOCS_IMAGES_TAG / K8S_DEV_DOCS_BRANCH / K8S_DEV_DOCS_HELM_CHART / K8S_DEV_DOCS_HELM_CHART_VERSION)"; exit 1; }
+          done
+          echo "IMAGES_TAG=$IMAGES_TAG"
+          echo "K8S_BRANCH=$K8S_BRANCH"
+          echo "HELM_CHART=$HELM_CHART"
+          echo "HELM_CHART_VERSION=$HELM_CHART_VERSION"
+
+      - name: Setup Puppeteer
+        uses: ./.github/actions/setup-puppeteer
+        with:
+          git_ssh_private_key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
+
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region ${{ env.AWS_REGION }}
+
+      - name: Install eksctl
+        run: |
+          curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin
+          eksctl version
+
+      - name: Create EKS cluster
+        run: |
+          eksctl create cluster \
+            --name ${{ env.CLUSTER_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --nodegroup-name arm64-nodes \
+            --node-type c6g.xlarge \
+            --nodes 2 \
+            --nodes-min 2 \
+            --nodes-max 2 \
+            --managed \
+            --timeout 30m
+          kubectl get nodes
+
+      - name: Add Helm repositories
+        run: |
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo add nfs-server-provisioner https://kubernetes-sigs.github.io/nfs-ganesha-server-and-external-provisioner
+          helm repo add onlyoffice https://download.onlyoffice.com/charts/stable
+          helm repo add docs-testing https://download.onlyoffice.com/charts/4testing
+          helm repo update
+          helm search repo ${{ env.HELM_CHART }} --versions --devel | head -5
+
+      # Storage is not persistent (as in release-K8s-EKS-arm64): a fresh EKS cluster has no EBS CSI driver,
+      # and the cluster is thrown away after the run anyway.
+      - name: Install NFS Server Provisioner
+        run: |
+          helm install nfs-server nfs-server-provisioner/nfs-server-provisioner \
+            --set persistence.enabled=false \
+            --set "storageClass.mountOptions={noac,vers=3}"
+
+      - name: Install RabbitMQ
+        run: |
+          helm install rabbitmq --version 16.0.14 bitnami/rabbitmq \
+            --set persistence.enabled=false \
+            --set resourcesPreset=none \
+            --set image.repository=bitnamilegacy/rabbitmq \
+            --set image.tag=4.1.3-debian-12-r1 \
+            --set global.security.allowInsecureImages=true \
+            --set metrics.enabled=false
+
+      - name: Install Redis
+        run: |
+          helm install redis --version 22.0.7 bitnami/redis \
+            --set architecture=standalone \
+            --set master.persistence.enabled=false \
+            --set master.resourcesPreset=none \
+            --set global.security.allowInsecureImages=true \
+            --set image.repository=bitnamilegacy/redis \
+            --set image.tag=8.2.1-debian-12-r0 \
+            --set metrics.enabled=false
+
+      - name: Install PostgreSQL
+        run: |
+          helm install postgresql --version 16.7.27 bitnami/postgresql \
+            --set auth.database=postgres \
+            --set primary.persistence.enabled=false \
+            --set primary.resourcesPreset=none \
+            --set image.repository=bitnamilegacy/postgresql \
+            --set global.security.allowInsecureImages=true \
+            --set image.tag=17.6.0-debian-12-r2 \
+            --set metrics.enabled=false
+
+      - name: Wait for dependencies to start
+        run: |
+          sleep 60
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=rabbitmq --timeout=180s || true
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=redis --timeout=180s || true
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=postgresql --timeout=180s || true
+          kubectl get pods
+
+      - name: Clone Kubernetes-Docs
+        run: |
+          git clone https://github.com/ONLYOFFICE/Kubernetes-Docs.git -b ${{ env.K8S_BRANCH }}
+          git -C ./Kubernetes-Docs status
+
+      # proxy.infoAllowedIP — so that /info/info.json (version check) is reachable from the runner
+      - name: Install ONLYOFFICE Docs
+        run: |
+          helm install documentserver -f ./Kubernetes-Docs/values.yaml \
+            --version ${{ env.HELM_CHART_VERSION }} ${{ env.HELM_CHART }} \
+            --set example.enabled=true \
+            --set wopi.enabled=true \
+            --set jwt.secret=doc-linux \
+            --set service.type=LoadBalancer,service.port=80 \
+            --set adminpanel.enabled=true \
+            --set "proxy.infoAllowedIP={0.0.0.0/0}" \
+            --set "images.tag=${{ env.IMAGES_TAG }}"
+
+      - name: Get LoadBalancer hostname
+        run: |
+          for i in $(seq 1 30); do
+            LB_HOST=$(kubectl get svc documentserver -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+            [ -n "$LB_HOST" ] || LB_HOST=$(kubectl get svc documentserver -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+            if [ -n "$LB_HOST" ]; then
+              echo "LB_HOST=$LB_HOST" >> $GITHUB_ENV
+              echo "LoadBalancer: http://$LB_HOST/"
+              kubectl get svc documentserver
+              exit 0
+            fi
+            echo "Attempt $i/30: hostname not yet assigned, waiting 15s..."
+            sleep 15
+          done
+          echo "::error::LoadBalancer hostname not available after 7.5 minutes"
+          kubectl describe svc documentserver || true
+          exit 1
+
+      # Instead of a fixed sleep: wait until healthcheck answers true (DNS of a new ELB + DS startup), up to 20 minutes
+      - name: Wait for DS startup
+        run: |
+          for i in $(seq 1 80); do
+            HC=$(curl -s --max-time 10 "http://${{ env.LB_HOST }}/healthcheck" || true)
+            echo "Attempt $i/80: healthcheck=${HC:-<no answer>}"
+            [ "$HC" = "true" ] && exit 0
+            sleep 15
+          done
+          echo "::warning::healthcheck did not become true in 20 minutes"
+          kubectl get pods -o wide
+
+      - name: INFO about installation
+        continue-on-error: true
+        run: |
+          sudo apt-get install jq -y
+          echo "-------------healthcheck-------------"
+          curl -s "http://${{ env.LB_HOST }}/healthcheck"; echo
+          echo "-------------Pods status-------------"
+          kubectl get pods -o wide
+          echo "-------------Images------------------"
+          kubectl get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .spec.containers[*]}{.image}{" "}{end}{"\n"}{end}'
+          echo "--------info.json--------"
+          curl -s "http://${{ env.LB_HOST }}/info/info.json" | jq || true
+          echo "-------------WOPI discovery----------"
+          curl -s "http://${{ env.LB_HOST }}/hosting/discovery" | tail -c 150; echo
+
+      - name: Check healthcheck
+        continue-on-error: true
+        run: |
+          HC=$(curl -s "http://${{ env.LB_HOST }}/healthcheck" || echo "error")
+          # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
+          echo "HC_PORT=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.LB_HOST }}/healthcheck" || true)" >> $GITHUB_ENV
+          echo "Healthcheck: $HC"
+          echo "HEALTHCHECK=$HC" >> $GITHUB_ENV
+
+      - name: Check version
+        continue-on-error: true
+        run: |
+          INFO=$(curl -s "http://${{ env.LB_HOST }}/info/info.json" || echo "{}")
+          BUILD_VERSION=$(echo "$INFO" | jq -r '.buildVersion // empty')
+          BUILD_NUMBER=$(echo "$INFO" | jq -r '.buildNumber // empty')
+          ACTUAL="${BUILD_VERSION}-${BUILD_NUMBER}"
+          echo "Version: installed=$ACTUAL, expected=${{ env.IMAGES_TAG }}"
+          if [ "$BUILD_VERSION" = "${{ vars.ONLYOFFICE_DEV_VERSION }}" ] && [ "$BUILD_NUMBER" = "${{ vars.ONLYOFFICE_DEV_BUILD }}" ]; then
+            echo "VERSION_OK=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_OK=false" >> $GITHUB_ENV
+          fi
+          echo "VERSION_ACTUAL=$ACTUAL" >> $GITHUB_ENV
+
+      - name: Check pods status
+        continue-on-error: true
+        run: |
+          PODS=$(kubectl get pods --no-headers | grep -E "^(adminpanel|converter|docservice|example)" || true)
+          echo "$PODS"
+          NOT_RUNNING=$(echo "$PODS" | grep -vE "Running|Completed" || true)
+          # no matching pods at all is a failure too, not a vacuous OK
+          if [ -n "$PODS" ] && [ -z "$NOT_RUNNING" ]; then
+            echo "PODS_OK=true" >> $GITHUB_ENV
+          else
+            echo "Not all pods are Running:"
+            echo "$NOT_RUNNING"
+            echo "PODS_OK=false" >> $GITHUB_ENV
+          fi
+
+      # Short smoke: the same 6 test files as dev-SRV-storage (the example is already available at http://<LB>/example/)
+      - name: Clear puppeteer output
+        run: rm -rf Dep.Tests/puppeteer/out
+
+      - name: Smoke puppeteer API tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          jq --arg url "http://${{ env.LB_HOST }}/example/" '.testOptions.url = $url' ../config_chrome_linux.json > tmp.json
+          mv tmp.json ../config_chrome_linux.json
+          jq -r '.testOptions.url' ../config_chrome_linux.json
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example || true
+
+      - name: Smoke puppeteer WOPI tests
+        continue-on-error: true
+        run: |
+          cd Dep.Tests/puppeteer/engine
+          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          # vsdx.js временно закомментирован в WOPI: фича не доработана, падает на WOPI-провайдере
+          # python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+
+      - name: Parse puppeteer results
+        if: always()
+        run: python3 .github/scripts/parse-puppeteer-results.py --edition DE
+
+      - name: Documentserver logs
+        continue-on-error: true
+        run: |
+          for pod in $(kubectl get pods --no-headers -o custom-columns=':metadata.name' \
+            | grep -E "^(adminpanel|converter|docservice|example)"); do
+            echo "=== Logs: $pod ==="
+            kubectl logs $pod --tail=200 || true
+          done
+
+      - name: Check DS logs for errors
+        continue-on-error: true
+        run: |
+          ERROR_COUNT=0
+          for pod in $(kubectl get pods --no-headers -o custom-columns=':metadata.name' \
+            | grep -E "^(adminpanel|converter|docservice|example)"); do
+            COUNT=$(kubectl logs $pod 2>&1 | grep -ciE '\[ERROR\]|typeerror|failed to load|load error') || true
+            ERROR_COUNT=$((ERROR_COUNT + COUNT))
+          done
+          echo "DS_LOG_ERRORS=$ERROR_COUNT" >> $GITHUB_ENV
+          echo "DS log errors: $ERROR_COUNT"
+
+      - name: Final check
+        if: always()
+        run: |
+          FAILED=0
+          icon() { [ "$1" = "true" ] && echo "✅ OK" || { echo "❌ FAILED"; return 0; }; }
+          [ "${HEALTHCHECK}" = "true" ] || FAILED=1
+          [ "${VERSION_OK}" = "true" ]  || FAILED=1
+          [ "${PODS_OK}" = "true" ]     || FAILED=1
+
+          PPT="${PUPPETEER_DE_FAILED:-0}"; PPT_O="${PUPPETEER_DE_OK:-0}"; PPT_T="${PUPPETEER_DE_TOTAL:-0}"
+          PPT_DETAIL="${PPT_O}/${PPT_T} passed, ${PPT} failed"
+          PPT_OK=true
+          if [ "${PPT}" -gt 0 ] || [ "${PPT_T}" -eq 0 ]; then PPT_OK=false; FAILED=1; fi
+
+          {
+            echo "## Final Check — dev K8s EKS Docs arm64"
+            echo ""
+            echo "**Expected version:** \`${IMAGES_TAG}\` (chart \`${HELM_CHART}\` ${HELM_CHART_VERSION}, branch \`${K8S_BRANCH}\`)"
+            echo ""
+            echo "| Check | Status |"
+            echo "|-------|--------|"
+            echo "| Healthcheck | $(icon "${HEALTHCHECK}") |"
+            echo "| Version | $(icon "${VERSION_OK}") \`${VERSION_ACTUAL:-?}\` |"
+            echo "| Pods | $(icon "${PODS_OK}") |"
+            echo "| Puppeteer (=0) | $(icon "$PPT_OK") (${PPT_DETAIL}) |"
+            echo "| DS Log Errors (info) | ${DS_LOG_ERRORS:-0} |"
+            echo ""
+            if [ "$FAILED" -eq 1 ]; then echo "> ❌ **Final check FAILED**"; else echo "> ✅ **All checks passed**"; fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "FINAL_CONCLUSION=failure" >> "$GITHUB_ENV"
+            exit 1
+          fi
+          echo "FINAL_CONCLUSION=success" >> "$GITHUB_ENV"
+
+      - name: Save results
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p .github/workflow-results
+          python3 - << 'PYEOF'
+          import json, os
+          from datetime import datetime, timezone
+
+          def b(v):   return os.environ.get(v, 'false') == 'true'
+          def n(v):   return int(os.environ.get(v, '0') or '0')
+          def s(v):   return os.environ.get(v, 'not set')
+
+          ppt_ok = n('PUPPETEER_DE_FAILED') == 0 and n('PUPPETEER_DE_TOTAL') > 0
+          # the same conditions as Final check (DS log errors are information only)
+          ok = b('HEALTHCHECK') and b('VERSION_OK') and b('PODS_OK') and ppt_ok
+
+          data = {
+              'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+              'ee': {
+                  'healthy':               b('HEALTHCHECK'),
+                  'hc_port':               os.environ.get('HC_PORT', ''),
+                  'version_ok':            b('VERSION_OK'),
+                  'version_actual':        s('VERSION_ACTUAL'),
+                  'pods_ok':               b('PODS_OK'),
+                  'puppeteer_failed':      n('PUPPETEER_DE_FAILED'),
+                  'puppeteer_api_failed':  n('PUPPETEER_DE_API_FAILED'),
+                  'puppeteer_wopi_failed': n('PUPPETEER_DE_WOPI_FAILED'),
+                  'puppeteer_ok':          n('PUPPETEER_DE_OK'),
+                  'puppeteer_total':       n('PUPPETEER_DE_TOTAL'),
+                  'ds_log_errors':         n('DS_LOG_ERRORS'),
+                  'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_TEXT', ''),
+                  'conclusion': 'success' if ok else 'failure',
+              },
+              'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
+          }
+          path = '.github/workflow-results/dev-k8s-eks-docs-arm64.json'
+          with open(path, 'w') as f:
+              json.dump(data, f, indent=2)
+          print(f'Saved: {path}')
+          PYEOF
+
+          aws s3 cp .github/workflow-results/dev-k8s-eks-docs-arm64.json \
+            s3://${{ vars.DASHBOARD_BUCKET_NAME }}/results/dev-k8s-eks-docs-arm64.json \
+            --region ${{ vars.DASHBOARD_BUCKET_REGION }}
+
+      # The LoadBalancer (ELB) must be removed first, otherwise it holds the VPC and the stack deletion hangs
+      - name: Delete EKS cluster
+        if: always() && inputs.delete_cluster
+        run: |
+          if eksctl get cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            helm uninstall documentserver --wait --timeout 5m || true
+            eksctl delete cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} --wait
+          else
+            echo "Cluster ${{ env.CLUSTER_NAME }} not found, nothing to delete"
+          fi

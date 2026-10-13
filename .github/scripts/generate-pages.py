@@ -731,13 +731,13 @@ def generate_dev():
         + section("SRV Storage (S3, MinIO, Azure)", "dev-SRV-storage.yml", "dev SRV storage", server_body)
         + section("SRV Dependances (Virtual Path, ActiveMQ, Redis)", "dev-SRV-dependances.yml", "dev SRV dependances", dep_body)
         + section("TLS Dependencies", "dev-TLS-dependencies.yml", "dev TLS dependencies", tls_body(tls_deps))
+        + section("K8s EKS arm64 (Helm, docs-testing)", "dev-K8s-EKS-Docs-arm64.yml", "dev-K8s-EKS-Docs-arm64", k8s_table(load("dev-k8s-eks-docs-arm64.json"), "arm64"))
         + section("Apps install (on top of Docs)", "dev-APPS-install.yml", "dev APPS install", apps_body())
     )
     write("dev.html", page_html("DEV — ONLYOFFICE Docs Test Results", body, breadcrumb("DEV")))
 
 
-def generate_release():
-    k8s = load("release-k8s-eks-arm64.json")
+def k8s_table(k8s, arch_label):
     run_date = (k8s or {}).get("run_date", "")
     date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
 
@@ -759,8 +759,8 @@ def generate_release():
             + '</tr>'
         )
 
-    k8s_body = (
-        f'<h3>arm64{date_part}</h3>\n'
+    return (
+        f'<h3>{arch_label}{date_part}</h3>\n'
         '<table><thead><tr>'
         '<th>Edition</th><th>Healthcheck</th><th>Version</th>'
         '<th>Pods</th><th>Puppeteer (=0)</th><th>DS Log Errors</th>'
@@ -768,6 +768,10 @@ def generate_release():
         + row
         + '</tbody></table>\n'
     )
+
+
+def generate_release():
+    k8s_body = k8s_table(load("release-k8s-eks-arm64.json"), "arm64")
 
     def rel(f):
         return load(f"release-{f}.json")
