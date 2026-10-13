@@ -3,8 +3,12 @@ name: dev K8s EKS Docs arm64
 on:
   workflow_dispatch:
     inputs:
-      delete_cluster:
-        description: 'Delete the EKS cluster at the end (default: keep it; delete manually with eksctl delete cluster)'
+      keep_cluster:
+        description: 'Leave the EKS cluster for manual checks (remove later with cleanup=true)'
+        type: boolean
+        default: true
+      cleanup:
+        description: 'Only delete EKS clusters left by previous runs (dev-K8s-EKS-Docs-arm64-*), test nothing'
         type: boolean
         default: false
 
@@ -13,10 +17,11 @@ permissions:
 
 jobs:
   check-k8s-eks:
+    if: ${{ !inputs.cleanup }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
-      CLUSTER_NAME: onlyoffice-k8s-dev-${{ github.run_id }}
+      CLUSTER_NAME: dev-K8s-EKS-Docs-arm64-${{ github.run_id }}
       AWS_REGION: us-east-1
       IMAGES_TAG: ${{ vars.K8S_DEV_DOCS_IMAGES_TAG }}
       K8S_BRANCH: ${{ vars.K8S_DEV_DOCS_BRANCH }}
@@ -366,7 +371,7 @@ jobs:
 
       # The LoadBalancer (ELB) must be removed first, otherwise it holds the VPC and the stack deletion hangs
       - name: Delete EKS cluster
-        if: always() && inputs.delete_cluster
+        if: always() && !inputs.keep_cluster
         run: |
           if eksctl get cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} 2>/dev/null; then
             helm uninstall documentserver --wait --timeout 5m || true
@@ -374,3 +379,43 @@ jobs:
           else
             echo "Cluster ${{ env.CLUSTER_NAME }} not found, nothing to delete"
           fi
+
+      - name: Keep cluster notice
+        if: always() && inputs.keep_cluster
+        run: |
+          echo "**Left running for manual checks:** cluster \`${{ env.CLUSTER_NAME }}\` (${{ env.AWS_REGION }}), remove with cleanup=true" >> "$GITHUB_STEP_SUMMARY"
+
+  # Deletes every cluster left by previous runs of this workflow (name prefix dev-K8s-EKS-Docs-arm64-), tests nothing
+  cleanup:
+    if: ${{ inputs.cleanup }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      AWS_REGION: us-east-1
+    steps:
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region ${{ env.AWS_REGION }}
+
+      - name: Install eksctl
+        run: |
+          curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin
+          eksctl version
+
+      # The LoadBalancer (ELB) must be removed first, otherwise it holds the VPC and the stack deletion hangs
+      - name: Delete leftover EKS clusters
+        run: |
+          CLUSTERS=$(eksctl get cluster --region ${{ env.AWS_REGION }} -o json | jq -r '.[].name' | grep '^dev-K8s-EKS-Docs-arm64-' || true)
+          if [ -z "$CLUSTERS" ]; then
+            echo "No dev-K8s-EKS-Docs-arm64-* clusters found, nothing to delete"
+            exit 0
+          fi
+          for C in $CLUSTERS; do
+            echo "=== Deleting $C ==="
+            aws eks update-kubeconfig --name "$C" --region ${{ env.AWS_REGION }} || true
+            helm uninstall documentserver --wait --timeout 5m || true
+            eksctl delete cluster --name "$C" --region ${{ env.AWS_REGION }} --wait
+          done
