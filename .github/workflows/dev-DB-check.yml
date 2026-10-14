@@ -1,8 +1,8 @@
 name: dev DB check x64
 
 on:
-  schedule:
-    - cron: '0 14 * * 3'  # Wednesday 17:00 UTC+3
+  # schedule:  # отключено: новые dev-версии ещё не выложены
+  #   - cron: '0 14 * * 3'  # Wednesday 17:00 UTC+3
   workflow_dispatch:
 
 permissions:
