@@ -21,6 +21,7 @@ jobs:
           sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "http${{ vars.TEST_K6_PROTO_SUFFIX }}://${{ vars.TEST_K6_DUMMY_DSURL }}/wopi/files/docid/contents"|' save-changes-document-random-close.json
           sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "http${{ vars.TEST_K6_PROTO_SUFFIX }}://${{ vars.TEST_K6_DUMMY_DSURL }}/dummyCallback"|' save-changes-document-random-close.json
           sed -i 's|"jwtSecret": ""|"jwtSecret": "${{ vars.TEST_K6_JWT }}"|' save-changes-document-random-close.json
+          sed -i 's|"closeSessionPercentPerMinute": [0-9]*|"closeSessionPercentPerMinute": ${{ vars.TEST_K6_CLOSE_SESSION_PERCENT }}|' save-changes-document-random-close.json
           sed -i 's|"changesPath": "dataset/[^/]*/changes.csv"|"changesPath": "dataset/${{ vars.TEST_K6_CHANGES_VERSION }}/changes.csv"|' save-changes-document-random-close.json
 
       - name: INFO about save-changes-document-random-close.json
