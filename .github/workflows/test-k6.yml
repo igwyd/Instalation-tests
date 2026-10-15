@@ -12,14 +12,14 @@ jobs:
 
       - name: Install pre-requisites for LOAD test
         run: |
-          git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
+          git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.TEST_K6_BRANCH }}
           cd document-server-stress-testing/K6/
 
           sed -i 's|"serverProtoSuffix": ""|"serverProtoSuffix": "${{ vars.TEST_K6_PROTO_SUFFIX }}"|' save-changes-document-random-close.json
           sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "${{ vars.TEST_K6_DSURL }}"|' save-changes-document-random-close.json
           sed -i 's|"serverPort": 80|"serverPort": ${{ vars.TEST_K6_DSPORT }}|' save-changes-document-random-close.json
-          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "https://${{ vars.TEST_K6_DSURL }}/wopi/files/docid/contents"|' save-changes-document-random-close.json
-          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "https://${{ vars.TEST_K6_DSURL }}/dummyCallback"|' save-changes-document-random-close.json
+          sed -i 's|"documentUrl": "https://example.com/url-to-example-document"|"documentUrl": "http${{ vars.TEST_K6_PROTO_SUFFIX }}://${{ vars.TEST_K6_DSURL }}/wopi/files/docid/contents"|' save-changes-document-random-close.json
+          sed -i 's|"callbackUrl": "https://example.com/url-to-callback"|"callbackUrl": "http${{ vars.TEST_K6_PROTO_SUFFIX }}://${{ vars.TEST_K6_DSURL }}/dummyCallback"|' save-changes-document-random-close.json
           sed -i 's|"jwtSecret": ""|"jwtSecret": "${{ vars.TEST_K6_JWT }}"|' save-changes-document-random-close.json
           sed -i 's|"changesPath": "dataset/[^/]*/changes.csv"|"changesPath": "dataset/${{ vars.TEST_K6_CHANGES_VERSION }}/changes.csv"|' save-changes-document-random-close.json
 
