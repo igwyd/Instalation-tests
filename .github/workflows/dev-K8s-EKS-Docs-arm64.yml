@@ -408,7 +408,10 @@ jobs:
       # The LoadBalancer (ELB) must be removed first, otherwise it holds the VPC and the stack deletion hangs
       - name: Delete leftover EKS clusters
         run: |
-          CLUSTERS=$(eksctl get cluster --region ${{ env.AWS_REGION }} -o json | jq -r '.[].name' | grep '^dev-K8s-EKS-Docs-arm64-' || true)
+          # aws eks list-clusters, not `eksctl get cluster -o json | jq .[].name`: the eksctl JSON shape differs between versions and gave an empty list
+          aws sts get-caller-identity --query Arn --output text
+          aws eks list-clusters --region ${{ env.AWS_REGION }} --output text --query 'clusters[]'
+          CLUSTERS=$(aws eks list-clusters --region ${{ env.AWS_REGION }} --output text --query 'clusters[]' | tr '\t' '\n' | grep '^dev-K8s-EKS-Docs-arm64-' || true)
           if [ -z "$CLUSTERS" ]; then
             echo "No dev-K8s-EKS-Docs-arm64-* clusters found, nothing to delete"
             exit 0
