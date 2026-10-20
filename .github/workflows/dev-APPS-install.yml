@@ -16,9 +16,6 @@ on:
       cases:
         description: '"all" or comma list of case numbers from the table in README (1-19)'
         default: 'all'
-      apps_branch:
-        description: 'DocSpace-buildtools branch with apps-install.sh'
-        default: 'release/v4.0.0'
       keep_instances:
         description: 'Leave EC2 instances and DNS records for manual checks (remove later with cleanup=true)'
         type: boolean
@@ -162,7 +159,7 @@ jobs:
       DS_VERSION: ${{ vars.ONLYOFFICE_DEV_VERSION }}
       DS_BUILD: ${{ vars.ONLYOFFICE_DEV_BUILD }}
       DOCS_PORT: ${{ matrix.docs_port }}
-      APPS_BRANCH: ${{ inputs.apps_branch }}
+      APPS_BRANCH: ${{ vars.APPS_DEV_BRANCH }}
       APPS_ADMIN_EMAIL: i.demin.test@gmail.com
       DOCS_SSL: ${{ matrix.ssl }}
       DOCS_LICENSE: ${{ matrix.docs_license }}
