@@ -206,8 +206,9 @@ jobs:
         continue-on-error: true
         run: |
           INFO=$(curl -s "http://${{ env.LB_HOST }}/info/info.json" || echo "{}")
-          BUILD_VERSION=$(echo "$INFO" | jq -r '.buildVersion // empty')
-          BUILD_NUMBER=$(echo "$INFO" | jq -r '.buildNumber // empty')
+          # 10.0.0+ puts the version under serverInfo; older builds have it at the top level
+          BUILD_VERSION=$(echo "$INFO" | jq -r '.serverInfo.buildVersion // .buildVersion // empty')
+          BUILD_NUMBER=$(echo "$INFO" | jq -r '.serverInfo.buildNumber // .buildNumber // empty')
           ACTUAL="${BUILD_VERSION}-${BUILD_NUMBER}"
           echo "Version: installed=$ACTUAL, expected=${{ env.IMAGES_TAG }}"
           if [ "$BUILD_VERSION" = "${{ vars.ONLYOFFICE_DEV_VERSION }}" ] && [ "$BUILD_NUMBER" = "${{ vars.ONLYOFFICE_DEV_BUILD }}" ]; then
