@@ -13,7 +13,7 @@ jobs:
       CLUSTER_NAME: onlyoffice-k8s-${{ github.run_id }}
       AWS_REGION: us-east-1
       IMAGES_TAG: ${{ vars.K8S_DOCS_RELEASE_VERSION }}
-      HELM_CHART_VERSION: 6.1.1
+      HELM_CHART_VERSION: 7.0.0
       HELM_CHART: onlyoffice/docs
       K8S_BRANCH: master
     steps:
