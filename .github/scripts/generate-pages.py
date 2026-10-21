@@ -828,7 +828,8 @@ def apps_body(prefix="dev-apps-"):
             f'<td>{escape(d.get("os_name", ""))}</td><td>{escape(d.get("arch", ""))}</td>'
             f'<td>{escape(str(d.get("edition", "")).upper())}'
             f'{" + " + escape(d["docs_license"].upper()) + " lic" if d.get("docs_license", "none") != "none" else ""}</td>'
-            f'<td>{escape(str(d.get("docs_port", "")))} → {escape(str(d.get("docs_port_after", "")))}</td>'
+            f'<td>{escape(str(d.get("docs_port", "")))} → {escape(str(d.get("docs_port_after", "")))}'
+            f'{" → " + escape(str(d["docs_port_restored"])) if d.get("docs_port_restored") else ""}</td>'
             + ok("docs_before_ok")
             + f'<td class="{status(d.get("welcome_ok"))}" title="{escape("В окне: " + d.get("welcome_cmd", "") + chr(10) + "Ожидалось: " + d.get("welcome_expected", ""))}">'
             f'{"✅" if d.get("welcome_ok") else "❌"}</td>' + ok("apps_install_ok") + ok("apps_up")
@@ -851,7 +852,7 @@ def apps_body(prefix="dev-apps-"):
         ("OS", "ОС тестового инстанса AWS EC2"),
         ("Arch", "Архитектура инстанса: x64 (t3.xlarge) или arm64 (t4g.xlarge)"),
         ("Docs", "Редакция Docs (CE/DE/EE), которую ставят первой. Apps должен взять ту же редакцию"),
-        ("Docs port", "Порт Docs до установки Apps → после. Для пакетов Apps переносит Docs с 80 и 8888 на 8083 (освобождает 80 под свой openresty), другие порты (8083, 7070) остаются"),
+        ("Docs port", "Порт Docs до установки Apps → после. Для пакетов Apps переносит Docs с 80 и 8888 на 8083 (освобождает 80 под свой openresty), другие порты (8083, 7070) остаются. Третье значение (только package) — порт Docs после удаления Apps (из восстановленного ds.conf), должен совпасть с первым; ответил ли Docs на нём — колонка Uninstall"),
         ("Docs installed", "Docs установлен через OneClickInstall-Docs (нужной редакции и порта) и отвечает на /healthcheck ДО установки Apps"),
         ("Welcome", "Страница /welcome/ Docs: data-platform = linux/docker, нет неподставленных {{...}}, в HTML есть команда установки Apps с нужным скриптом для редакции (CE apps-install.sh, DE apps-developer-install.sh, EE apps-enterprise-install.sh)"),
         ("Apps install", "Установщик Apps (apps-install.sh, 4testing-сборка) завершился с кодом 0"),

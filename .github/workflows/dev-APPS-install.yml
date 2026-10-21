@@ -598,8 +598,10 @@ jobs:
           GOT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -oP 'is serving HTTPS for \K[^;[:space:]]+' /opt/apps-test/apps-install.out | head -1" || true)
           if ssh $SSH_OPTS $U@$EC2_IP "grep -q 'cannot be determined' /opt/apps-test/apps-install.out" || [ "$GOT" != "$DOMAIN" ]; then
             CERTS=/etc/ssl/apps-test
-            [ "${{ matrix.method }}" = "docker" ] && CERTS=/app/onlyoffice/DocumentServer/data/certs
-            ssh $SSH_OPTS $U@$EC2_IP "sudo apps-ssl-setup -f $DOMAIN $CERTS/tls.crt $CERTS/tls.key" && echo "WILDCARD_NOTE=true" >> $GITHUB_ENV
+            SETUP=apps-ssl-setup
+            # Docker: not in PATH - install-Docker.sh itself runs it as bash $BASE_DIR/config/${PRODUCT}-ssl-setup
+            [ "${{ matrix.method }}" = "docker" ] && CERTS=/app/onlyoffice/DocumentServer/data/certs && SETUP="bash /app/onlyoffice/config/apps-ssl-setup"
+            ssh $SSH_OPTS $U@$EC2_IP "sudo $SETUP -f $DOMAIN $CERTS/tls.crt $CERTS/tls.key" && echo "WILDCARD_NOTE=true" >> $GITHUB_ENV
           else
             echo "installer found the host name behind the wildcard itself"
           fi
@@ -865,6 +867,10 @@ jobs:
           CONF_SHA=$(ssh $SSH_OPTS $U@$EC2_IP "sudo sha256sum /etc/onlyoffice/documentserver/nginx/ds.conf" | cut -c1-16)
           INFO="$INFO; ds.conf $( [ -n "$CONF_SHA" ] && [ "$CONF_SHA" = "$DS_CONF_SHA_BEFORE" ] && echo restored || echo "DIFFERS ($DS_CONF_SHA_BEFORE -> ${CONF_SHA:-none})" )"
           [ -n "$CONF_SHA" ] && [ "$CONF_SHA" = "$DS_CONF_SHA_BEFORE" ] || OK=false
+          # the port Docs is back on, the same way as DOCS_PORT_AFTER - the third value of the dashboard's Docs port
+          PORT_R=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -oP '^\s*listen\s+(\S*:)?\K\d+' /etc/onlyoffice/documentserver/nginx/ds.conf | head -1" || true)
+          echo "DOCS_PORT_RESTORED=${PORT_R:-?}" >> $GITHUB_ENV
+          INFO="$INFO; Docs port $DOCS_PORT -> $DOCS_PORT_AFTER -> ${PORT_R:-?}"
 
           # same Docs: JWT secret untouched
           JWT=$(ssh $SSH_OPTS $U@$EC2_IP 'sudo cat /etc/onlyoffice/documentserver/local.json' | jq -r '.services.CoAuthoring.secret.inbox.string // empty' 2>/dev/null)
@@ -934,8 +940,9 @@ jobs:
             *)       MODE=docker-keep-volumes; VOL=n; KEEP=n;;
           esac
           echo "UNINSTALL_MODE=$MODE" >> $GITHUB_ENV
-          # named volumes before the uninstall, to tell removed from kept afterwards
-          VOLS_BEFORE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker volume ls -q" | sort | tr '\n' ' ')
+          # the installer's named volumes (onlyoffice_*) before the uninstall, to tell removed from kept afterwards;
+          # anonymous ones come from the original `docker run` of Docs (VOLUME in its image), not from Apps
+          VOLS_BEFORE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker volume ls -q" | grep '^onlyoffice_' | sort | tr '\n' ' ')
           echo "volumes before: ${VOLS_BEFORE:-none}"
           ssh $SSH_OPTS $U@$EC2_IP "sudo env SCRIPT=$EXPECTED_APPS_SCRIPT BRANCH=$APPS_BRANCH ANSWERS='$VOL\n$KEEP\n' bash -s" << 'EOF'
           cd /opt/apps-test
@@ -949,16 +956,18 @@ jobs:
           HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" | tr -d '\r\n' | head -c 60 || true)
 
           # volumes: "y" - none of the earlier ones is left, "n" - all of them are still there
-          VOLS_AFTER=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker volume ls -q" | sort | tr '\n' ' ')
-          GONE=0; KEPT=0
+          ALL_AFTER=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker volume ls -q" | sort)
+          VOLS_AFTER=$(echo "$ALL_AFTER" | grep '^onlyoffice_' | tr '\n' ' ')
+          OTHER_LEFT=$(echo "$ALL_AFTER" | grep -v '^onlyoffice_' | grep -c . || true)
+          GONE=0; KEPT=0; KEPT_NAMES=""
           for v in $VOLS_BEFORE; do
-            case " $VOLS_AFTER " in *" $v "*) KEPT=$((KEPT+1));; *) GONE=$((GONE+1));; esac
+            case " $VOLS_AFTER " in *" $v "*) KEPT=$((KEPT+1)); KEPT_NAMES="$KEPT_NAMES $v";; *) GONE=$((GONE+1));; esac
           done
           if [ -z "$VOLS_BEFORE" ]; then
             # nothing to compare with: reported, not failed - the installer may keep its data in directories instead
-            VOL_OK=true; VOL_INFO="no named volumes before, not checked"
+            VOL_OK=true; VOL_INFO="no onlyoffice_* volumes before, not checked"
           else
-            VOL_INFO="volumes removed $GONE, kept $KEPT"
+            VOL_INFO="onlyoffice_* volumes removed $GONE, kept $KEPT${KEPT_NAMES:+ ($KEPT_NAMES )}, other volumes left: $OTHER_LEFT"
             if [ "$VOL" = "y" ]; then [ "$KEPT" = "0" ] && VOL_OK=true || VOL_OK=false
             else [ "$GONE" = "0" ] && VOL_OK=true || VOL_OK=false; fi
           fi
@@ -1040,7 +1049,7 @@ jobs:
           data = {
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
               'case': int(e('CASE')), 'method': e('METHOD'), 'os_name': e('OS_NAME'), 'arch': e('ARCH'),
-              'edition': e('EDITION'), 'docs_port': e('DOCS_PORT'), 'docs_port_after': e('DOCS_PORT_AFTER'),
+              'edition': e('EDITION'), 'docs_port': e('DOCS_PORT'), 'docs_port_after': e('DOCS_PORT_AFTER'), 'docs_port_restored': e('DOCS_PORT_RESTORED', ''),
               'docs_before_ok': b('DOCS_BEFORE_OK'), 'welcome_ok': b('WELCOME_OK'), 'welcome_cmd': e('WELCOME_CMD', ''), 'welcome_expected': e('WELCOME_EXPECTED', ''),
               'apps_install_ok': b('APPS_INSTALL_OK'), 'apps_up': b('APPS_UP'),
               'docs_after_ok': b('DOCS_AFTER_OK'),
