@@ -833,7 +833,12 @@ def apps_body(prefix="dev-apps-"):
             + ok("docs_before_ok")
             + f'<td class="{status(d.get("welcome_ok"))}" title="{escape("В окне: " + d.get("welcome_cmd", "") + chr(10) + "Ожидалось: " + d.get("welcome_expected", ""))}">'
             f'{"✅" if d.get("welcome_ok") else "❌"}</td>' + ok("apps_install_ok") + ok("apps_up")
-            + ok("docs_after_ok") + ok("docs_port_ok")
+            + ok("docs_after_ok")
+            # the port Docs was moved to; docker is not checked ("—"): it keeps its published port or goes under
+            # /ds-vpath/ ("none")
+            + (f'<td class="na">—' if d.get("method") == "docker" else
+               f'<td class="{status(d.get("docs_port_ok"))}">{"✅" if d.get("docs_port_ok") else "❌"}')
+            + f'{" " + escape(str(d["docs_port_after"])) if d.get("docs_port_after") else ""}</td>'
             + f'<td class="{status(d.get("docs_same_ok"))}" title="{escape(d.get("docs_same_info", ""))}">'
             f'{"✅" if d.get("docs_same_ok") else "❌"}</td>'
             + f'<td class="{status(d.get("apps_edition_ok"))}" title="{escape(d.get("apps_edition_info", ""))}">'
@@ -858,7 +863,7 @@ def apps_body(prefix="dev-apps-"):
         ("Apps install", "Установщик Apps (apps-install.sh, 4testing-сборка) завершился с кодом 0"),
         ("Apps up", "Apps реально поднялся: API /api/2.0/settings отвечает (установщик может написать «Thank you» при неработающем Apps)"),
         ("Docs alive", "Docs после установки Apps жив: /healthcheck = true (пакеты — на порту из ds.conf; docker — на опубликованном порту или через /ds-vpath/)"),
-        ("Port moved", "Только для package: порт Docs после установки Apps совпал с ожидаемым (80 → 8083, 8888 → 8083, иначе без изменений). Для docker не проверяется — всегда ✅"),
+        ("Port moved", "Только для package: порт Docs после установки Apps совпал с ожидаемым (80 → 8083, 8888 → 8083, иначе без изменений). Рядом — порт, на котором Docs оказался после установки Apps. Для docker не проверяется — «—»; там порт — опубликованный порт контейнера Docs или none, если Apps снял публикацию и отдаёт Docs через /ds-vpath/"),
         ("Same Docs", "Apps «усыновил» тот же Docs, а не поставил второй: sha256 JWT-секрета до и после совпал; для docker ещё образ контейнера Docs остался тем же (не заменён другим)"),
         ("Edition", "Редакция Docs и Apps совпала с заказанной. Docs: packageType из /info/info.json (0 CE, 1 EE, 2 DE) до и после установки Apps. Apps: редакция на странице Settings → Payments («You are using ONLYOFFICE DocSpace …», для DE/EE); для CE — мастер не просит лицензию (так же для кейсов, где лицензия добавлена в Docs заранее, напр. 19: мастер Apps не должен её просить). Docker — ещё INSTALLATION_TYPE в .env. Детали — в подсказке ячейки"),
         ("HTTPS takeover", "Только для HTTPS-кейсов (13–18): Apps нашёл Docs на HTTPS и забрал его сертификат (тот же отпечаток на 443), http→https редирект работает, Docs переведён на HTTP, для letsencrypt — продление (certbot --dry-run + weekly-cron). Тип сертификата — справа; детали — в подсказке ячейки"),
