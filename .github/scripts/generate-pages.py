@@ -796,6 +796,13 @@ def td_https(d):
             f'{"✅" if v else "❌"} {escape(ssl)}</td>')
 
 
+def td_uninstall(d):
+    # mode: deps-kept / deps-removed (package, Docs stays) or docker-all (everything removed)
+    v = d.get("uninstall_ok", False)
+    return (f'<td class="{status(v)}" title="{escape(d.get("uninstall_info", ""))}">'
+            f'{"✅" if v else "❌"} {escape(d.get("uninstall_mode", ""))}</td>')
+
+
 def apps_body(prefix="dev-apps-"):
     # one JSON per case (<prefix><case>.json): the workflow is manual and may run only some cases
     n = len(prefix)
@@ -828,6 +835,9 @@ def apps_body(prefix="dev-apps-"):
             f'{"✅" if d.get("docs_same_ok") else "❌"}</td>'
             + f'<td class="{status(d.get("apps_edition_ok"))}" title="{escape(d.get("apps_edition_info", ""))}">'
             f'{"✅" if d.get("apps_edition_ok") else "❌"}</td>' + td_https(d) + smoke_td
+            + td_uninstall(d)
+            + f'<td class="{status(d.get("cleanup_ok"))}" title="{escape(d.get("cleanup_info", ""))}">'
+            f'{"✅" if d.get("cleanup_ok") else "❌"}</td>'
             + f'<td class="date">{escape(d.get("run_date", "").replace(" UTC", ""))}</td></tr>'
         )
     if not rows:
@@ -850,6 +860,8 @@ def apps_body(prefix="dev-apps-"):
         ("Edition", "Редакция Docs и Apps совпала с заказанной. Docs: packageType из /info/info.json (0 CE, 1 EE, 2 DE) до и после установки Apps. Apps: редакция на странице Settings → Payments («You are using ONLYOFFICE DocSpace …», для DE/EE); для CE — мастер не просит лицензию (так же для кейсов, где лицензия добавлена в Docs заранее, напр. 19: мастер Apps не должен её просить). Docker — ещё INSTALLATION_TYPE в .env. Детали — в подсказке ячейки"),
         ("HTTPS takeover", "Только для HTTPS-кейсов (13–18): Apps нашёл Docs на HTTPS и забрал его сертификат (тот же отпечаток на 443), http→https редирект работает, Docs переведён на HTTP, для letsencrypt — продление (certbot --dry-run + weekly-cron). Тип сертификата — справа; детали — в подсказке ячейки"),
         ("Editor + typing", "E2E в Chromium: мастер Apps → логин → создание smoke.docx → редактор открылся (onDocumentReady, iframe с того же хоста) → ввод слова «test». Клик по OK раскрывает скриншот редактора"),
+        ("Uninstall", "После e2e запущено `apps-install.sh <package|docker> --uninstall true`. package, deps-kept: зависимости оставить, Docs оставить; package, deps-removed: зависимости удалить, Docs оставить (кейсы 2, 6, 14, 17). Проверяется: код 0, Docs отвечает на исходном адресе (протокол и порт как до Apps), ds.conf вернулся байт в байт (из ds.conf.apps.bak), JWT тот же, пакетов Apps нет, openresty остановлен, nginx работает, для HTTPS — на 443 снова исходный сертификат. docker-all: на все вопросы «да», проверяется код 0 и что контейнеров onlyoffice не осталось. Детали и список оставшихся зависимостей — в подсказке ячейки"),
+        ("Server clean", "Docs удалён, сервер чистый: package — пакетов onlyoffice-documentserver* нет и /healthcheck не отвечает true (apt purge / dnf remove); docker — контейнеров onlyoffice нет и /healthcheck не отвечает true"),
         ("Run", "Дата и время завершения прогона (UTC)"),
     ]
     thead = ''.join(f'<th title="{escape(t)}">{h}</th>' if t else f'<th>{h}</th>' for h, t in cols)

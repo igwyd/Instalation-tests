@@ -229,12 +229,12 @@ jobs:
         run: |
           for v in DOCS_BEFORE_OK WELCOME_OK WELCOME_ADMIN_PANEL_OK APPS_INSTALL_OK APPS_UP \
                    DOCS_AFTER_OK DOCS_PORT_OK DOCS_SAME_OK SMOKE_OK APPS_EDITION_OK \
-                   HTTPS_DETECTED_OK HTTPS_CERT_SAME_OK HTTPS_REDIRECT_OK DOCS_DEMOTED_OK LE_RENEW_OK WILDCARD_NOTE; do
+                   HTTPS_DETECTED_OK HTTPS_CERT_SAME_OK HTTPS_REDIRECT_OK DOCS_DEMOTED_OK LE_RENEW_OK WILDCARD_NOTE UNINSTALL_OK CLEANUP_OK; do
             echo "$v=false" >> "$GITHUB_ENV"
           done
           for v in WELCOME_PLATFORM WELCOME_ADMIN_PANEL WELCOME_CMD WELCOME_EXPECTED APPS_INSTALL_RC DOCS_PORT_AFTER \
                    DOCS_AFTER_URL DOCS_SAME_INFO APPS_INSTALL_TYPE DOCS_PKGTYPE_BEFORE DOCS_PKGTYPE_AFTER APPS_UI_EDITION APPS_EDITION_INFO SMOKE_INFO LICENSE_REQUIRED DOCS_LICENSE_INFO \
-                   DOCS_CERT_BEFORE DOCS_CERT_AFTER HTTPS_REDIRECT_INFO DOCS_DEMOTED_INFO LE_RENEW_INFO HTTPS_DETECTED_INFO; do
+                   DOCS_CERT_BEFORE DOCS_CERT_AFTER HTTPS_REDIRECT_INFO DOCS_DEMOTED_INFO LE_RENEW_INFO HTTPS_DETECTED_INFO UNINSTALL_INFO UNINSTALL_MODE CLEANUP_INFO; do
             echo "$v=not set" >> "$GITHUB_ENV"
           done
 
@@ -470,6 +470,12 @@ jobs:
           JWT_SHA=$(echo "$LOCAL_JSON" | jq -r '.services.CoAuthoring.secret.inbox.string // empty' | sha256sum | cut -c1-16)
           echo "JWT secret sha256 (prefix): $JWT_SHA"
           echo "JWT_SHA_BEFORE=$JWT_SHA" >> $GITHUB_ENV
+          if [ "${{ matrix.method }}" = "package" ]; then
+            # ds.conf as it is right before Apps: after the uninstall it has to come back unchanged
+            CONF_SHA=$(ssh $SSH_OPTS $U@$EC2_IP "sudo sha256sum /etc/onlyoffice/documentserver/nginx/ds.conf" | cut -c1-16)
+            echo "ds.conf sha256 (prefix): $CONF_SHA"
+            echo "DS_CONF_SHA_BEFORE=$CONF_SHA" >> $GITHUB_ENV
+          fi
           PKGTYPE=$(echo "$INFO_JSON" | jq -r 'first(.. | objects | select(has("packageType"))) | .packageType' 2>/dev/null)
           echo "Docs packageType before Apps: ${PKGTYPE:-not found} (expected $EXPECTED_PKGTYPE)"
           echo "DOCS_PKGTYPE_BEFORE=${PKGTYPE:-not found}" >> $GITHUB_ENV
@@ -642,8 +648,8 @@ jobs:
           if [ "${{ matrix.method }}" = "package" ]; then
             ssh $SSH_OPTS $U@$EC2_IP "sudo grep -nE 'listen|ssl_certificate' /etc/onlyoffice/documentserver/nginx/ds.conf" || true
             SSL_LINES=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -cE '^\s*listen\s+\S*443|ssl_certificate' /etc/onlyoffice/documentserver/nginx/ds.conf" || true)
-            BAK=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -f /etc/onlyoffice/documentserver/nginx/ds.conf.ssl.bak && echo yes || echo no")
-            INFO="ds.conf TLS lines: ${SSL_LINES:-?}, ds.conf.ssl.bak: $BAK"
+            BAK=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -f /etc/onlyoffice/documentserver/nginx/ds.conf.apps.bak && echo yes || echo no")
+            INFO="ds.conf TLS lines: ${SSL_LINES:-?}, ds.conf.apps.bak: $BAK"
             [ "$SSL_LINES" = "0" ] && OK=true || OK=false
           else
             C=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps --format '{{.Names}} {{.Image}}' | awk '\$2 ~ /documentserver/ {print \$1; exit}'")
@@ -744,6 +750,117 @@ jobs:
           echo "APPS_EDITION_INFO=$INFO" >> $GITHUB_ENV
           echo "APPS_EDITION_OK=$OK" >> $GITHUB_ENV
 
+      # Scenario from the developer's apps-docs-packages.md: Apps is removed, Docs stays and returns to its
+      # original address. Packages run in two variants, to see that the uninstaller works both ways:
+      #   deps-kept    - answers "n" (keep dependencies) and "N" (keep Docs)
+      #   deps-removed - answers "Y" (remove dependencies) and "N" (keep Docs); Docs must survive it
+      # Cases 2, 6, 14, 17 take deps-removed (DEB and RPM, x64 and arm64, with and without HTTPS), the rest deps-kept.
+      # ds.conf.apps.bak is the installer's own backup.
+      - name: Uninstall Apps, keep Docs
+        if: matrix.method == 'package'
+        continue-on-error: true
+        timeout-minutes: 70
+        run: |
+          case ${{ matrix.case }} in
+            2|6|14|17) MODE=deps-removed; ANSWERS='Y\nN\n';;
+            *)         MODE=deps-kept;    ANSWERS='n\nN\n';;
+          esac
+          echo "UNINSTALL_MODE=$MODE" >> $GITHUB_ENV
+          BAK=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -f /etc/onlyoffice/documentserver/nginx/ds.conf.apps.bak && echo yes || echo no")
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env SCRIPT=$EXPECTED_APPS_SCRIPT BRANCH=$APPS_BRANCH ANSWERS='$ANSWERS' bash -s" << 'EOF'
+          cd /opt/apps-test
+          printf "$ANSWERS" | timeout 3600 bash $SCRIPT package -gb $BRANCH --uninstall true > apps-uninstall.out 2>&1
+          echo $? > apps-uninstall.rc
+          EOF
+          RC=$(ssh $SSH_OPTS $U@$EC2_IP 'cat /opt/apps-test/apps-uninstall.rc')
+          ssh $SSH_OPTS $U@$EC2_IP 'tail -n 40 /opt/apps-test/apps-uninstall.out'
+          OK=true
+          INFO="$MODE, uninstall exit $RC, ds.conf.apps.bak before: $BAK"
+          [ "$RC" = "0" ] || OK=false
+
+          # Docs answers on its original address (DOCS_URL_BEFORE keeps protocol and port); nginx was just restarted
+          for i in $(seq 1 18); do
+            HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" || true)
+            [ "$HC" = "true" ] && break
+            sleep 10
+          done
+          INFO="$INFO; $DOCS_URL_BEFORE/healthcheck=${HC:-none}"
+          [ "$HC" = "true" ] || OK=false
+
+          # the original ds.conf is back, byte for byte (ports and TLS lines come with it)
+          CONF_SHA=$(ssh $SSH_OPTS $U@$EC2_IP "sudo sha256sum /etc/onlyoffice/documentserver/nginx/ds.conf" | cut -c1-16)
+          INFO="$INFO; ds.conf $( [ "$CONF_SHA" = "$DS_CONF_SHA_BEFORE" ] && echo restored || echo "DIFFERS ($DS_CONF_SHA_BEFORE -> $CONF_SHA)" )"
+          [ "$CONF_SHA" = "$DS_CONF_SHA_BEFORE" ] || OK=false
+
+          # same Docs: JWT secret untouched
+          JWT_SHA=$(ssh $SSH_OPTS $U@$EC2_IP 'sudo cat /etc/onlyoffice/documentserver/local.json' | jq -r '.services.CoAuthoring.secret.inbox.string // empty' | sha256sum | cut -c1-16)
+          [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] || { OK=false; INFO="$INFO; JWT changed"; }
+
+          # Apps packages are gone, OpenResty stopped, nginx of Docs runs
+          LEFT=$(ssh $SSH_OPTS $U@$EC2_IP "if command -v dpkg >/dev/null; then dpkg -l 'onlyoffice-apps*' 2>/dev/null | grep -c '^ii'; else rpm -qa 'onlyoffice-apps*' | wc -l; fi" || true)
+          OR=$(ssh $SSH_OPTS $U@$EC2_IP 'systemctl is-active openresty 2>/dev/null' || true)
+          NG=$(ssh $SSH_OPTS $U@$EC2_IP 'systemctl is-active nginx 2>/dev/null' || true)
+          INFO="$INFO; apps packages left: ${LEFT:-?}, openresty: ${OR:-absent}, nginx: ${NG:-?}"
+          [ "$LEFT" = "0" ] && [ "$OR" != "active" ] && [ "$NG" = "active" ] || OK=false
+          # Apps-only dependencies: informational, what the answer to the first question is expected to change
+          DEPS=$(ssh $SSH_OPTS $U@$EC2_IP 'L=""; command -v mysqld >/dev/null && L="$L mysql"; { dpkg -l opensearch 2>/dev/null | grep -q "^ii" || rpm -q opensearch >/dev/null 2>&1; } && L="$L opensearch"; echo "${L:-none}"' || true)
+          INFO="$INFO; dependencies still installed:$DEPS"
+          ssh $SSH_OPTS $U@$EC2_IP 'sudo ss -lntp' || true
+
+          # HTTPS cases: Docs serves its own original certificate on 443 again
+          if [ "$DOCS_SSL" != "none" ]; then
+            FP=$(echo | openssl s_client -connect "$EC2_IP:443" -servername "$DOMAIN" 2>/dev/null | openssl x509 -noout -fingerprint -sha256 | cut -d= -f2)
+            INFO="$INFO; cert on 443 $( [ -n "$FP" ] && [ "$FP" = "$DOCS_CERT_BEFORE" ] && echo same || echo "DIFFERS (${FP:-none})" )"
+            [ -n "$FP" ] && [ "$FP" = "$DOCS_CERT_BEFORE" ] || OK=false
+          fi
+          echo "$INFO"
+          echo "UNINSTALL_INFO=$INFO" >> $GITHUB_ENV
+          echo "UNINSTALL_OK=$OK" >> $GITHUB_ENV
+
+      # Everything checked: remove Docs too, to leave the server clean (the same purge/remove as in dev-DEB/RPM)
+      - name: Remove Docs package
+        if: always() && matrix.method == 'package'
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP 'bash -s' << 'EOF'
+          if command -v apt-get >/dev/null; then
+            printf "n/n" | sudo apt-get purge 'onlyoffice-documentserver*' -y
+          else
+            sudo dnf remove 'onlyoffice-documentserver*' -y
+          fi
+          EOF
+          LEFT=$(ssh $SSH_OPTS $U@$EC2_IP "if command -v dpkg >/dev/null; then dpkg -l 'onlyoffice-documentserver*' 2>/dev/null | grep -c '^ii'; else rpm -qa 'onlyoffice-documentserver*' | wc -l; fi" || true)
+          HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" || true)
+          INFO="docs packages left: ${LEFT:-?}, $DOCS_URL_BEFORE/healthcheck=${HC:-none}"
+          echo "$INFO"
+          echo "CLEANUP_INFO=$INFO" >> $GITHUB_ENV
+          [ "$LEFT" = "0" ] && [ "$HC" != "true" ] && echo "CLEANUP_OK=true" >> $GITHUB_ENV
+
+      # Docker: nothing is restored, so this only checks that the uninstaller removes everything. Prompts are
+      # answered "yes" to all (remove dependencies, volumes, Docs). -s as in the install, to find the 4testing- images.
+      - name: Uninstall Apps and Docs (Docker)
+        if: matrix.method == 'docker'
+        continue-on-error: true
+        timeout-minutes: 70
+        run: |
+          echo "UNINSTALL_MODE=docker-all" >> $GITHUB_ENV
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env SCRIPT=$EXPECTED_APPS_SCRIPT BRANCH=$APPS_BRANCH bash -s" << 'EOF'
+          cd /opt/apps-test
+          yes y | timeout 3600 bash $SCRIPT docker -gb $BRANCH -s 4testing- --uninstall true > apps-uninstall.out 2>&1
+          echo $? > apps-uninstall.rc
+          EOF
+          RC=$(ssh $SSH_OPTS $U@$EC2_IP 'cat /opt/apps-test/apps-uninstall.rc')
+          ssh $SSH_OPTS $U@$EC2_IP 'tail -n 40 /opt/apps-test/apps-uninstall.out'
+          LEFT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps -a --format '{{.Names}}' | grep -c '^onlyoffice'" || true)
+          ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps -a; sudo docker images; sudo ss -lntp" || true
+          HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" || true)
+          INFO="docker-all, uninstall exit $RC, onlyoffice containers left: ${LEFT:-?}, $DOCS_URL_BEFORE/healthcheck=${HC:-none}"
+          echo "$INFO"
+          echo "UNINSTALL_INFO=$INFO" >> $GITHUB_ENV
+          echo "CLEANUP_INFO=$INFO" >> $GITHUB_ENV
+          [ "$RC" = "0" ] && [ "$LEFT" = "0" ] && echo "UNINSTALL_OK=true" >> $GITHUB_ENV
+          [ "$LEFT" = "0" ] && [ "$HC" != "true" ] && echo "CLEANUP_OK=true" >> $GITHUB_ENV
+
       - name: Collect logs
         if: always()
         continue-on-error: true
@@ -811,6 +928,8 @@ jobs:
               'apps_edition_ok': b('APPS_EDITION_OK'), 'apps_edition_info': e('APPS_EDITION_INFO', ''),
               'smoke_ok': b('SMOKE_OK'), 'smoke_info': e('SMOKE_INFO', ''),
               'screenshot': e('SHOT', ''),
+              'uninstall_ok': b('UNINSTALL_OK'), 'uninstall_mode': e('UNINSTALL_MODE', ''), 'uninstall_info': e('UNINSTALL_INFO', ''),
+              'cleanup_ok': b('CLEANUP_OK'), 'cleanup_info': e('CLEANUP_INFO', ''),
               'ssl': e('SSL'), 'docs_license': e('DOCS_LICENSE', 'none'),
           }
           if e('SSL') != 'none':
@@ -852,6 +971,8 @@ jobs:
             echo "| Same Docs kept | $(r $DOCS_SAME_OK) | $DOCS_SAME_INFO |"
             echo "| Apps edition = Docs edition | $(r $APPS_EDITION_OK) | $APPS_EDITION_INFO |"
             echo "| Smoke: document opens in this Docs | $(r $SMOKE_OK) | $SMOKE_INFO |"
+            echo "| Uninstall Apps ($UNINSTALL_MODE) | $(r $UNINSTALL_OK) | $UNINSTALL_INFO |"
+            echo "| Docs removed, server clean | $(r $CLEANUP_OK) | $CLEANUP_INFO |"
             if [ "$DOCS_SSL" != "none" ]; then
               echo "| HTTPS: installer detected it | $(r $HTTPS_DETECTED_OK) | inherited for \`$HTTPS_DETECTED_INFO\` (expected \`$DOMAIN\`) |"
               echo "| HTTPS: Apps serves the same cert (Docker+LE: its own valid one) | $(r $HTTPS_CERT_SAME_OK) | Docs \`$DOCS_CERT_BEFORE\` → Apps \`$DOCS_CERT_AFTER\` |"
@@ -876,6 +997,9 @@ jobs:
           # port move and "same Docs" apply to what the installers promise; failing them is a real bug
           [ "${{ matrix.method }}" = "package" ] && [ "$DOCS_PORT_OK" != "true" ] && FAILED="$FAILED DOCS_PORT_OK"
           [ "$DOCS_SAME_OK" = "true" ] || FAILED="$FAILED DOCS_SAME_OK"
+          for v in UNINSTALL_OK CLEANUP_OK; do
+            [ "${!v}" = "true" ] || FAILED="$FAILED $v"
+          done
           if [ "$DOCS_SSL" != "none" ]; then
             for v in HTTPS_DETECTED_OK HTTPS_CERT_SAME_OK HTTPS_REDIRECT_OK DOCS_DEMOTED_OK; do
               [ "${!v}" = "true" ] || FAILED="$FAILED $v"
