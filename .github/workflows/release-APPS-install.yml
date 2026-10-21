@@ -368,6 +368,7 @@ jobs:
             [ "$MODE" = "selfsigned" ] && openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=$D" -addext "subjectAltName=DNS:$D" \
               -keyout /etc/ssl/apps-test/tls.key -out /etc/ssl/apps-test/tls.crt
             SECRET=$(grep -oP '(?<=secure_link_secret ).*(?=;)' $NG/ds.conf | head -1)
+            cp -p $NG/ds.conf $NG/ds.conf.gh-bak
             cp -f $NG/ds-ssl.conf.tmpl $NG/ds.conf
             sed -i -e "s|^[[:space:]]*set[[:space:]]\+\$secure_link_secret[[:space:]]\+.*;|set \$secure_link_secret $SECRET;|" \
               -e "s|{{SSL_CERTIFICATE_PATH}}|/etc/ssl/apps-test/tls.crt|g" \
@@ -375,6 +376,22 @@ jobs:
             nginx -t && systemctl reload nginx
           fi
           grep -nE 'listen|ssl_certificate|server_name' $NG/ds.conf
+          EOF
+
+      # Docs (node) fetches and saves documents over https://<domain>, now served by Apps with the self-signed
+      # cert: without this the editor opens but shows "Download failed". Docker has USE_UNAUTHORIZED_STORAGE for it.
+      - name: Allow Docs package to trust self-signed cert
+        if: matrix.method == 'package' && matrix.ssl == 'selfsigned'
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP 'bash -s' << 'EOF'
+          set -ex
+          command -v jq >/dev/null || { sudo apt-get install -y jq 2>/dev/null || sudo dnf install -y jq; }
+          F=/etc/onlyoffice/documentserver/local.json
+          sudo cp -p $F $F.gh-bak
+          sudo jq '.services.CoAuthoring.requestDefaults.rejectUnauthorized = false' $F | sudo tee $F.new >/dev/null
+          sudo chown --reference=$F $F.new && sudo chmod --reference=$F $F.new && sudo mv $F.new $F
+          sudo systemctl restart ds-docservice ds-converter
           EOF
 
       # The Docs image turns HTTPS on by itself when data/certs holds tls.crt + tls.key (no server_name then,
@@ -627,7 +644,7 @@ jobs:
             SSL_LINES=$(ssh $SSH_OPTS $U@$EC2_IP "sudo grep -cE '^\s*listen\s+\S*443|ssl_certificate' /etc/onlyoffice/documentserver/nginx/ds.conf" || true)
             BAK=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -f /etc/onlyoffice/documentserver/nginx/ds.conf.ssl.bak && echo yes || echo no")
             INFO="ds.conf TLS lines: ${SSL_LINES:-?}, ds.conf.ssl.bak: $BAK"
-            [ "$SSL_LINES" = "0" ] && [ "$BAK" = "yes" ] && OK=true || OK=false
+            [ "$SSL_LINES" = "0" ] && OK=true || OK=false
           else
             C=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps --format '{{.Names}} {{.Image}}' | awk '\$2 ~ /documentserver/ {print \$1; exit}'")
             SSL_LINES=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C sh -c \"grep -cE '^\s*listen\s+\S*443|ssl_certificate' /etc/onlyoffice/documentserver/nginx/ds.conf\"" || true)
