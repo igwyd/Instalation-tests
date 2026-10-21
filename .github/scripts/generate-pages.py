@@ -798,7 +798,9 @@ def td_https(d):
 
 def td_uninstall(d):
     # mode: deps-kept / deps-removed (package, Docs stays) or docker-all (everything removed)
-    v = d.get("uninstall_ok", False)
+    if "uninstall_ok" not in d:  # results from before the uninstall steps existed
+        return '<td class="na">—</td>'
+    v = d["uninstall_ok"]
     return (f'<td class="{status(v)}" title="{escape(d.get("uninstall_info", ""))}">'
             f'{"✅" if v else "❌"} {escape(d.get("uninstall_mode", ""))}</td>')
 
@@ -836,8 +838,8 @@ def apps_body(prefix="dev-apps-"):
             + f'<td class="{status(d.get("apps_edition_ok"))}" title="{escape(d.get("apps_edition_info", ""))}">'
             f'{"✅" if d.get("apps_edition_ok") else "❌"}</td>' + td_https(d) + smoke_td
             + td_uninstall(d)
-            + f'<td class="{status(d.get("cleanup_ok"))}" title="{escape(d.get("cleanup_info", ""))}">'
-            f'{"✅" if d.get("cleanup_ok") else "❌"}</td>'
+            + (f'<td class="{status(d.get("cleanup_ok"))}" title="{escape(d.get("cleanup_info", ""))}">'
+               f'{"✅" if d.get("cleanup_ok") else "❌"}</td>' if "cleanup_ok" in d else '<td class="na">—</td>')
             + f'<td class="date">{escape(d.get("run_date", "").replace(" UTC", ""))}</td></tr>'
         )
     if not rows:

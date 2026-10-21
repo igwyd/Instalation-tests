@@ -859,8 +859,10 @@ jobs:
           echo "CLEANUP_INFO=$INFO" >> $GITHUB_ENV
           [ "$LEFT" = "0" ] && [ "$HC" != "true" ] && echo "CLEANUP_OK=true" >> $GITHUB_ENV
 
-      # Docker: nothing is restored, so this only checks that the uninstaller removes everything. Prompts are
-      # answered "yes" to all (remove dependencies, volumes, Docs). Same script as the install, no branch or 4testing- images.
+      # Docker: nothing is restored, so this only checks that the uninstaller removes everything. Seen so far:
+      # "Also remove data volumes ...? (Y/n)"; the developer's notes mention a "keep configuration" choice too, so a
+      # few finite "y" - not `yes`: an endless stream into the installer's pty ended with "Killed" (2026-10-21), and
+      # EOF on a prompt loops forever. Same script as the install, no branch or 4testing- images.
       - name: Uninstall Apps and Docs (Docker)
         if: matrix.method == 'docker'
         continue-on-error: true
@@ -869,7 +871,7 @@ jobs:
           echo "UNINSTALL_MODE=docker-all" >> $GITHUB_ENV
           ssh $SSH_OPTS $U@$EC2_IP "sudo env SCRIPT=$EXPECTED_APPS_SCRIPT bash -s" << 'EOF'
           cd /opt/apps-test
-          yes y | timeout 3600 bash $SCRIPT docker --uninstall true > apps-uninstall.out 2>&1
+          printf 'y\ny\ny\n' | timeout 3600 bash $SCRIPT docker --uninstall true > apps-uninstall.out 2>&1
           echo $? > apps-uninstall.rc
           EOF
           RC=$(ssh $SSH_OPTS $U@$EC2_IP 'cat /opt/apps-test/apps-uninstall.rc')
