@@ -67,7 +67,7 @@ Pre-release builds from S3 dev repo.
 
 
 ### ONLYOFFICE Apps install (up to 19 runners, manual)
-- Install dev Docs, check the `/welcome` "Install apps" modal, install ONLYOFFICE Apps (4testing) on top of it and open a document from Apps in this Docs. Triggered manually via `workflow_dispatch` (`cases`: `all` or case numbers, e.g. `1,7`). Each job terminates its EC2 instance (with its disk) and deletes its DNS record at the end; `keep_instances=true` leaves them for manual checks — then re-run with `cleanup=true` to remove them.
+- Install dev Docs, check the `/welcome` "Install apps" modal, install ONLYOFFICE Apps (4testing) on top of it and open a document from Apps in this Docs. Triggered manually via `workflow_dispatch` (`cases`: `all` or case numbers, e.g. `1,7`). Each job terminates its EC2 instance (with its disk) and deletes its DNS record at the end; `cleanup=true` removes what cancelled runs left behind.
 
 | Test | Status |
 |------|--------|
@@ -120,7 +120,7 @@ Official public repos. Triggered manually via `workflow_dispatch`.
 | release-Docker-DEB | [![release-Docker-DEB](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/release-Docker-DEB-x64-arm64.yml) |
 
 ### ONLYOFFICE Apps install (up to 19 runners, manual)
-- The release flow as a user does it: Docs from the published per-edition script (`docs-enterprise-install.sh`, `docs-developer-install.sh`, `docs-install.sh` for CE; official release packages / images, `--docsport`), then the command from the `/welcome` "Install apps" pop-up is run as written — no test branch, no 4testing repos or images. Checks are the same as in dev-APPS-install, including the HTTPS takeover (Route53 records `rapps-<case>-<run>`, same certificates), and results go to the release dashboard. Cases 1–19 are the same as in the dev table above (case 19 — a DE license put into Docs before Apps — is expected to fail on Debian arm64 until Apps supports it, and stays for the future). Triggered manually (`cases`, `keep_instances`, `cleanup`).
+- The release flow as a user does it: Docs from the published per-edition script (`docs-enterprise-install.sh`, `docs-developer-install.sh`, `docs-install.sh` for CE; official release packages / images, `--docsport`), then the command from the `/welcome` "Install apps" pop-up is run as written — no test branch, no 4testing repos or images. Checks are the same as in dev-APPS-install, including the HTTPS takeover (Route53 records `rapps-<case>-<run>`, same certificates), and results go to the release dashboard. Cases 1–19 are the same as in the dev table above (case 19 — a DE license put into Docs before Apps — is expected to fail on Debian arm64 until Apps supports it, and stays for the future). Triggered manually (`cases`, `cleanup`).
 
 | Test | Status |
 |------|--------|

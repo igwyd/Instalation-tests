@@ -219,7 +219,7 @@ jobs:
       - name: Remove ONLYOFFICE-Docs EE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
+          printf "n\n" | sudo apt-get purge onlyoffice-documentserver* -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
@@ -234,7 +234,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ubuntu@${{ env.EC2_IP }} << EOF
           echo onlyoffice-documentserver-de onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
           echo onlyoffice-documentserver-de onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
-          printf "n/n" | sudo apt-get install onlyoffice-documentserver-de -y
+          printf "n\n" | sudo apt-get install onlyoffice-documentserver-de -y
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs DE
@@ -346,7 +346,7 @@ jobs:
       - name: Remove ONLYOFFICE-Docs DE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
+          printf "n\n" | sudo apt-get purge onlyoffice-documentserver* -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 
@@ -361,7 +361,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 ubuntu@${{ env.EC2_IP }} << EOF
           echo onlyoffice-documentserver onlyoffice/db-pwd select onlyoffice | sudo debconf-set-selections
           echo onlyoffice-documentserver onlyoffice/wopi-enabled boolean true | sudo debconf-set-selections
-          printf "n/n" | sudo apt-get install onlyoffice-documentserver -y
+          printf "n\n" | sudo apt-get install onlyoffice-documentserver -y
           EOF
 
       - name: Info about installed Package, must be ONLYOFFICE-Docs CE
@@ -473,7 +473,7 @@ jobs:
       - name: Remove ONLYOFFICE-Docs CE
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} << EOF
-          printf "n/n" | sudo apt-get purge onlyoffice-documentserver* -y
+          printf "n\n" | sudo apt-get purge onlyoffice-documentserver* -y
           sudo rm -rvf /etc/onlyoffice /var/www/onlyoffice /var/log/onlyoffice
           EOF
 

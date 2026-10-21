@@ -10,8 +10,8 @@ name: release APPS install
 # arm64 is expected to fail until Apps supports it - the case stays for the future). Results go to S3 as
 # results/release-apps-<case>.json for the dashboard.
 # Each job terminates its EC2 instance (root EBS volume included) and deletes its DNS record at the end;
-# keep_instances=true leaves them for manual checks, then re-run with cleanup=true to terminate everything this
-# workflow created (tag Name=demin_release-apps-*, DNS records rapps-<case>-<run>.[div.]<APPS_DNS_ZONE>).
+# cleanup=true terminates what cancelled runs left behind (tag Name=demin_release-apps-*, DNS records
+# rapps-<case>-<run>.[div.]<APPS_DNS_ZONE>).
 
 on:
   workflow_dispatch:
@@ -19,12 +19,8 @@ on:
       cases:
         description: '"all" or comma list of case numbers from the table in README (1-19)'
         default: 'all'
-      keep_instances:
-        description: 'Leave EC2 instances and DNS records for manual checks (remove later with cleanup=true)'
-        type: boolean
-        default: false
       cleanup:
-        description: 'Only terminate EC2 instances left by previous runs, test nothing'
+        description: 'Only terminate EC2 instances and DNS records left by cancelled runs, test nothing'
         type: boolean
         default: false
 
@@ -467,14 +463,16 @@ jobs:
             echo "DS container before: $C ($IMAGE)"
             echo "DS_IMAGE_BEFORE=$IMAGE" >> $GITHUB_ENV
           fi
-          JWT_SHA=$(echo "$LOCAL_JSON" | jq -r '.services.CoAuthoring.secret.inbox.string // empty' | sha256sum | cut -c1-16)
+          # "none" when there is no secret or local.json was not read: two empty values must not count as the same Docs
+          JWT=$(echo "$LOCAL_JSON" | jq -r '.services.CoAuthoring.secret.inbox.string // empty' 2>/dev/null)
+          JWT_SHA=$( [ -n "$JWT" ] && echo "$JWT" | sha256sum | cut -c1-16 || echo none )
           echo "JWT secret sha256 (prefix): $JWT_SHA"
           echo "JWT_SHA_BEFORE=$JWT_SHA" >> $GITHUB_ENV
           if [ "${{ matrix.method }}" = "package" ]; then
             # ds.conf as it is right before Apps: after the uninstall it has to come back unchanged
             CONF_SHA=$(ssh $SSH_OPTS $U@$EC2_IP "sudo sha256sum /etc/onlyoffice/documentserver/nginx/ds.conf" | cut -c1-16)
             echo "ds.conf sha256 (prefix): $CONF_SHA"
-            echo "DS_CONF_SHA_BEFORE=$CONF_SHA" >> $GITHUB_ENV
+            echo "DS_CONF_SHA_BEFORE=${CONF_SHA:-none}" >> $GITHUB_ENV
           fi
           PKGTYPE=$(echo "$INFO_JSON" | jq -r 'first(.. | objects | select(has("packageType"))) | .packageType' 2>/dev/null)
           echo "Docs packageType before Apps: ${PKGTYPE:-not found} (expected $EXPECTED_PKGTYPE)"
@@ -590,13 +588,14 @@ jobs:
             TYPE=${TYPE//[\"\']/}
             echo "APPS_INSTALL_TYPE=${TYPE:-not found}" >> $GITHUB_ENV
             echo "image $DS_IMAGE_BEFORE -> $IMAGE"
-            [ "$IMAGE" = "$DS_IMAGE_BEFORE" ] && SAME_EXTRA=true || SAME_EXTRA=false
+            [ -n "$IMAGE" ] && [ "$IMAGE" = "$DS_IMAGE_BEFORE" ] && SAME_EXTRA=true || SAME_EXTRA=false
             INFO=", image $( [ "$IMAGE" = "$DS_IMAGE_BEFORE" ] && echo same || echo changed )"
           fi
           # HTTPS cases: Docs is demoted to plain HTTP on loopback, reachable only through Apps
           [ "$DOCS_SSL" != "none" ] && URL="$APPS_URL/ds-vpath"
           HC=$(curl -s $CURL_TLS --max-time 10 "$URL/healthcheck" || true)
-          JWT_SHA=$(echo "$LOCAL_JSON" | jq -r '.services.CoAuthoring.secret.inbox.string // empty' | sha256sum | cut -c1-16)
+          JWT=$(echo "$LOCAL_JSON" | jq -r '.services.CoAuthoring.secret.inbox.string // empty' 2>/dev/null)
+          JWT_SHA=$( [ -n "$JWT" ] && echo "$JWT" | sha256sum | cut -c1-16 || echo none )
           echo "Docs after: $URL healthcheck=$HC, JWT sha $JWT_SHA_BEFORE -> $JWT_SHA"
           PKGTYPE=$(echo "$INFO_JSON" | jq -r 'first(.. | objects | select(has("packageType"))) | .packageType' 2>/dev/null)
           echo "Docs packageType after Apps: ${PKGTYPE:-not found} (expected $EXPECTED_PKGTYPE)"
@@ -606,8 +605,8 @@ jobs:
             echo "DOCS_AFTER_URL=$URL"
             [ "$HC" = "true" ] && echo "DOCS_AFTER_OK=true"
             [ "$PORT" = "$EXPECTED_DOCS_PORT_AFTER" ] && echo "DOCS_PORT_OK=true"
-            [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] && [ "$SAME_EXTRA" = "true" ] && echo "DOCS_SAME_OK=true"
-            echo "DOCS_SAME_INFO=JWT $( [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] && echo same || echo changed )$INFO"
+            [ "$JWT_SHA" != "none" ] && [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] && [ "$SAME_EXTRA" = "true" ] && echo "DOCS_SAME_OK=true"
+            echo "DOCS_SAME_INFO=JWT $( [ "$JWT_SHA" = "none" ] && echo "not found" || { [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] && echo same || echo changed; } )$INFO"
           } >> $GITHUB_ENV
 
       - name: Check HTTPS takeover
@@ -750,6 +749,28 @@ jobs:
           echo "APPS_EDITION_INFO=$INFO" >> $GITHUB_ENV
           echo "APPS_EDITION_OK=$OK" >> $GITHUB_ENV
 
+      # Before the uninstall steps: they remove Apps (and in Docker all containers), diagnostics of a broken Apps
+      # would be gone. The uninstall log is fetched at the end, see Collect uninstall log.
+      - name: Collect logs
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p out
+          # what the installer's "OK"/"Thank you" does not tell: failed units, container states and logs
+          ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -s' > out/diagnostics.txt 2>&1 << 'EOF' || true
+          echo "### listening ports"; ss -lntp
+          echo "### failed systemd units"; systemctl --failed --no-pager
+          for u in $(systemctl list-units --failed --plain --no-legend | awk '{print $1}'); do
+            echo "### journal $u"; journalctl -u "$u" -n 80 --no-pager
+          done
+          if command -v docker >/dev/null; then
+            echo "### docker ps -a"; docker ps -a --format 'table {{.Names}}	{{.Image}}	{{.Status}}	{{.Ports}}'
+            for c in $(docker ps -a --format '{{.Names}}'); do echo "### docker logs $c"; docker logs --tail 80 "$c" 2>&1; done
+          fi
+          echo "### openresty/nginx configs with ssl"; grep -rlE 'listen\s+\S*443|ssl_certificate' /etc/openresty /etc/nginx 2>/dev/null
+          EOF
+          ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -c "cd /opt/apps-test 2>/dev/null && tar czf - apps-install.out OneClick*.log 2>/dev/null"' > out/apps-install-logs.tar.gz || true
+
       # Scenario from the developer's apps-docs-packages.md: Apps is removed, Docs stays and returns to its
       # original address. Packages run in two variants, to see that the uninstaller works both ways:
       #   deps-kept    - answers "n" (keep dependencies) and "N" (keep Docs)
@@ -767,9 +788,9 @@ jobs:
           esac
           echo "UNINSTALL_MODE=$MODE" >> $GITHUB_ENV
           BAK=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -f /etc/onlyoffice/documentserver/nginx/ds.conf.apps.bak && echo yes || echo no")
-          ssh $SSH_OPTS $U@$EC2_IP "sudo env SCRIPT=$EXPECTED_APPS_SCRIPT BRANCH=$APPS_BRANCH ANSWERS='$ANSWERS' bash -s" << 'EOF'
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env SCRIPT=$EXPECTED_APPS_SCRIPT ANSWERS='$ANSWERS' bash -s" << 'EOF'
           cd /opt/apps-test
-          printf "$ANSWERS" | timeout 3600 bash $SCRIPT package -gb $BRANCH --uninstall true > apps-uninstall.out 2>&1
+          printf "$ANSWERS" | timeout 3600 bash $SCRIPT package --uninstall true > apps-uninstall.out 2>&1
           echo $? > apps-uninstall.rc
           EOF
           RC=$(ssh $SSH_OPTS $U@$EC2_IP 'cat /opt/apps-test/apps-uninstall.rc')
@@ -780,7 +801,7 @@ jobs:
 
           # Docs answers on its original address (DOCS_URL_BEFORE keeps protocol and port); nginx was just restarted
           for i in $(seq 1 18); do
-            HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" || true)
+            HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" | tr -d '\r\n' | head -c 60 || true)
             [ "$HC" = "true" ] && break
             sleep 10
           done
@@ -789,12 +810,13 @@ jobs:
 
           # the original ds.conf is back, byte for byte (ports and TLS lines come with it)
           CONF_SHA=$(ssh $SSH_OPTS $U@$EC2_IP "sudo sha256sum /etc/onlyoffice/documentserver/nginx/ds.conf" | cut -c1-16)
-          INFO="$INFO; ds.conf $( [ "$CONF_SHA" = "$DS_CONF_SHA_BEFORE" ] && echo restored || echo "DIFFERS ($DS_CONF_SHA_BEFORE -> $CONF_SHA)" )"
-          [ "$CONF_SHA" = "$DS_CONF_SHA_BEFORE" ] || OK=false
+          INFO="$INFO; ds.conf $( [ -n "$CONF_SHA" ] && [ "$CONF_SHA" = "$DS_CONF_SHA_BEFORE" ] && echo restored || echo "DIFFERS ($DS_CONF_SHA_BEFORE -> ${CONF_SHA:-none})" )"
+          [ -n "$CONF_SHA" ] && [ "$CONF_SHA" = "$DS_CONF_SHA_BEFORE" ] || OK=false
 
           # same Docs: JWT secret untouched
-          JWT_SHA=$(ssh $SSH_OPTS $U@$EC2_IP 'sudo cat /etc/onlyoffice/documentserver/local.json' | jq -r '.services.CoAuthoring.secret.inbox.string // empty' | sha256sum | cut -c1-16)
-          [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] || { OK=false; INFO="$INFO; JWT changed"; }
+          JWT=$(ssh $SSH_OPTS $U@$EC2_IP 'sudo cat /etc/onlyoffice/documentserver/local.json' | jq -r '.services.CoAuthoring.secret.inbox.string // empty' 2>/dev/null)
+          JWT_SHA=$( [ -n "$JWT" ] && echo "$JWT" | sha256sum | cut -c1-16 || echo none )
+          [ "$JWT_SHA" != "none" ] && [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] || { OK=false; INFO="$INFO; JWT changed or not found"; }
 
           # Apps packages are gone, OpenResty stopped, nginx of Docs runs
           LEFT=$(ssh $SSH_OPTS $U@$EC2_IP "if command -v dpkg >/dev/null; then dpkg -l 'onlyoffice-apps*' 2>/dev/null | grep -c '^ii'; else rpm -qa 'onlyoffice-apps*' | wc -l; fi" || true)
@@ -824,36 +846,37 @@ jobs:
         run: |
           ssh $SSH_OPTS $U@$EC2_IP 'bash -s' << 'EOF'
           if command -v apt-get >/dev/null; then
-            printf "n/n" | sudo apt-get purge 'onlyoffice-documentserver*' -y
+            printf "n\n" | sudo apt-get purge 'onlyoffice-documentserver*' -y
           else
             sudo dnf remove 'onlyoffice-documentserver*' -y
           fi
           EOF
           LEFT=$(ssh $SSH_OPTS $U@$EC2_IP "if command -v dpkg >/dev/null; then dpkg -l 'onlyoffice-documentserver*' 2>/dev/null | grep -c '^ii'; else rpm -qa 'onlyoffice-documentserver*' | wc -l; fi" || true)
-          HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" || true)
+          # an error page is multi-line HTML: one short line only, GITHUB_ENV breaks on multi-line values
+          HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" | tr -d '\r\n' | head -c 60 || true)
           INFO="docs packages left: ${LEFT:-?}, $DOCS_URL_BEFORE/healthcheck=${HC:-none}"
           echo "$INFO"
           echo "CLEANUP_INFO=$INFO" >> $GITHUB_ENV
           [ "$LEFT" = "0" ] && [ "$HC" != "true" ] && echo "CLEANUP_OK=true" >> $GITHUB_ENV
 
       # Docker: nothing is restored, so this only checks that the uninstaller removes everything. Prompts are
-      # answered "yes" to all (remove dependencies, volumes, Docs). -s as in the install, to find the 4testing- images.
+      # answered "yes" to all (remove dependencies, volumes, Docs). Same script as the install, no branch or 4testing- images.
       - name: Uninstall Apps and Docs (Docker)
         if: matrix.method == 'docker'
         continue-on-error: true
         timeout-minutes: 70
         run: |
           echo "UNINSTALL_MODE=docker-all" >> $GITHUB_ENV
-          ssh $SSH_OPTS $U@$EC2_IP "sudo env SCRIPT=$EXPECTED_APPS_SCRIPT BRANCH=$APPS_BRANCH bash -s" << 'EOF'
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env SCRIPT=$EXPECTED_APPS_SCRIPT bash -s" << 'EOF'
           cd /opt/apps-test
-          yes y | timeout 3600 bash $SCRIPT docker -gb $BRANCH -s 4testing- --uninstall true > apps-uninstall.out 2>&1
+          yes y | timeout 3600 bash $SCRIPT docker --uninstall true > apps-uninstall.out 2>&1
           echo $? > apps-uninstall.rc
           EOF
           RC=$(ssh $SSH_OPTS $U@$EC2_IP 'cat /opt/apps-test/apps-uninstall.rc')
           ssh $SSH_OPTS $U@$EC2_IP 'tail -n 40 /opt/apps-test/apps-uninstall.out'
           LEFT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps -a --format '{{.Names}}' | grep -c '^onlyoffice'" || true)
           ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps -a; sudo docker images; sudo ss -lntp" || true
-          HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" || true)
+          HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" | tr -d '\r\n' | head -c 60 || true)
           INFO="docker-all, uninstall exit $RC, onlyoffice containers left: ${LEFT:-?}, $DOCS_URL_BEFORE/healthcheck=${HC:-none}"
           echo "$INFO"
           echo "UNINSTALL_INFO=$INFO" >> $GITHUB_ENV
@@ -861,25 +884,12 @@ jobs:
           [ "$RC" = "0" ] && [ "$LEFT" = "0" ] && echo "UNINSTALL_OK=true" >> $GITHUB_ENV
           [ "$LEFT" = "0" ] && [ "$HC" != "true" ] && echo "CLEANUP_OK=true" >> $GITHUB_ENV
 
-      - name: Collect logs
+      - name: Collect uninstall log
         if: always()
         continue-on-error: true
         run: |
           mkdir -p out
-          # what the installer's "OK"/"Thank you" does not tell: failed units, container states and logs
-          ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -s' > out/diagnostics.txt 2>&1 << 'EOF' || true
-          echo "### listening ports"; ss -lntp
-          echo "### failed systemd units"; systemctl --failed --no-pager
-          for u in $(systemctl list-units --failed --plain --no-legend | awk '{print $1}'); do
-            echo "### journal $u"; journalctl -u "$u" -n 80 --no-pager
-          done
-          if command -v docker >/dev/null; then
-            echo "### docker ps -a"; docker ps -a --format 'table {{.Names}}	{{.Image}}	{{.Status}}	{{.Ports}}'
-            for c in $(docker ps -a --format '{{.Names}}'); do echo "### docker logs $c"; docker logs --tail 80 "$c" 2>&1; done
-          fi
-          echo "### openresty/nginx configs with ssl"; grep -rlE 'listen\s+\S*443|ssl_certificate' /etc/openresty /etc/nginx 2>/dev/null
-          EOF
-          ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -c "cd /opt/apps-test 2>/dev/null && tar czf - apps-install.out OneClick*.log 2>/dev/null"' > out/apps-install-logs.tar.gz || true
+          ssh $SSH_OPTS $U@$EC2_IP 'sudo cat /opt/apps-test/apps-uninstall.out' > out/apps-uninstall.out 2>/dev/null || true
 
       - name: Upload artifacts
         if: always()
@@ -982,11 +992,7 @@ jobs:
                 echo "| HTTPS: LE renewal handed over | $(r $LE_RENEW_OK) | $LE_RENEW_INFO |"
             fi
             echo
-            if [ "${{ inputs.keep_instances }}" = "true" ]; then
-              echo "**Left running for manual checks:** \`ssh $U@$EC2_IP\` · Apps $APPS_URL/ (login \`$APPS_ADMIN_EMAIL\`, password from secret \`APPS_ADMIN_PASSWORD\`) · Docs $DOCS_AFTER_URL/ · instance \`$INSTANCE_ID\`, terminate with cleanup=true"
-            else
-              echo "Instance \`$INSTANCE_ID\` is terminated at the end of the job (keep_instances=true leaves it for manual checks)."
-            fi
+            echo "Instance \`$INSTANCE_ID\` is terminated at the end of the job."
           } >> $GITHUB_STEP_SUMMARY
           cat $GITHUB_STEP_SUMMARY
 
@@ -1011,14 +1017,14 @@ jobs:
       # runs even when an earlier step failed or the job was cancelled; the root EBS volume goes with the
       # instance (DeleteOnTermination above)
       - name: Delete DNS record
-        if: always() && !inputs.keep_instances && matrix.ssl != 'none' && env.EC2_IP != ''
+        if: always() && matrix.ssl != 'none' && env.EC2_IP != ''
         continue-on-error: true
         run: |
           ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "$APPS_DNS_ZONE" --query 'HostedZones[0].Id' --output text)
-          aws route53 change-resource-record-sets --hosted-zone-id "$ZONE_ID"             --change-batch "{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":{\"Name\":\"$DOMAIN\",\"Type\":\"A\",\"TTL\":60,\"ResourceRecords\":[{\"Value\":\"$EC2_IP\"}]}}]}"             && echo "Deleted $DOMAIN"
+          aws route53 change-resource-record-sets --hosted-zone-id "$ZONE_ID" --change-batch "{\"Changes\":[{\"Action\":\"DELETE\",\"ResourceRecordSet\":{\"Name\":\"$DOMAIN\",\"Type\":\"A\",\"TTL\":60,\"ResourceRecords\":[{\"Value\":\"$EC2_IP\"}]}}]}" && echo "Deleted $DOMAIN"
 
       - name: Delete EC2 Instance
-        if: always() && !inputs.keep_instances && env.INSTANCE_ID != ''
+        if: always() && env.INSTANCE_ID != ''
         run: |
           aws ec2 terminate-instances --instance-ids "$INSTANCE_ID"
           aws ec2 wait instance-terminated --instance-ids "$INSTANCE_ID"

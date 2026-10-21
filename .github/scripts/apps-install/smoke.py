@@ -29,7 +29,8 @@ def set_env(**kv):
     env = os.environ.get('GITHUB_ENV')
     if env:
         with open(env, 'a') as f:
-            f.writelines(f'{k}={v}\n' for k, v in kv.items())
+            # one line per value: an HTTP error body is often multi-line HTML, which breaks GITHUB_ENV
+            f.writelines(f'{k}=' + ' '.join(str(v).splitlines()) + '\n' for k, v in kv.items())
 
 
 def done(ok, info):
