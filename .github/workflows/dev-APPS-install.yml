@@ -912,31 +912,71 @@ jobs:
           echo "CLEANUP_INFO=$INFO" >> $GITHUB_ENV
           [ "$LEFT" = "0" ] && [ "$HC" != "true" ] && echo "CLEANUP_OK=true" >> $GITHUB_ENV
 
-      # Docker: nothing is restored, so this only checks that the uninstaller removes everything. Seen so far:
-      # "Also remove data volumes ...? (Y/n)"; the developer's notes mention a "keep configuration" choice too, so a
-      # few finite "y" - not `yes`: an endless stream into the installer's pty ended with "Killed" (2026-10-21), and
-      # EOF on a prompt loops forever. -s as in the install, to find the 4testing- images.
+      # Docker: Docs is not restored, the uninstaller only has to remove what it was asked to. Two prompts:
+      #   "Also remove data volumes (mysql, opensearch, documents)? (Y/n)"
+      #   "Keep configuration and Docs data for reinstallation? (Y/n)"
+      # The four answer pairs are spread over the Docker cases (x64 and arm64 in each):
+      #   docker-clean        y n - cases 7, 12, 16
+      #   docker-keep-all     n y - cases 8, 15
+      #   docker-keep-config  y y - cases 9, 18
+      #   docker-keep-volumes n n - cases 10, 11
+      # Finite answers, not `yes`: an endless stream into the installer's pty ended with "Killed" (2026-10-21),
+      # and EOF on a prompt loops forever. -s as in the install, to find the 4testing- images.
       - name: Uninstall Apps and Docs (Docker)
         if: matrix.method == 'docker'
         continue-on-error: true
         timeout-minutes: 70
         run: |
-          echo "UNINSTALL_MODE=docker-all" >> $GITHUB_ENV
-          ssh $SSH_OPTS $U@$EC2_IP "sudo env SCRIPT=$EXPECTED_APPS_SCRIPT BRANCH=$APPS_BRANCH bash -s" << 'EOF'
+          case ${{ matrix.case }} in
+            7|12|16) MODE=docker-clean;        VOL=y; KEEP=n;;
+            8|15)    MODE=docker-keep-all;     VOL=n; KEEP=y;;
+            9|18)    MODE=docker-keep-config;  VOL=y; KEEP=y;;
+            *)       MODE=docker-keep-volumes; VOL=n; KEEP=n;;
+          esac
+          echo "UNINSTALL_MODE=$MODE" >> $GITHUB_ENV
+          # named volumes before the uninstall, to tell removed from kept afterwards
+          VOLS_BEFORE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker volume ls -q" | sort | tr '\n' ' ')
+          echo "volumes before: ${VOLS_BEFORE:-none}"
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env SCRIPT=$EXPECTED_APPS_SCRIPT BRANCH=$APPS_BRANCH ANSWERS='$VOL\n$KEEP\n' bash -s" << 'EOF'
           cd /opt/apps-test
-          printf 'y\ny\ny\n' | timeout 3600 bash $SCRIPT docker -gb $BRANCH -s 4testing- --uninstall true > apps-uninstall.out 2>&1
+          printf "$ANSWERS" | timeout 3600 bash $SCRIPT docker -gb $BRANCH -s 4testing- --uninstall true > apps-uninstall.out 2>&1
           echo $? > apps-uninstall.rc
           EOF
           RC=$(ssh $SSH_OPTS $U@$EC2_IP 'cat /opt/apps-test/apps-uninstall.rc')
           ssh $SSH_OPTS $U@$EC2_IP 'tail -n 40 /opt/apps-test/apps-uninstall.out'
           LEFT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps -a --format '{{.Names}}' | grep -c '^onlyoffice'" || true)
-          ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps -a; sudo docker images; sudo ss -lntp" || true
+          ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps -a; sudo docker images; sudo docker volume ls; sudo ss -lntp; sudo ls -la /app/onlyoffice /app/onlyoffice/DocumentServer" || true
           HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" | tr -d '\r\n' | head -c 60 || true)
-          INFO="docker-all, uninstall exit $RC, onlyoffice containers left: ${LEFT:-?}, $DOCS_URL_BEFORE/healthcheck=${HC:-none}"
+
+          # volumes: "y" - none of the earlier ones is left, "n" - all of them are still there
+          VOLS_AFTER=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker volume ls -q" | sort | tr '\n' ' ')
+          GONE=0; KEPT=0
+          for v in $VOLS_BEFORE; do
+            case " $VOLS_AFTER " in *" $v "*) KEPT=$((KEPT+1));; *) GONE=$((GONE+1));; esac
+          done
+          if [ -z "$VOLS_BEFORE" ]; then
+            # nothing to compare with: reported, not failed - the installer may keep its data in directories instead
+            VOL_OK=true; VOL_INFO="no named volumes before, not checked"
+          else
+            VOL_INFO="volumes removed $GONE, kept $KEPT"
+            if [ "$VOL" = "y" ]; then [ "$KEPT" = "0" ] && VOL_OK=true || VOL_OK=false
+            else [ "$GONE" = "0" ] && VOL_OK=true || VOL_OK=false; fi
+          fi
+
+          # configuration (.env) and Docs data: "y" - both stay, "n" - neither is left
+          HAS_ENV=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -f /app/onlyoffice/.env && echo yes || echo no")
+          HAS_DATA=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -d /app/onlyoffice/DocumentServer/data && echo yes || echo no")
+          if [ "$KEEP" = "y" ]; then
+            [ "$HAS_ENV" = "yes" ] && [ "$HAS_DATA" = "yes" ] && CONF_OK=true || CONF_OK=false
+          else
+            [ "$HAS_ENV" = "no" ] && [ "$HAS_DATA" = "no" ] && CONF_OK=true || CONF_OK=false
+          fi
+
+          INFO="$MODE (volumes $VOL, keep config $KEEP), uninstall exit $RC, onlyoffice containers left: ${LEFT:-?}, $VOL_INFO, /app/onlyoffice/.env: $HAS_ENV, DocumentServer/data: $HAS_DATA, $DOCS_URL_BEFORE/healthcheck=${HC:-none}"
           echo "$INFO"
           echo "UNINSTALL_INFO=$INFO" >> $GITHUB_ENV
           echo "CLEANUP_INFO=$INFO" >> $GITHUB_ENV
-          [ "$RC" = "0" ] && [ "$LEFT" = "0" ] && echo "UNINSTALL_OK=true" >> $GITHUB_ENV
+          [ "$RC" = "0" ] && [ "$LEFT" = "0" ] && [ "$VOL_OK" = "true" ] && [ "$CONF_OK" = "true" ] && echo "UNINSTALL_OK=true" >> $GITHUB_ENV
           [ "$LEFT" = "0" ] && [ "$HC" != "true" ] && echo "CLEANUP_OK=true" >> $GITHUB_ENV
 
       - name: Collect uninstall log
