@@ -13,6 +13,8 @@ if command -v getenforce >/dev/null; then
   echo "### selinux"; getenforce
   echo "### http_port_t"; semanage port -l 2>/dev/null | grep -w http_port_t
   echo "### locally added port labels"; semanage port -l -C 2>/dev/null
+  # OneClickInstall-Docs makes httpd_t permissive (install-preq.sh), a Docs installed by hand per the manual does not
+  echo "### permissive domains"; semanage permissive -l 2>/dev/null
   echo "### AVC denials"; ausearch -m avc -ts today 2>/dev/null | tail -n 40
 fi
 if command -v docker >/dev/null; then
