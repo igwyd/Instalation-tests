@@ -758,19 +758,7 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p out
-          # what the installer's "OK"/"Thank you" does not tell: failed units, container states and logs
-          ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -s' > out/diagnostics.txt 2>&1 << 'EOF' || true
-          echo "### listening ports"; ss -lntp
-          echo "### failed systemd units"; systemctl --failed --no-pager
-          for u in $(systemctl list-units --failed --plain --no-legend | awk '{print $1}'); do
-            echo "### journal $u"; journalctl -u "$u" -n 80 --no-pager
-          done
-          if command -v docker >/dev/null; then
-            echo "### docker ps -a"; docker ps -a --format 'table {{.Names}}	{{.Image}}	{{.Status}}	{{.Ports}}'
-            for c in $(docker ps -a --format '{{.Names}}'); do echo "### docker logs $c"; docker logs --tail 80 "$c" 2>&1; done
-          fi
-          echo "### openresty/nginx configs with ssl"; grep -rlE 'listen\s+\S*443|ssl_certificate' /etc/openresty /etc/nginx 2>/dev/null
-          EOF
+          ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -s' < .github/scripts/apps-install/diagnostics.sh > out/diagnostics.txt 2>&1 || true
           ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -c "cd /opt/apps-test 2>/dev/null && tar czf - apps-install.out OneClick*.log 2>/dev/null"' > out/apps-install-logs.tar.gz || true
 
       # Scenario from the developer's apps-docs-packages.md: Apps is removed, Docs stays and returns to its
@@ -941,6 +929,8 @@ jobs:
         run: |
           mkdir -p out
           ssh $SSH_OPTS $U@$EC2_IP 'sudo cat /opt/apps-test/apps-uninstall.out' > out/apps-uninstall.out 2>/dev/null || true
+          # why Docs did not come back (nginx failing on the restored port, SELinux)
+          ssh $SSH_OPTS $U@$EC2_IP 'sudo bash -s' < .github/scripts/apps-install/diagnostics.sh > out/diagnostics-uninstall.txt 2>&1 || true
 
       - name: Upload artifacts
         if: always()
