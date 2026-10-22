@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       cases:
-        description: '"all" or comma list of case numbers from the table in README (1-19)'
+        description: '"all" or comma list of case numbers from the table in README (1-20)'
         default: 'all'
       cleanup:
         description: 'Only terminate EC2 instances and DNS records left by cancelled runs, test nothing'
@@ -114,10 +114,15 @@ jobs:
               (17, 'package', 'rhel10',     'x64',   'de', 80,   'letsencrypt'),
               (18, 'docker',  'debian13',   'arm64', 'ee', 80,   'selfsigned'),
               (19, 'package', 'debian12',   'arm64', 'ee', 7070, 'none'),
+              (20, 'package', 'centos9',    'x64',   'ce', 8888, 'none'),
           ]
           # Cases where a license is added to Docs right after its install (value: which Apps license secret).
           # Apps EE has to accept the DE license, and its wizard must then not ask for a license at all.
           DOCS_LICENSE = {19: 'de'}
+          # Cases where Docs is installed by hand per the helpcenter manual instead of OneClickInstall-Docs.
+          # OneClickInstall makes SELinux httpd_t permissive, which hides SELinux bugs of the Apps installer
+          # (bug 84646: Docs moved to 8083 without an http_port_t label, nginx fails to bind).
+          DOCS_INSTALL = {20: 'manual'}
           want = [x.strip() for x in os.environ['CASES'].split(',') if x.strip()]
           ids = [c[0] for c in CASES]
           if want != ['all']:
@@ -136,7 +141,8 @@ jobs:
                   'instance_type': 't3.xlarge' if arch == 'x64' else 't4g.xlarge',
                   'edition': edition, 'docs_port': str(port), 'ssl': ssl,
                   'docs_license': DOCS_LICENSE.get(cid, 'none'),
-                  'tag': f'apps-{cid}-{method}-{os_key}-{arch}-{edition}-{port}' + ('' if ssl == 'none' else f'-{ssl}') + (f'-doclic-{DOCS_LICENSE[cid]}' if cid in DOCS_LICENSE else ''),
+                  'docs_install': DOCS_INSTALL.get(cid, 'oneclick'),
+                  'tag': f'apps-{cid}-{method}-{os_key}-{arch}-{edition}-{port}' + ('' if ssl == 'none' else f'-{ssl}') + (f'-doclic-{DOCS_LICENSE[cid]}' if cid in DOCS_LICENSE else '') + (f'-{DOCS_INSTALL[cid]}' if cid in DOCS_INSTALL else ''),
               })
           print('matrix=' + json.dumps({'include': include}))
           PYEOF
@@ -144,7 +150,7 @@ jobs:
   test:
     needs: prepare
     runs-on: ubuntu-24.04
-    name: "#${{ matrix.case }} ${{ matrix.method }} ${{ matrix.os_name }} ${{ matrix.arch }} ${{ matrix.edition }} docs:${{ matrix.docs_port }}${{ matrix.ssl != 'none' && format(' {0}', matrix.ssl) || '' }}${{ matrix.docs_license != 'none' && format(' docs-license:{0}', matrix.docs_license) || '' }}"
+    name: "#${{ matrix.case }} ${{ matrix.method }} ${{ matrix.os_name }} ${{ matrix.arch }} ${{ matrix.edition }} docs:${{ matrix.docs_port }}${{ matrix.ssl != 'none' && format(' {0}', matrix.ssl) || '' }}${{ matrix.docs_license != 'none' && format(' docs-license:{0}', matrix.docs_license) || '' }}${{ matrix.docs_install != 'oneclick' && format(' docs:{0}', matrix.docs_install) || '' }}"
     timeout-minutes: 240
     strategy:
       fail-fast: false
@@ -159,6 +165,7 @@ jobs:
       APPS_ADMIN_EMAIL: i.demin.test@gmail.com
       DOCS_SSL: ${{ matrix.ssl }}
       DOCS_LICENSE: ${{ matrix.docs_license }}
+      DOCS_INSTALL: ${{ matrix.docs_install }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -225,12 +232,12 @@ jobs:
         run: |
           for v in DOCS_BEFORE_OK WELCOME_OK WELCOME_ADMIN_PANEL_OK APPS_INSTALL_OK APPS_UP \
                    DOCS_AFTER_OK DOCS_PORT_OK DOCS_SAME_OK SMOKE_OK APPS_EDITION_OK \
-                   HTTPS_DETECTED_OK HTTPS_CERT_SAME_OK HTTPS_REDIRECT_OK DOCS_DEMOTED_OK LE_RENEW_OK WILDCARD_NOTE UNINSTALL_OK CLEANUP_OK; do
+                   HTTPS_DETECTED_OK HTTPS_CERT_SAME_OK HTTPS_REDIRECT_OK DOCS_DEMOTED_OK LE_RENEW_OK WILDCARD_NOTE UNINSTALL_OK CLEANUP_OK SELINUX_OK; do
             echo "$v=false" >> "$GITHUB_ENV"
           done
           for v in WELCOME_PLATFORM WELCOME_ADMIN_PANEL WELCOME_CMD WELCOME_EXPECTED APPS_INSTALL_RC DOCS_PORT_AFTER \
                    DOCS_AFTER_URL DOCS_SAME_INFO APPS_INSTALL_TYPE DOCS_PKGTYPE_BEFORE DOCS_PKGTYPE_AFTER APPS_UI_EDITION APPS_EDITION_INFO SMOKE_INFO LICENSE_REQUIRED DOCS_LICENSE_INFO \
-                   DOCS_CERT_BEFORE DOCS_CERT_AFTER HTTPS_REDIRECT_INFO DOCS_DEMOTED_INFO LE_RENEW_INFO HTTPS_DETECTED_INFO UNINSTALL_INFO UNINSTALL_MODE CLEANUP_INFO; do
+                   DOCS_CERT_BEFORE DOCS_CERT_AFTER HTTPS_REDIRECT_INFO DOCS_DEMOTED_INFO LE_RENEW_INFO HTTPS_DETECTED_INFO UNINSTALL_INFO UNINSTALL_MODE CLEANUP_INFO SELINUX_INFO; do
             echo "$v=not set" >> "$GITHUB_ENV"
           done
 
@@ -329,7 +336,7 @@ jobs:
           EOF
 
       - name: Install Docs from DEB/RPM package
-        if: matrix.method == 'package'
+        if: matrix.method == 'package' && matrix.docs_install == 'oneclick'
         continue-on-error: true
         run: |
           ssh $SSH_OPTS $U@$EC2_IP << EOF
@@ -348,6 +355,56 @@ jobs:
           cd OneClickInstall-Docs
           printf "n\n" | sudo bash docs-install.sh --installationtype $DS_TYPE --docsport $DOCS_PORT \
             --skiphardwarecheck true --localscripts true --packagepath "\$PKG"
+          EOF
+
+      # By hand, the way the helpcenter manual for CentOS does it (and dev-RPM-x64-arm64.yml): nginx from nginx.org,
+      # EPEL, PostgreSQL, Redis, RabbitMQ, mscorefonts, onlyoffice-repo for dependencies, the exact dev package
+      # from S3, then DS_PORT + documentserver-configure.sh. No OneClickInstall-Docs, so SELinux httpd_t stays
+      # strict - checked in "Check SELinux is strict before Apps".
+      - name: Install Docs by hand per the manual (RPM)
+        if: matrix.method == 'package' && matrix.docs_install == 'manual'
+        continue-on-error: true
+        run: |
+          scp $SSH_OPTS rpm-check-configs/nginx.repo $U@$EC2_IP:/tmp/nginx.repo
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env F=$DS_PKG-$DS_VERSION-$DS_BUILD.el7 P=$DOCS_PORT bash -s" << 'EOF'
+          set -x
+          cp /tmp/nginx.repo /etc/yum.repos.d/nginx.repo
+          yum install nginx -y
+          yum install epel-release -y
+
+          yum install postgresql postgresql-server -y
+          service postgresql initdb
+          yum install chkconfig -y
+          chkconfig postgresql on
+          sed -i '86s/\<ident\>/scram-sha-256/;88s/\<ident\>/scram-sha-256/' /var/lib/pgsql/data/pg_hba.conf
+          sed -i "s/^#\?password_encryption *= *.*/password_encryption = 'scram-sha-256'/" /var/lib/pgsql/data/postgresql.conf
+          service postgresql restart
+          cd /tmp
+          sudo -i -u postgres psql -c "CREATE USER onlyoffice WITH PASSWORD 'onlyoffice';"
+          sudo -i -u postgres psql -c "CREATE DATABASE onlyoffice OWNER onlyoffice;"
+
+          yum -y install redis
+          systemctl enable --now redis
+
+          curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | os=centos dist=9 bash
+          curl -s https://packagecloud.io/install/repositories/rabbitmq/erlang/script.rpm.sh | os=centos dist=9 bash
+          yum install rabbitmq-server -y
+          systemctl enable --now rabbitmq-server
+
+          yum install https://download.onlyoffice.com/repo/centos/main/noarch/onlyoffice-repo.noarch.rpm -y
+          yum install cabextract xorg-x11-font-utils -y
+          yum install fontconfig -y
+          rpm -i https://sourceforge.net/projects/mscorefonts2/files/rpms/msttcore-fonts-installer-2.6-1.noarch.rpm
+
+          # the exact dev build straight from S3, as everywhere else (the dev repo is updated with a delay)
+          curl -fL --retry 5 --retry-delay 10 -o /tmp/ds.rpm "https://s3.eu-west-1.amazonaws.com/repo-doc-onlyoffice-com/server/linux/rhel/$F.$(uname -m).rpm"
+          dnf install /tmp/ds.rpm -y
+          rm -f /tmp/ds.rpm
+          service nginx start
+          systemctl enable nginx
+          # the manual: export DS_PORT=<port> before documentserver-configure; CE asks no Redis host
+          printf 'localhost\nonlyoffice\nonlyoffice\nonlyoffice\nlocalhost\nguest\nguest\n' | DS_PORT=$P documentserver-configure.sh
+          grep -nE 'listen' /etc/onlyoffice/documentserver/nginx/ds.conf
           EOF
 
       # The same steps as the package's own documentserver-letsencrypt.sh: ds-ssl.conf.tmpl becomes ds.conf,
@@ -498,6 +555,22 @@ jobs:
           PKGTYPE=$(echo "$INFO_JSON" | jq -r 'first(.. | objects | select(has("packageType"))) | .packageType' 2>/dev/null)
           echo "Docs packageType before Apps: ${PKGTYPE:-not found} (expected $EXPECTED_PKGTYPE)"
           echo "DOCS_PKGTYPE_BEFORE=${PKGTYPE:-not found}" >> $GITHUB_ENV
+
+      # Docs installed by hand: the case only means something when SELinux really confines nginx. Enforcing and
+      # httpd_t not in the local permissive list (OneClickInstall-Docs adds it there), else the case fails as vacuous.
+      - name: Check SELinux is strict before Apps
+        if: matrix.docs_install == 'manual'
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP 'command -v semanage >/dev/null || sudo dnf install -y policycoreutils-python-utils >/dev/null'
+          MODE=$(ssh $SSH_OPTS $U@$EC2_IP 'getenforce' || true)
+          PERM=$(ssh $SSH_OPTS $U@$EC2_IP "sudo semanage permissive -l -C 2>/dev/null | grep -cx 'httpd_t'" || true)
+          PORTS=$(ssh $SSH_OPTS $U@$EC2_IP "sudo semanage port -l -C 2>/dev/null | awk '\$1==\"http_port_t\"{\$1=\$2=\"\"; print}' | tr -s ' ,' ' '" || true)
+          INFO="SELinux ${MODE:-?}, httpd_t permissive: $( [ "$PERM" = "0" ] && echo no || echo yes ), http_port_t added before Apps:${PORTS:- none}"
+          echo "$INFO"
+          echo "SELINUX_INFO=$INFO" >> $GITHUB_ENV
+          [ "$MODE" = "Enforcing" ] && [ "$PERM" = "0" ] && echo "SELINUX_OK=true" >> $GITHUB_ENV \
+            || echo "::error::SELinux does not confine nginx here ($INFO), the case checks nothing"
 
       # Case 19: the license goes into Docs now, before Apps exists. Apps has to pick it up from this Docs, so its
       # wizard must not ask for one (checked in "Check Apps edition matches Docs"). licenseInfo is only printed:
@@ -669,6 +742,22 @@ jobs:
             [ "$JWT_SHA" != "none" ] && [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] && [ "$SAME_EXTRA" = "true" ] && echo "DOCS_SAME_OK=true"
             echo "DOCS_SAME_INFO=JWT $( [ "$JWT_SHA" = "none" ] && echo "not found" || { [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] && echo same || echo changed; } )$INFO"
           } >> $GITHUB_ENV
+
+      # Bug 84646: Apps has to label the port it moves Docs to (8083) as http_port_t before nginx is reloaded,
+      # otherwise nginx fails with "bind() to 0.0.0.0:8083 failed (13: Permission denied)". Docs alive is checked
+      # above; here - the label and no nginx bind denials.
+      - name: Check SELinux after Apps install
+        if: matrix.docs_install == 'manual'
+        continue-on-error: true
+        run: |
+          P=${DOCS_PORT_AFTER:-8083}
+          LABEL=$(ssh $SSH_OPTS $U@$EC2_IP "sudo semanage port -l 2>/dev/null | awk '\$1==\"http_port_t\" && \$2==\"tcp\"' | tr -s ', ' '\n' | grep -cx '$P'" || true)
+          DENIED=$(ssh $SSH_OPTS $U@$EC2_IP "sudo journalctl -u nginx --no-pager 2>/dev/null | grep -c 'Permission denied'" || true)
+          AVC=$(ssh $SSH_OPTS $U@$EC2_IP "sudo ausearch -m avc -c nginx -ts today 2>/dev/null | grep -c 'name_bind'" || true)
+          INFO="$SELINUX_INFO; after Apps: port $P in http_port_t: $( [ "${LABEL:-0}" -gt 0 ] && echo yes || echo no ), nginx 'Permission denied': ${DENIED:-?}, nginx name_bind AVC: ${AVC:-?}"
+          echo "$INFO"
+          echo "SELINUX_INFO=$INFO" >> $GITHUB_ENV
+          [ "${LABEL:-0}" -gt 0 ] && [ "${DENIED:-1}" = "0" ] && [ "${AVC:-1}" = "0" ] || echo "SELINUX_OK=false" >> $GITHUB_ENV
 
       - name: Check HTTPS takeover
         if: matrix.ssl != 'none'
@@ -1061,8 +1150,11 @@ jobs:
               'screenshot': e('SHOT', ''),
               'uninstall_ok': b('UNINSTALL_OK'), 'uninstall_mode': e('UNINSTALL_MODE', ''), 'uninstall_info': e('UNINSTALL_INFO', ''),
               'cleanup_ok': b('CLEANUP_OK'), 'cleanup_info': e('CLEANUP_INFO', ''),
-              'ssl': e('SSL'), 'docs_license': e('DOCS_LICENSE', 'none'),
+              'ssl': e('SSL'), 'docs_license': e('DOCS_LICENSE', 'none'), 'docs_install': e('DOCS_INSTALL', 'oneclick'),
           }
+          if e('DOCS_INSTALL') == 'manual':
+              data['selinux_ok'] = b('SELINUX_OK')
+              data['selinux_info'] = e('SELINUX_INFO', '')
           if e('SSL') != 'none':
               checks = ['HTTPS_DETECTED_OK', 'HTTPS_CERT_SAME_OK', 'HTTPS_REDIRECT_OK', 'DOCS_DEMOTED_OK']
               if e('SSL') == 'letsencrypt':
@@ -1104,6 +1196,7 @@ jobs:
             echo "| Smoke: document opens in this Docs | $(r $SMOKE_OK) | $SMOKE_INFO |"
             echo "| Uninstall Apps ($UNINSTALL_MODE) | $(r $UNINSTALL_OK) | $UNINSTALL_INFO |"
             echo "| Docs removed, server clean | $(r $CLEANUP_OK) | $CLEANUP_INFO |"
+            [ "$DOCS_INSTALL" = "manual" ] && echo "| SELinux: strict, Docs port labelled by Apps | $(r $SELINUX_OK) | $SELINUX_INFO |"
             if [ "$DOCS_SSL" != "none" ]; then
               echo "| HTTPS: installer detected it | $(r $HTTPS_DETECTED_OK) | inherited for \`$HTTPS_DETECTED_INFO\` (expected \`$DOMAIN\`) |"
               echo "| HTTPS: Apps serves the same cert (Docker+LE: its own valid one) | $(r $HTTPS_CERT_SAME_OK) | Docs \`$DOCS_CERT_BEFORE\` → Apps \`$DOCS_CERT_AFTER\` |"
@@ -1124,6 +1217,7 @@ jobs:
           # port move and "same Docs" apply to what the installers promise; failing them is a real bug
           [ "${{ matrix.method }}" = "package" ] && [ "$DOCS_PORT_OK" != "true" ] && FAILED="$FAILED DOCS_PORT_OK"
           [ "$DOCS_SAME_OK" = "true" ] || FAILED="$FAILED DOCS_SAME_OK"
+          [ "$DOCS_INSTALL" = "manual" ] && [ "$SELINUX_OK" != "true" ] && FAILED="$FAILED SELINUX_OK"
           for v in UNINSTALL_OK CLEANUP_OK; do
             [ "${!v}" = "true" ] || FAILED="$FAILED $v"
           done

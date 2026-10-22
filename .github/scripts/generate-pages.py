@@ -826,8 +826,12 @@ def apps_body(prefix="dev-apps-"):
         rows.append(
             f'<tr><td>{d.get("case")}</td><td>{escape(d.get("method", ""))}</td>'
             f'<td>{escape(d.get("os_name", ""))}</td><td>{escape(d.get("arch", ""))}</td>'
-            f'<td>{escape(str(d.get("edition", "")).upper())}'
-            f'{" + " + escape(d["docs_license"].upper()) + " lic" if d.get("docs_license", "none") != "none" else ""}</td>'
+            # Docs installed by hand per the manual: SELinux has to stay strict and Apps has to label the moved port
+            + (f'<td class="{status(d.get("selinux_ok"))}" title="{escape(d.get("selinux_info", ""))}">'
+               if d.get("docs_install") == "manual" else '<td>')
+            + f'{escape(str(d.get("edition", "")).upper())}'
+            f'{" + " + escape(d["docs_license"].upper()) + " lic" if d.get("docs_license", "none") != "none" else ""}'
+            f'{" · manual, SELinux " + ("✅" if d.get("selinux_ok") else "❌") if d.get("docs_install") == "manual" else ""}</td>'
             f'<td>{escape(str(d.get("docs_port", "")))} → {escape(str(d.get("docs_port_after", "")))}'
             f'{" → " + escape(str(d["docs_port_restored"])) if d.get("docs_port_restored") else ""}</td>'
             + ok("docs_before_ok")
@@ -856,7 +860,7 @@ def apps_body(prefix="dev-apps-"):
         ("Method", "package — Docs и Apps ставятся пакетами (apt/dnf); docker — контейнерами"),
         ("OS", "ОС тестового инстанса AWS EC2"),
         ("Arch", "Архитектура инстанса: x64 (t3.xlarge) или arm64 (t4g.xlarge)"),
-        ("Docs", "Редакция Docs (CE/DE/EE), которую ставят первой. Apps должен взять ту же редакцию"),
+        ("Docs", "Редакция Docs (CE/DE/EE), которую ставят первой. Apps должен взять ту же редакцию. «manual» — Docs поставлен вручную по мануалу helpcenter (без OneClickInstall-Docs, который делает SELinux httpd_t permissive): SELinux ✅ — режим Enforcing, httpd_t не permissive, после установки Apps порт Docs размечен как http_port_t и у nginx нет отказов bind (баг 84646). Детали — в подсказке ячейки"),
         ("Docs port", "Порт Docs до установки Apps → после. Для пакетов Apps переносит Docs с 80 и 8888 на 8083 (освобождает 80 под свой openresty), другие порты (8083, 7070) остаются. Третье значение (только package) — порт Docs после удаления Apps (из восстановленного ds.conf), должен совпасть с первым; ответил ли Docs на нём — колонка Uninstall"),
         ("Docs installed", "Docs установлен через OneClickInstall-Docs (нужной редакции и порта) и отвечает на /healthcheck ДО установки Apps"),
         ("Welcome", "Страница /welcome/ Docs: data-platform = linux/docker, нет неподставленных {{...}}, в HTML есть команда установки Apps с нужным скриптом для редакции (CE apps-install.sh, DE apps-developer-install.sh, EE apps-enterprise-install.sh)"),
