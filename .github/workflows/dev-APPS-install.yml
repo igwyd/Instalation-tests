@@ -5,7 +5,7 @@ name: dev APPS install
 # Apps is up, Docs survived (port move / data migration) and an editor opens from this Docs.
 # Each job terminates its EC2 instance (root EBS volume included) and deletes its DNS record at the end.
 # cleanup=true terminates what cancelled runs left behind (tag Name=demin_apps-*, DNS records
-# apps-<case>-<run>.[div.]<APPS_DNS_ZONE>).
+# div-apps-<case>-<run>.[div.]<APPS_DNS_ZONE>).
 # Cases 13-18: Docs serves HTTPS on 443 (self-signed, wildcard or Let's Encrypt) for a Route53 name created per run,
 # and Apps has to take that certificate over.
 # Case 19: a license is put into Docs right after its install; the Apps wizard must then not ask for one.
@@ -57,9 +57,9 @@ jobs:
         run: |
           ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "$APPS_DNS_ZONE" --query 'HostedZones[0].Id' --output text)
           aws route53 list-resource-record-sets --hosted-zone-id "$ZONE_ID" \
-            --query "ResourceRecordSets[?Type=='A' && starts_with(Name, 'apps-')]" --output json > rr.json
-          # the zone is shared: only names this workflow creates, apps-<case>-<run>.[div.]<zone>
-          python3 -c "import json, re, os; z = re.escape(os.environ['APPS_DNS_ZONE']); rr = [x for x in json.load(open('rr.json')) if re.fullmatch(rf'apps-\d+-\d+\.(div\.)?{z}\.', x['Name'])]; print(len(rr)); json.dump({'Changes': [{'Action': 'DELETE', 'ResourceRecordSet': x} for x in rr]}, open('batch.json', 'w'))" > count
+            --query "ResourceRecordSets[?Type=='A' && starts_with(Name, 'div-apps-')]" --output json > rr.json
+          # the zone is shared: only names this workflow creates, div-apps-<case>-<run>.[div.]<zone>
+          python3 -c "import json, re, os; z = re.escape(os.environ['APPS_DNS_ZONE']); rr = [x for x in json.load(open('rr.json')) if re.fullmatch(rf'div-apps-\d+-\d+\.(div\.)?{z}\.', x['Name'])]; print(len(rr)); json.dump({'Changes': [{'Action': 'DELETE', 'ResourceRecordSet': x} for x in rr]}, open('batch.json', 'w'))" > count
           [ "$(cat count)" = "0" ] && { echo "No DNS records to delete"; exit 0; }
           jq -r '.Changes[].ResourceRecordSet.Name' batch.json
           aws route53 change-resource-record-sets --hosted-zone-id "$ZONE_ID" --change-batch file://batch.json
@@ -216,7 +216,7 @@ jobs:
             # curl/browser skip verification only for the self-signed cert, a Let's Encrypt one must validate
             if [ "$DOCS_SSL" != "none" ]; then
               [ "$DOCS_SSL" = "wildcard" ] && PARENT=$APPS_WILDCARD_DOMAIN || PARENT=$APPS_DNS_ZONE
-              echo "DOMAIN=apps-${{ matrix.case }}-${{ github.run_number }}.$PARENT"
+              echo "DOMAIN=div-apps-${{ matrix.case }}-${{ github.run_number }}.$PARENT"
               [ "$DOCS_SSL" = "selfsigned" ] && echo "CURL_TLS=-k" || echo "CURL_TLS="
             fi
           } >> "$GITHUB_ENV"

@@ -97,7 +97,7 @@ Cases 1–12: within each method every architecture gets all three Docs ports; C
 | 18 | docker | Debian 13 | arm64 | EE | 80 + 443 | self-signed |
 | 19 | package | Debian 12 | arm64 | EE | 7070 | — (DE license added to Docs before Apps) |
 
-Cases 13–18: Docs already serves HTTPS on 443 for `apps-<case>-<run>.qa-onlyoffice.net` (`.div.qa-onlyoffice.net` for the wildcard cases; an A record created in Route53 for the run) and Apps must take the certificate over: Apps serves 443 with the same certificate, redirects HTTP to HTTPS and moves Docs to plain HTTP behind itself. The Let's Encrypt cases also check that renewal is handed over to Apps.
+Cases 13–18: Docs already serves HTTPS on 443 for `div-apps-<case>-<run>.qa-onlyoffice.net` (`.div.qa-onlyoffice.net` for the wildcard cases; an A record created in Route53 for the run) and Apps must take the certificate over: Apps serves 443 with the same certificate, redirects HTTP to HTTPS and moves Docs to plain HTTP behind itself. The Let's Encrypt cases also check that renewal is handed over to Apps.
 
 Case 19: the Apps DE license (`APPS_LICENSE_DE`) is put into Docs right after its install; Apps EE is then installed on top and its wizard must not ask for a license (`LICENSE_REQUIRED=false`).
 

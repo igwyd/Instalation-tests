@@ -61,7 +61,7 @@ jobs:
           ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "$APPS_DNS_ZONE" --query 'HostedZones[0].Id' --output text)
           aws route53 list-resource-record-sets --hosted-zone-id "$ZONE_ID" \
             --query "ResourceRecordSets[?Type=='A' && starts_with(Name, 'rapps-')]" --output json > rr.json
-          # the zone is shared: only names this workflow creates, rapps-<case>-<run>.[div.]<zone> (dev uses apps-)
+          # the zone is shared: only names this workflow creates, rapps-<case>-<run>.[div.]<zone> (dev uses div-apps-)
           python3 -c "import json, re, os; z = re.escape(os.environ['APPS_DNS_ZONE']); rr = [x for x in json.load(open('rr.json')) if re.fullmatch(rf'rapps-\d+-\d+\.(div\.)?{z}\.', x['Name'])]; print(len(rr)); json.dump({'Changes': [{'Action': 'DELETE', 'ResourceRecordSet': x} for x in rr]}, open('batch.json', 'w'))" > count
           [ "$(cat count)" = "0" ] && { echo "No DNS records to delete"; exit 0; }
           jq -r '.Changes[].ResourceRecordSet.Name' batch.json
