@@ -593,11 +593,18 @@ jobs:
           echo "Docs licenseInfo: $INFO"
           echo "DOCS_LICENSE_INFO=${INFO:0:300}" >> $GITHUB_ENV
 
+      # --with-deps runs apt-get on the runner; a stuck mirror held case 14 here for over an hour (2026-10-22),
+      # a normal one takes 20 s to ~14 min; a retry picks up what the previous attempt already fetched
       - name: Setup Playwright
         continue-on-error: true
+        timeout-minutes: 35
         run: |
           pip install --quiet playwright
-          python3 -m playwright install --with-deps chromium
+          for i in 1 2 3; do
+            timeout 600 python3 -m playwright install --with-deps chromium && break
+            echo "::warning::playwright install attempt $i failed or timed out"
+            sleep 20
+          done
 
       # as a user does: open /welcome, press "Install free apps", read the command from the pop-up
       - name: Check welcome page
