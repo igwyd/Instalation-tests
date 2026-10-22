@@ -684,9 +684,13 @@ jobs:
           CRON=$(ls /etc/cron.weekly/*-renew-letsencrypt 2>/dev/null | head -1)
           if [ -n "$CRON" ]; then
             echo "WHERE=$CRON"
-            CMD=$(sed -n '/docker run/,/certbot renew/p' "$CRON" | sed 's/--force-renewal/--dry-run/; s/2>&1 | tee.*//')
+            # the file up to the certbot run, so the standalone format's `declare -p CERTBOT_DOCKER_ARGS` (volumes)
+            # comes along - without it certbot saw no certificates and "renewed" nothing in 4 s (case 16, 2026-10-21)
+            CMD=$(sed -n '1,/certbot\/certbot renew/p' "$CRON" | sed 's/--force-renewal//; s#certbot/certbot renew#certbot/certbot renew --dry-run --no-random-sleep-on-renew#; s/2>&1 | tee.*//')
             echo "+ $CMD"
-            bash -c "$CMD" && echo "RENEW=ok" || echo "RENEW=failed"
+            OUT=$(bash -c "$CMD" 2>&1); echo "$OUT"
+            # exit 0 also when there was nothing to renew: a real check has to have renewed something
+            echo "$OUT" | grep -q "all simulated renewals succeeded" && echo "RENEW=ok" || echo "RENEW=failed"
             exit
           fi
           for c in $(docker ps --format '{{.Names}}'); do

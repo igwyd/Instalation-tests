@@ -534,9 +534,11 @@ jobs:
 
       # ==================== Apps ====================
       # The published command (checked above) pulls production packages that do not exist yet, so Apps
-      # is installed with the very script the welcome page offers (download.onlyoffice.com/apps/<per-edition
-      # script>, mode package|docker) plus -gb <branch> and the 4testing repos (packages) / 4testing- images
-      # (docker): the script only picks the installers from that branch, the edition comes from its default.
+      # is installed with the script the welcome page names (<per-edition script>, mode package|docker) plus
+      # -gb <branch> and the 4testing repos (packages) / 4testing- images (docker). The script itself comes from
+      # the branch too, not from download.onlyoffice.com/apps/: it changes there before it is published. Only
+      # apps-install.sh lives in the branch; the per-edition ones are published as its copy with another
+      # default -it, so they are made the same way here - the edition still comes from the script's default.
       - name: Add 4testing repos for Docs and Apps
         if: matrix.method == 'package'
         continue-on-error: true
@@ -575,9 +577,13 @@ jobs:
           fi
           # stdin from /dev/null: an unexpected prompt fails fast instead of eating the heredoc; the
           # timeout guards against prompt loops that spin on EOF
-          ssh $SSH_OPTS $U@$EC2_IP "sudo env ARGS=$(printf %q "$ARGS") SCRIPT=$EXPECTED_APPS_SCRIPT bash -s" << 'EOF'
+          ssh $SSH_OPTS $U@$EC2_IP "sudo env ARGS=$(printf %q "$ARGS") SCRIPT=$EXPECTED_APPS_SCRIPT BRANCH=$APPS_BRANCH TYPE=$DS_TYPE bash -s" << 'EOF'
           mkdir -p /opt/apps-test && cd /opt/apps-test
-          curl -fsSLO "https://download.onlyoffice.com/apps/${SCRIPT}"
+          # a failed download must not leave an empty script that "installs" with exit 0
+          curl -fsSL -o "$SCRIPT" "https://raw.githubusercontent.com/ONLYOFFICE/DocSpace-buildtools/${BRANCH}/install/OneClickInstall/apps-install.sh" \
+            || { echo "cannot download apps-install.sh from $BRANCH" > apps-install.out; echo 1 > apps-install.rc; exit; }
+          sed -i "s/^PARAMETERS=(-it COMMUNITY)/PARAMETERS=(-it ${TYPE})/" "$SCRIPT"
+          grep -n '^PARAMETERS=(-it' "$SCRIPT"
           timeout 5400 bash $SCRIPT $ARGS < /dev/null > apps-install.out 2>&1
           echo $? > apps-install.rc
           EOF
@@ -737,9 +743,13 @@ jobs:
           CRON=$(ls /etc/cron.weekly/*-renew-letsencrypt 2>/dev/null | head -1)
           if [ -n "$CRON" ]; then
             echo "WHERE=$CRON"
-            CMD=$(sed -n '/docker run/,/certbot renew/p' "$CRON" | sed 's/--force-renewal/--dry-run/; s/2>&1 | tee.*//')
+            # the file up to the certbot run, so the standalone format's `declare -p CERTBOT_DOCKER_ARGS` (volumes)
+            # comes along - without it certbot saw no certificates and "renewed" nothing in 4 s (case 16, 2026-10-21)
+            CMD=$(sed -n '1,/certbot\/certbot renew/p' "$CRON" | sed 's/--force-renewal//; s#certbot/certbot renew#certbot/certbot renew --dry-run --no-random-sleep-on-renew#; s/2>&1 | tee.*//')
             echo "+ $CMD"
-            bash -c "$CMD" && echo "RENEW=ok" || echo "RENEW=failed"
+            OUT=$(bash -c "$CMD" 2>&1); echo "$OUT"
+            # exit 0 also when there was nothing to renew: a real check has to have renewed something
+            echo "$OUT" | grep -q "all simulated renewals succeeded" && echo "RENEW=ok" || echo "RENEW=failed"
             exit
           fi
           for c in $(docker ps --format '{{.Names}}'); do
