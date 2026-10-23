@@ -199,7 +199,7 @@ jobs:
           # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
           echo "HC_PORT_EE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}:8083/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck EE: $HC"
-          echo "HEALTHCHECK_EE=$HC" >> $GITHUB_ENV
+          echo "HEALTHCHECK_EE=$(printf %s "$HC" | tr -d '\r\n' | head -c 60)" >> $GITHUB_ENV  # one line: an HTML error page breaks GITHUB_ENV
 
           SSH_TARGET=ubuntu@${{ env.EC2_IP }} PKG=onlyoffice-documentserver-ee SUFFIX=EE \
             EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
@@ -332,7 +332,7 @@ jobs:
           # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
           echo "HC_PORT_DE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}:8083/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck DE: $HC"
-          echo "HEALTHCHECK_DE=$HC" >> $GITHUB_ENV
+          echo "HEALTHCHECK_DE=$(printf %s "$HC" | tr -d '\r\n' | head -c 60)" >> $GITHUB_ENV  # one line: an HTML error page breaks GITHUB_ENV
 
           SSH_TARGET=ubuntu@${{ env.EC2_IP }} PKG=onlyoffice-documentserver-de SUFFIX=DE \
             EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
@@ -464,7 +464,7 @@ jobs:
           # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
           echo "HC_PORT_CE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}:8083/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck CE: $HC"
-          echo "HEALTHCHECK_CE=$HC" >> $GITHUB_ENV
+          echo "HEALTHCHECK_CE=$(printf %s "$HC" | tr -d '\r\n' | head -c 60)" >> $GITHUB_ENV  # one line: an HTML error page breaks GITHUB_ENV
 
           SSH_TARGET=ubuntu@${{ env.EC2_IP }} PKG=onlyoffice-documentserver SUFFIX=CE \
             EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
@@ -590,12 +590,12 @@ jobs:
       - name: Check healthcheck EE RELEASE and save JWT before upgrade
         continue-on-error: true
         run: |
-          # Release (pre-10.0.0) defaults to port 80, not 8083 (that default started in 10.0.0)
-          HC=$(curl -s "http://${{ env.EC2_IP }}:80/healthcheck" || echo "error")
+          # Release is 10.0.0+ now: default port 8083
+          HC=$(curl -s "http://${{ env.EC2_IP }}:8083/healthcheck" || echo "error")
           # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
-          echo "HC_PORT_EE_RELEASE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}:80/healthcheck" || true)" >> $GITHUB_ENV
+          echo "HC_PORT_EE_RELEASE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}:8083/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck EE RELEASE: $HC"
-          echo "HEALTHCHECK_EE_RELEASE=$HC" >> $GITHUB_ENV
+          echo "HEALTHCHECK_EE_RELEASE=$(printf %s "$HC" | tr -d '\r\n' | head -c 60)" >> $GITHUB_ENV  # one line: an HTML error page breaks GITHUB_ENV
 
           SSH_TARGET=ubuntu@${{ env.EC2_IP }} PKG=onlyoffice-documentserver-ee SUFFIX=EE_RELEASE \
             bash .github/scripts/check-ds-version.sh
@@ -651,12 +651,12 @@ jobs:
       - name: Check healthcheck, version and JWT after upgrade
         continue-on-error: true
         run: |
-          # Upgrade preserves the port that was already configured (80, from the release install)
-          HC=$(curl -s "http://${{ env.EC2_IP }}:80/healthcheck" || echo "error")
+          # Upgrade preserves the release port (8083)
+          HC=$(curl -s "http://${{ env.EC2_IP }}:8083/healthcheck" || echo "error")
           # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
-          echo "HC_PORT_EE_UPGRADE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}:80/healthcheck" || true)" >> $GITHUB_ENV
+          echo "HC_PORT_EE_UPGRADE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ env.EC2_IP }}:8083/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck EE after upgrade: $HC"
-          echo "HEALTHCHECK_EE_UPGRADE=$HC" >> $GITHUB_ENV
+          echo "HEALTHCHECK_EE_UPGRADE=$(printf %s "$HC" | tr -d '\r\n' | head -c 60)" >> $GITHUB_ENV  # one line: an HTML error page breaks GITHUB_ENV
 
           SSH_TARGET=ubuntu@${{ env.EC2_IP }} PKG=onlyoffice-documentserver-ee SUFFIX=EE_UPGRADE \
             EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
@@ -695,8 +695,8 @@ jobs:
         continue-on-error: true
         run: |
           cd Dep.Tests/puppeteer/engine
-          # Upgrade kept the release's port (80) — repatch from the :8083 URL set for the earlier fresh installs
-          sed -i -E "s#\"url\": \"http://[^:]+:[0-9]+/example/?\"#\"url\": \"http://${{ env.EC2_IP }}:80/example/\"#" ../config_chrome_linux.json
+          # Upgrade kept the release port (8083) — same as the fresh installs
+          sed -i -E "s#\"url\": \"http://[^:]+:[0-9]+/example/?\"#\"url\": \"http://${{ env.EC2_IP }}:8083/example/\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
