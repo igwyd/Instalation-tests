@@ -694,6 +694,17 @@ jobs:
             # the file up to the certbot run, so the standalone format's `declare -p CERTBOT_DOCKER_ARGS` (volumes)
             # comes along - without it certbot saw no certificates and "renewed" nothing in 4 s (case 16, 2026-10-21)
             CMD=$(sed -n '1,/certbot\/certbot renew/p' "$CRON" | sed 's/--force-renewal//; s#certbot/certbot renew#certbot/certbot renew --dry-run --no-random-sleep-on-renew#; s/2>&1 | tee.*//')
+            # certbot locks its config/work/logs dirs, and right after the install apps-ssl-setup's background
+            # certbot may still hold them ("Another instance of Certbot is already running", dev case 16, 2026-10-23).
+            # So the dry run gets a copy of the config and empty work/logs dirs instead of the host ones.
+            T=$(mktemp -d)
+            for d in /etc/letsencrypt /var/lib/letsencrypt /var/log; do
+              src=$(grep -oP "[^\"=\s]+(?=:$d(\"|\s|$))" <<< "$CMD" | head -1)
+              [ -n "$src" ] || continue
+              mkdir -p "$T$d"
+              [ "$d" = /etc/letsencrypt ] && cp -a "$src/." "$T$d/"
+              CMD=${CMD//"$src:$d"/"$T$d:$d"}
+            done
             echo "+ $CMD"
             OUT=$(bash -c "$CMD" 2>&1); echo "$OUT"
             # exit 0 also when there was nothing to renew: a real check has to have renewed something
