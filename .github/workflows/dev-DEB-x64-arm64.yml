@@ -209,7 +209,7 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            "sudo systemctl start ds-example"
+            "sudo systemctl start ds-example; for i in \$(seq 1 30); do [ \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8083/example/)\" = 200 ] && break; sleep 2; done"
 
       - name: Add example host to DS ipfilter
         continue-on-error: true
@@ -342,7 +342,7 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            "sudo systemctl start ds-example"
+            "sudo systemctl start ds-example; for i in \$(seq 1 30); do [ \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8083/example/)\" = 200 ] && break; sleep 2; done"
 
       - name: Add example host to DS ipfilter
         continue-on-error: true
@@ -474,7 +474,7 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            "sudo systemctl start ds-example"
+            "sudo systemctl start ds-example; for i in \$(seq 1 30); do [ \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8083/example/)\" = 200 ] && break; sleep 2; done"
 
       - name: Add example host to DS ipfilter
         continue-on-error: true
@@ -678,7 +678,7 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
-            "sudo systemctl start ds-example"
+            "sudo systemctl start ds-example; for i in \$(seq 1 30); do [ \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8083/example/)\" = 200 ] && break; sleep 2; done"
 
       - name: Add example host to DS ipfilter
         continue-on-error: true

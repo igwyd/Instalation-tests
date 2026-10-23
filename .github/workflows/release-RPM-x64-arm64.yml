@@ -194,7 +194,7 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo systemctl start ds-example"
+            "sudo systemctl start ds-example; for i in \$(seq 1 30); do [ \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8083/example/)\" = 200 ] && break; sleep 2; done"
 
       - name: Clear puppeteer output before EE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -323,7 +323,7 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo systemctl start ds-example"
+            "sudo systemctl start ds-example; for i in \$(seq 1 30); do [ \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8083/example/)\" = 200 ] && break; sleep 2; done"
 
       - name: Clear puppeteer output before DE tests
         run: rm -rf Dep.Tests/puppeteer/out
@@ -451,7 +451,7 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} \
-            "sudo systemctl start ds-example"
+            "sudo systemctl start ds-example; for i in \$(seq 1 30); do [ \"\$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8083/example/)\" = 200 ] && break; sleep 2; done"
 
       - name: Clear puppeteer output before CE tests
         run: rm -rf Dep.Tests/puppeteer/out
