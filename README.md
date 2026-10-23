@@ -11,7 +11,6 @@ Everything is scheduled on **Wednesday**. Jobs = GitHub-hosted runners the slot 
 
 | UTC | UTC+3 | Workflow | Jobs |
 |-----|--------|----------|------|
-| 07:30 | 10:30 Wed | Update version in README | 1 |
 | 11:00 | 14:00 Wed | dev-DEB | 2 |
 | 11:00 | 14:00 Wed | dev-RPM | 2 |
 | 11:00 | 14:00 Wed | dev-OS | 14 |

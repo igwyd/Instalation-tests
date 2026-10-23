@@ -97,3 +97,34 @@ jobs:
           if [ "${{ inputs.snapshot }}" = "true" ]; then
             echo "Snapshot: https://${{ vars.CLOUDFRONT_DOMAIN }}/snapshots/${{ env.SNAPSHOT_ID }}/index.html" >> $GITHUB_STEP_SUMMARY
           fi
+
+  update-readme:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Update version badge in README.md
+        run: |
+          VERSION="v${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}"
+          FILE="README.md"
+          START="<!-- onlyoffice-version-start -->"
+          END="<!-- onlyoffice-version-end -->"
+
+          CURRENT=$(grep -oP "$START\K.*?(?=$END)" "$FILE")
+          echo "Current: $CURRENT | Target: $VERSION"
+
+          if [ "$CURRENT" != "$VERSION" ]; then
+            echo "Updating version..."
+            sed -i "s|\($START\).*\($END\)|\1$VERSION\2|" "$FILE"
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            git add README.md
+            git commit -m "[Deploy Dashboard] Update version in README to $VERSION"
+            git push
+          else
+            echo "Version is up to date, skipping."
+          fi
