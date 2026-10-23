@@ -811,7 +811,7 @@ jobs:
           cd Dep.Tests/puppeteer/engine
           # Switch off the HTTPS domain to plain HTTP/IP — avoids mixed-content blocking when
           # the browser fetches presigned URLs directly from MinIO (also plain HTTP)
-          sed -i -E "s#\"url\": \"https?://[^\"]*/example/?\"#\"url\": \"http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/example/\"#" ../config_chrome_linux.json
+          sed -i -E "s#\"url\": \"https?://[^\"]*/example/?\"#\"url\": \"http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
