@@ -4,118 +4,57 @@ on:
   # schedule:  # отключено: новые dev-версии ещё не выложены
   #   - cron: '0 14 * * 3'  # Wednesday 17:00 UTC+3
   workflow_dispatch:
+    inputs:
+      db:
+        description: 'Which matrix entries to run: all or a comma-separated list (mysql, postgres, postgres14..17, mssql, oracle, oracle-thick, dameng, mariadb)'
+        default: all
 
 permissions:
   contents: read
 
 jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        env:
+          DB_INPUT: ${{ inputs.db }}
+        run: |
+          cat > all.json <<'EOF'
+          [
+            {"db": "mysql", "db_image": "mysql:latest", "db_name": "mysqldb", "db_port": 3306, "db_type": "mysql", "db_database": "onlyoffice", "db_user": "onlyoffice", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:500", "k6_stage_main": "9m:500"},
+            {"db": "postgres", "db_image": "postgres:latest", "db_name": "postgresdb", "db_port": 5432, "db_type": "postgres", "db_database": "onlyoffice", "db_user": "onlyoffice", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:500", "k6_stage_main": "9m:500"},
+            {"db": "postgres14", "db_image": "postgres:14", "db_name": "postgresdb", "db_port": 5432, "db_type": "postgres", "db_database": "onlyoffice", "db_user": "onlyoffice", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:500", "k6_stage_main": "9m:500"},
+            {"db": "postgres15", "db_image": "postgres:15", "db_name": "postgresdb", "db_port": 5432, "db_type": "postgres", "db_database": "onlyoffice", "db_user": "onlyoffice", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:500", "k6_stage_main": "9m:500"},
+            {"db": "postgres16", "db_image": "postgres:16", "db_name": "postgresdb", "db_port": 5432, "db_type": "postgres", "db_database": "onlyoffice", "db_user": "onlyoffice", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:500", "k6_stage_main": "9m:500"},
+            {"db": "postgres17", "db_image": "postgres:17", "db_name": "postgresdb", "db_port": 5432, "db_type": "postgres", "db_database": "onlyoffice", "db_user": "onlyoffice", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:500", "k6_stage_main": "9m:500"},
+            {"db": "mssql", "db_image": "docker.io/igwyd890/mssql-onlyoffice:2025", "db_name": "mssqldb", "db_port": 1433, "db_type": "mssql", "db_database": "onlyoffice", "db_user": "sa", "db_pwd": "onlYoff1ce", "k6_stage_ramp": "1m:50", "k6_stage_main": "9m:50"},
+            {"db": "oracle", "db_image": "container-registry.oracle.com/database/free:latest-lite", "db_name": "oracledb", "db_port": 1521, "db_type": "oracle", "db_database": "FREEPDB1", "db_user": "SYSTEM", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:100", "k6_stage_main": "9m:100"},
+            {"db": "oracle-thick", "db_image": "container-registry.oracle.com/database/free:latest-lite", "db_name": "oracledb", "db_port": 1521, "db_type": "oracle", "db_database": "FREEPDB1", "db_user": "SYSTEM", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:100", "k6_stage_main": "9m:100", "oracle_thin": "false"},
+            {"db": "dameng", "db_image": "igwyd890/dameng-onlyoffice:8.1.3", "db_name": "damengdb", "db_port": 5236, "db_type": "dameng", "db_database": "onlyoffice", "db_user": "onlyoffice", "db_pwd": "Onlyoffice_2026", "k6_stage_ramp": "1m:500", "k6_stage_main": "9m:500"},
+            {"db": "mariadb", "db_image": "mariadb:latest", "db_name": "mariadbdb", "db_port": 3306, "db_type": "mysql", "db_database": "onlyoffice", "db_user": "onlyoffice", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:500", "k6_stage_main": "9m:500"}
+          ]
+          EOF
+          # ponytail: exact match on matrix names, no globbing
+          SEL=$(echo "${DB_INPUT:-all}" | tr -d ' ')
+          if [ "$SEL" = "all" ]; then
+            jq -c . all.json > m.json
+          else
+            jq -c --arg sel "$SEL" '[.[] | select(.db as $d | ($sel | split(",") | index($d)))]' all.json > m.json
+          fi
+          [ "$(jq length m.json)" -gt 0 ] || { echo "No matrix entry matches: $SEL"; exit 1; }
+          echo "matrix=$(cat m.json)" >> "$GITHUB_OUTPUT"
+
   db-check:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - db: mysql
-            db_image: mysql:latest
-            db_name: mysqldb
-            db_port: 3306
-            db_type: mysql
-            db_database: onlyoffice
-            db_user: onlyoffice
-            db_pwd: onlyoffice
-            k6_stage_ramp: "1m:500"
-            k6_stage_main: "9m:500"
-          - db: postgres
-            db_image: postgres:latest
-            db_name: postgresdb
-            db_port: 5432
-            db_type: postgres
-            db_database: onlyoffice
-            db_user: onlyoffice
-            db_pwd: onlyoffice
-            k6_stage_ramp: "1m:500"
-            k6_stage_main: "9m:500"
-          - db: postgres14
-            db_image: postgres:14
-            db_name: postgresdb
-            db_port: 5432
-            db_type: postgres
-            db_database: onlyoffice
-            db_user: onlyoffice
-            db_pwd: onlyoffice
-            k6_stage_ramp: "1m:500"
-            k6_stage_main: "9m:500"
-          - db: postgres15
-            db_image: postgres:15
-            db_name: postgresdb
-            db_port: 5432
-            db_type: postgres
-            db_database: onlyoffice
-            db_user: onlyoffice
-            db_pwd: onlyoffice
-            k6_stage_ramp: "1m:500"
-            k6_stage_main: "9m:500"
-          - db: postgres16
-            db_image: postgres:16
-            db_name: postgresdb
-            db_port: 5432
-            db_type: postgres
-            db_database: onlyoffice
-            db_user: onlyoffice
-            db_pwd: onlyoffice
-            k6_stage_ramp: "1m:500"
-            k6_stage_main: "9m:500"
-          - db: postgres17
-            db_image: postgres:17
-            db_name: postgresdb
-            db_port: 5432
-            db_type: postgres
-            db_database: onlyoffice
-            db_user: onlyoffice
-            db_pwd: onlyoffice
-            k6_stage_ramp: "1m:500"
-            k6_stage_main: "9m:500"
-          - db: mssql
-            db_image: docker.io/igwyd890/mssql-onlyoffice:2025
-            db_name: mssqldb
-            db_port: 1433
-            db_type: mssql
-            db_database: onlyoffice
-            db_user: sa
-            db_pwd: onlYoff1ce
-            k6_stage_ramp: "1m:50"
-            k6_stage_main: "9m:50"
-          - db: oracle
-            db_image: container-registry.oracle.com/database/free:latest-lite
-            db_name: oracledb
-            db_port: 1521
-            db_type: oracle
-            db_database: FREEPDB1
-            db_user: SYSTEM
-            db_pwd: onlyoffice
-            k6_stage_ramp: "1m:100"
-            k6_stage_main: "9m:100"
-          - db: dameng
-            db_image: igwyd890/dameng-onlyoffice:8.1.3
-            db_name: damengdb
-            db_port: 5236
-            db_type: dameng
-            db_database: onlyoffice
-            db_user: onlyoffice
-            db_pwd: Onlyoffice_2026
-            k6_stage_ramp: "1m:500"
-            k6_stage_main: "9m:500"
-          - db: mariadb
-            db_image: mariadb:latest
-            db_name: mariadbdb
-            db_port: 3306
-            db_type: mysql
-            db_database: onlyoffice
-            db_user: onlyoffice
-            db_pwd: onlyoffice
-            k6_stage_ramp: "1m:500"
-            k6_stage_main: "9m:500"
+        include: ${{ fromJSON(needs.prepare.outputs.matrix) }}
 
     steps:
       - name: Checkout repo
@@ -147,7 +86,7 @@ jobs:
                 -e SA_PASSWORD=onlYoff1ce \
                 ${{ matrix.db_image }}
               ;;
-            oracle)
+            oracle | oracle-thick)
               docker run -d --network ds-network --name ${{ matrix.db_name }} \
                 -e ORACLE_PWD=${{ matrix.db_pwd }} \
                 ${{ matrix.db_image }}
@@ -218,6 +157,21 @@ jobs:
           echo '--- license ---'
           docker exec onlyoffice ls /var/www/onlyoffice/Data/
 
+      - name: Set Oracle driver mode (thin=${{ matrix.oracle_thin || 'true' }})
+        if: matrix.db_type == 'oracle'
+        run: |
+          # thick needs Oracle Instant Client, bundled in the image at /usr/share/instantclient
+          docker cp onlyoffice:/etc/onlyoffice/documentserver/local.json local.json
+          jq '.services.CoAuthoring.sql.oracleExtraOptions.thin = ${{ matrix.oracle_thin || 'true' }}' local.json > local.new.json
+          docker cp local.new.json onlyoffice:/etc/onlyoffice/documentserver/local.json
+          docker exec onlyoffice supervisorctl restart ds:docservice ds:converter
+          sleep 30
+          echo "--- oracleExtraOptions in local.json ---"
+          docker exec onlyoffice jq '.services.CoAuthoring.sql' /etc/onlyoffice/documentserver/local.json || docker exec onlyoffice grep -A3 oracleExtraOptions /etc/onlyoffice/documentserver/local.json
+          echo "--- Instant Client ---"
+          docker exec onlyoffice bash -c 'ls /usr/share/instantclient | grep -m3 libclntsh; echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"'
+          docker exec onlyoffice supervisorctl status all || true
+
       - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
         continue-on-error: true
         run: |
@@ -244,7 +198,7 @@ jobs:
             mssql)
               docker exec ${{ matrix.db_name }} /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "onlYoff1ce" -Q "SELECT @@VERSION" -C
               ;;
-            oracle)
+            oracle | oracle-thick)
               docker exec ${{ matrix.db_name }} sqlplus -version
               ;;
             dameng)
@@ -284,6 +238,27 @@ jobs:
         uses: ./.github/actions/run-puppeteer
         with:
           url: http://${{ env.RUNNER_IP }}/example
+
+      - name: Check Oracle driver mode (thin=${{ matrix.oracle_thin || 'true' }})
+        if: matrix.db_type == 'oracle'
+        continue-on-error: true
+        run: |
+          WANT=${{ matrix.oracle_thin == 'false' && 'thk' || 'thn' }}
+          DRV=$(docker exec -i ${{ matrix.db_name }} sqlplus -s ${{ matrix.db_user }}/${{ matrix.db_pwd }}@localhost:${{ matrix.db_port }}/${{ matrix.db_database }} <<'SQL'
+          set heading off feedback off
+          select client_driver || ' x' || count(*) from v$session_connect_info where client_driver like 'node-oracledb%' group by client_driver;
+          SQL
+          )
+          echo "--- DS sessions in Oracle by client_driver ---"
+          echo "${DRV:-<none>}"
+          echo "expected: node-oracledb $WANT"
+          echo "--- DS logs: Oracle driver errors (DPI-/NJS-/ORA-) ---"
+          docker exec onlyoffice bash -c "grep -rhE 'DPI-|NJS-|ORA-[0-9]+|thick|Instant Client' /var/log/onlyoffice/documentserver/docservice/*.log /var/log/onlyoffice/documentserver/converter/*.log | sort -u | cut -c1-300 | head -20" || true
+          if echo "$DRV" | grep -q "node-oracledb $WANT" && ! echo "$DRV" | grep -q "node-oracledb $([ $WANT = thk ] && echo thn || echo thk)"; then
+            echo "ORACLE_MODE_OK=true" >> "$GITHUB_ENV"
+          else
+            echo "ORACLE_MODE_OK=false" >> "$GITHUB_ENV"; exit 1
+          fi
 
       - name: Documentserver logs PUPPETEER TEST
         continue-on-error: true
@@ -418,6 +393,8 @@ jobs:
             PPT_ICON="✅"; PPT_LABEL="OK"
           fi
 
+          if [ "${{ matrix.db_type }}" = "oracle" ] && [ "${ORACLE_MODE_OK:-}" != "true" ]; then echo "Oracle driver mode not confirmed (ORACLE_MODE_OK=${ORACLE_MODE_OK:-unset})"; FAILED=1; fi
+
           DS_ERRORS="${DS_LOG_ERRORS:-0}"
           DS_DETAIL="${DS_ERRORS} errors"
           if [ "$DS_ERRORS" -gt 0 ]; then
@@ -491,6 +468,7 @@ jobs:
               "puppeteer_total": int(os.environ.get('PUPPETEER_TOTAL', '0') or '0'),
               "ds_log_errors": int(os.environ.get('DS_LOG_ERRORS', '0') or '0'),
               "ds_log_errors_text": os.environ.get('DS_LOG_ERRORS_TEXT', ''),
+              "oracle_mode_ok": os.environ.get('ORACLE_MODE_OK', ''),
               "conclusion": os.environ.get('FINAL_CONCLUSION', 'failure'),
               "k6": {
                   "exceptions": {

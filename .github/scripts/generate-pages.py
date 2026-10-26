@@ -20,6 +20,7 @@ DBS = [
     ("PostgreSQL 17", "postgres17"),
     ("MSSQL",         "mssql"),
     ("Oracle",        "oracle"),
+    ("Oracle thick",  "oracle-thick"),
     ("Dameng",        "dameng"),
     ("MariaDB",       "mariadb"),
 ]
