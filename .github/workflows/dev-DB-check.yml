@@ -164,12 +164,16 @@ jobs:
           docker cp onlyoffice:/etc/onlyoffice/documentserver/local.json local.json
           jq '.services.CoAuthoring.sql.oracleExtraOptions.thin = ${{ matrix.oracle_thin || 'true' }}' local.json > local.new.json
           docker cp local.new.json onlyoffice:/etc/onlyoffice/documentserver/local.json
+          if [ "${{ matrix.oracle_thin }}" = "false" ]; then
+            # LD_LIBRARY_PATH in docker run doesn't reach ds-converter (supervisor overrides it), so register the dir in ldconfig
+            docker exec onlyoffice bash -c 'echo /usr/share/instantclient > /etc/ld.so.conf.d/instantclient.conf && ldconfig'
+          fi
           docker exec onlyoffice supervisorctl restart ds:docservice ds:converter
           sleep 30
           echo "--- oracleExtraOptions in local.json ---"
           docker exec onlyoffice jq '.services.CoAuthoring.sql' /etc/onlyoffice/documentserver/local.json || docker exec onlyoffice grep -A3 oracleExtraOptions /etc/onlyoffice/documentserver/local.json
           echo "--- Instant Client ---"
-          docker exec onlyoffice bash -c 'ls /usr/share/instantclient | grep -m3 libclntsh; echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"'
+          docker exec onlyoffice bash -c 'ldconfig -p | grep libclntsh || echo "libclntsh not in ldconfig cache"; echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"'
           docker exec onlyoffice supervisorctl status all || true
 
       - name: INFO about installed Package, must be ONLYOFFICE-Docs EE
@@ -254,7 +258,8 @@ jobs:
           echo "expected: node-oracledb $WANT"
           echo "--- DS logs: Oracle driver errors (DPI-/NJS-/ORA-) ---"
           docker exec onlyoffice bash -c "grep -rhE 'DPI-|NJS-|ORA-[0-9]+|thick|Instant Client' /var/log/onlyoffice/documentserver/docservice/*.log /var/log/onlyoffice/documentserver/converter/*.log | sort -u | cut -c1-300 | head -20" || true
-          if echo "$DRV" | grep -q "node-oracledb $WANT" && ! echo "$DRV" | grep -q "node-oracledb $([ $WANT = thk ] && echo thn || echo thk)"; then
+          # client_driver looks like "node-oracledb : 6.10.0 thn"
+          if echo "$DRV" | grep -q "node-oracledb.* $WANT " && ! echo "$DRV" | grep -q "node-oracledb.* $([ $WANT = thk ] && echo thn || echo thk) "; then
             echo "ORACLE_MODE_OK=true" >> "$GITHUB_ENV"
           else
             echo "ORACLE_MODE_OK=false" >> "$GITHUB_ENV"; exit 1
