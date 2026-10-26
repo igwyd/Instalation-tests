@@ -167,6 +167,9 @@ jobs:
           if [ "${{ matrix.oracle_thin }}" = "false" ]; then
             # LD_LIBRARY_PATH in docker run doesn't reach ds-converter (supervisor overrides it), so register the dir in ldconfig
             docker exec onlyoffice bash -c 'echo /usr/share/instantclient > /etc/ld.so.conf.d/instantclient.conf && ldconfig'
+            # pkg unpacks the thick .node into <documentserver>/.cache, but that dir is read-only (dr-xr-xr-x) for ds:
+            # ds-converter fails with "EACCES mkdir .../.cache/pkg" (NJS-045) and silently falls back to thin
+            docker exec onlyoffice bash -c 'mkdir -p /var/www/onlyoffice/documentserver/.cache && chown -R ds:ds /var/www/onlyoffice/documentserver/.cache'
           fi
           docker exec onlyoffice supervisorctl restart ds:docservice ds:converter
           sleep 30
