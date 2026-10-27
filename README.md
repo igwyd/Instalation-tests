@@ -25,7 +25,7 @@ Concurrency limit for GitHub-hosted Linux runners is per account plan — 20 on 
 18 of them, and its runs are long enough to still be busy at 13:00 (18 + 7 = 25), so on the Free
 plan part of the 13:00 slot waits in the queue.
 
-## Develop **<!-- onlyoffice-version-start -->v9.4.2-3<!-- onlyoffice-version-end -->**
+## Develop **<!-- onlyoffice-version-start -->v10.0.2-5<!-- onlyoffice-version-end -->**
 
 Pre-release builds from S3 dev repo.
 
