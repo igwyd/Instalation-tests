@@ -498,7 +498,7 @@ def generate_main():
         '<a class="card card-release" href="release.html">\n'
         '  <div class="card-label">Official releases</div>\n'
         '  <div class="card-title">RELEASE</div>\n'
-        '  <div class="card-desc">DEB, RPM, Docker DEB, K8s EKS arm64</div>\n'
+        '  <div class="card-desc">DEB, RPM, Docker DEB</div>\n'
         '  <div class="card-arrow">Open →</div>\n'
         '</a>\n'
         '<a class="card card-common" href="common.html">\n'
@@ -745,48 +745,12 @@ def generate_dev():
         + section("SRV Storage (S3, MinIO, Azure)", "dev-SRV-storage.yml", "dev SRV storage", server_body)
         + section("SRV Dependances (Virtual Path, ActiveMQ, Redis)", "dev-SRV-dependances.yml", "dev SRV dependances", dep_body)
         + section("TLS Dependencies", "dev-TLS-dependencies.yml", "dev TLS dependencies", tls_body(tls_deps))
-        + section("K8s EKS arm64 (Helm, docs-testing)", "dev-K8s-EKS-Docs-arm64.yml", "dev-K8s-EKS-Docs-arm64", k8s_table(load("dev-k8s-eks-docs-arm64.json"), "arm64"))
         + section("Apps install (on top of Docs)", "dev-APPS-install.yml", "dev APPS install", apps_body())
     )
     write("dev.html", page_html("DEV — ONLYOFFICE Docs Test Results", body, breadcrumb("DEV")))
 
 
-def k8s_table(k8s, arch_label):
-    run_date = (k8s or {}).get("run_date", "")
-    date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
-
-    ee = (k8s or {}).get("ee", {})
-    if k8s is None:
-        row = '<tr><td>DE</td>' + '<td class="na">—</td>' * 5 + '</tr>'
-    else:
-        hc      = ee.get("healthy", False)
-        ver_ok  = ee.get("version_ok", False)
-        ver_act = ee.get("version_actual", "?") or "?"
-        pods_ok = ee.get("pods_ok", False)
-        row = (
-            '<tr><td>DE</td>'
-            + td_hc(hc, ee.get("hc_port"))
-            + f'<td class="{status(ver_ok)}">{"✅" if ver_ok else "❌"} {escape(ver_act)}</td>'
-            + f'<td class="{status(pods_ok)}">{"✅ OK" if pods_ok else "❌ FAILED"}</td>'
-            + td_ppt_breakdown(ee, threshold=0)
-            + td_ds_errors(ee)
-            + '</tr>'
-        )
-
-    return (
-        f'<h3>{arch_label}{date_part}</h3>\n'
-        '<table><thead><tr>'
-        '<th>Edition</th><th>Healthcheck</th><th>Version</th>'
-        '<th>Pods</th><th>Puppeteer (=0)</th><th>DS Log Errors</th>'
-        '</tr></thead><tbody>'
-        + row
-        + '</tbody></table>\n'
-    )
-
-
 def generate_release():
-    k8s_body = k8s_table(load("release-k8s-eks-arm64.json"), "arm64")
-
     def rel(f):
         return load(f"release-{f}.json")
     deb_body        = pkg_table(rel("deb-x64"), "x64", False) + pkg_table(rel("deb-arm64"), "arm64", False)
@@ -796,7 +760,6 @@ def generate_release():
     body = (section("DEB Packages (Ubuntu 24.04)", "release-DEB-x64-arm64.yml", "release-DEB-x64-arm64", deb_body)
             + section("RPM Packages (CentOS 9)", "release-RPM-x64-arm64.yml", "release-RPM-x64-arm64", rpm_body)
             + section("Docker DEB (Ubuntu 24.04)", "release-Docker-DEB-x64-arm64.yml", "release-Docker-DEB-x64-arm64", docker_deb_body)
-            + section("K8s EKS arm64", "release-K8s-EKS-arm64.yml", "release-K8s-EKS-arm64", k8s_body)
             + section("Apps install (on top of Docs)", "release-APPS-install.yml", "release-APPS-install", apps_body("release-apps-")))
     write("release.html", page_html("RELEASE — ONLYOFFICE Docs Test Results", body, breadcrumb("RELEASE")))
 
