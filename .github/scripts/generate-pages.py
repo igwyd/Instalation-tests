@@ -244,7 +244,7 @@ def pkg_table(data, arch_label, upgrade=True):
             f'<table>{thead}<tbody>' + '\n'.join(rows) + '</tbody></table>\n')
 
 
-def docker_table(data, arch_label, tags=False):
+def docker_table(data, arch_label, tags=False, node=False):
     run_date = (data or {}).get("run_date", "")
     date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
 
@@ -252,7 +252,7 @@ def docker_table(data, arch_label, tags=False):
     if data is None:
         for label in ["EE", "DE", "CE"]:
             rows.append(f'<tr><td>{label}</td>'
-                        + '<td class="na">—</td>' * 5 + '</tr>')
+                        + '<td class="na">—</td>' * (6 if node else 5) + '</tr>')
     else:
         for key, label in [("ee", "EE"), ("de", "DE"), ("ce", "CE")]:
             ed = data.get(key, {})
@@ -262,6 +262,7 @@ def docker_table(data, arch_label, tags=False):
                 + td_hc(ed.get("healthy", False), ed.get("hc_port"))
                 + td_version(ed)
                 + svc_cell
+                + (td_node(ed) if node else '')
                 + td_ppt_breakdown(ed)
                 + td_ds_errors(ed)
                 + (td_tags(ed) if tags else '')
@@ -270,7 +271,8 @@ def docker_table(data, arch_label, tags=False):
 
     thead = ('<thead><tr>'
              '<th>Edition</th><th>Healthcheck</th><th>Version</th>'
-             '<th>SVC</th><th>Puppeteer (=0)</th><th>DS Log Errors</th>'
+             '<th>SVC</th>' + ('<th>Node.js</th>' if node else '') +
+             '<th>Puppeteer (=0)</th><th>DS Log Errors</th>'
              + ('<th>Hub tags</th>' if tags else '') +
              '</tr></thead>')
     return (f'<h3>{arch_label}{date_part}</h3>\n'
@@ -285,6 +287,17 @@ def td_tags(data):
     text = (data.get("tags_text") or "").strip()
     tip = f' title="{escape(text, quote=True)}"' if text else ""
     return f'<td class="{status(v)}"{tip}>{"✅ OK" if v else "❌ FAILED"}</td>'
+
+
+def td_node(data):
+    # Node.js versions embedded in DS binaries (check-ds-node.sh, bug 84664); old JSON without the key — «—»
+    if "node_ok" not in data:
+        return '<td class="na">—</td>'
+    v = data["node_ok"]
+    vers = escape(data.get("node_versions") or "?")
+    text = (data.get("node_text") or "").strip()
+    tip = f' title="{escape(text, quote=True)}"' if text and text != "not set" else ""
+    return f'<td class="{status(v)}"{tip}>{"✅" if v else "❌"} {vers}</td>'
 
 
 def td_svc(data):
@@ -563,7 +576,7 @@ def generate_dev():
 
     deb_body        = pkg_table(deb_x64, "x64") + pkg_table(deb_arm64, "arm64")
     rpm_body        = pkg_table(rpm_x64, "x64") + pkg_table(rpm_arm64, "arm64")
-    docker_deb_body = docker_table(docker_deb_x64, "x64") + docker_table(docker_deb_arm64, "arm64")
+    docker_deb_body = docker_table(docker_deb_x64, "x64", node=True) + docker_table(docker_deb_arm64, "arm64", node=True)
 
     # DB section body
     db_run_date = next((db_data[k].get("run_date", "") for _, k in DBS if db_data.get(k)), "")

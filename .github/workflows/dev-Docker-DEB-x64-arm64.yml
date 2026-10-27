@@ -165,6 +165,12 @@ jobs:
             EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
             bash .github/scripts/check-ds-version.sh
 
+      - name: Check Node.js version in binaries EE
+        continue-on-error: true
+        run: |
+          SSH_TARGET=ubuntu@${{ env.EC2_IP }} SUFFIX=EE CONTAINER=ds-ee-dev \
+            bash .github/scripts/check-ds-node.sh
+
       - name: Start ds-example EE
         continue-on-error: true
         run: |
@@ -292,6 +298,12 @@ jobs:
             EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
             bash .github/scripts/check-ds-version.sh
 
+      - name: Check Node.js version in binaries DE
+        continue-on-error: true
+        run: |
+          SSH_TARGET=ubuntu@${{ env.EC2_IP }} SUFFIX=DE CONTAINER=ds-de-dev \
+            bash .github/scripts/check-ds-node.sh
+
       - name: Start ds-example DE
         continue-on-error: true
         run: |
@@ -418,6 +430,12 @@ jobs:
             EXPECTED="${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}" \
             bash .github/scripts/check-ds-version.sh
 
+      - name: Check Node.js version in binaries CE
+        continue-on-error: true
+        run: |
+          SSH_TARGET=ubuntu@${{ env.EC2_IP }} SUFFIX=CE CONTAINER=ds-dev \
+            bash .github/scripts/check-ds-node.sh
+
       - name: Start ds-example CE
         continue-on-error: true
         run: |
@@ -513,6 +531,11 @@ jobs:
           else
             EE_SVC_ICON="❌"; EE_SVC_LABEL="FAILED"; FAILED=1
           fi
+          if [ "${NODE_EE_OK}" = "true" ]; then
+            EE_NODE_ICON="✅"; EE_NODE_LABEL="OK"
+          else
+            EE_NODE_ICON="❌"; EE_NODE_LABEL="FAILED"; FAILED=1
+          fi
           EE_P="${PUPPETEER_EE_FAILED:-0}"; EE_O="${PUPPETEER_EE_OK:-0}"; EE_T="${PUPPETEER_EE_TOTAL:-0}"
           EE_PPT_DETAIL="${EE_O}/${EE_T} passed, ${EE_P} failed"
           if [ "${EE_P}" -gt 0 ] || [ "${EE_T}" -eq 0 ]; then
@@ -542,6 +565,11 @@ jobs:
             DE_SVC_ICON="✅"; DE_SVC_LABEL="OK"
           else
             DE_SVC_ICON="❌"; DE_SVC_LABEL="FAILED"; FAILED=1
+          fi
+          if [ "${NODE_DE_OK}" = "true" ]; then
+            DE_NODE_ICON="✅"; DE_NODE_LABEL="OK"
+          else
+            DE_NODE_ICON="❌"; DE_NODE_LABEL="FAILED"; FAILED=1
           fi
           DE_P="${PUPPETEER_DE_FAILED:-0}"; DE_O="${PUPPETEER_DE_OK:-0}"; DE_T="${PUPPETEER_DE_TOTAL:-0}"
           DE_PPT_DETAIL="${DE_O}/${DE_T} passed, ${DE_P} failed"
@@ -573,6 +601,11 @@ jobs:
           else
             CE_SVC_ICON="❌"; CE_SVC_LABEL="FAILED"; FAILED=1
           fi
+          if [ "${NODE_CE_OK}" = "true" ]; then
+            CE_NODE_ICON="✅"; CE_NODE_LABEL="OK"
+          else
+            CE_NODE_ICON="❌"; CE_NODE_LABEL="FAILED"; FAILED=1
+          fi
           CE_P="${PUPPETEER_CE_FAILED:-0}"; CE_O="${PUPPETEER_CE_OK:-0}"; CE_T="${PUPPETEER_CE_TOTAL:-0}"
           CE_PPT_DETAIL="${CE_O}/${CE_T} passed, ${CE_P} failed"
           if [ "${CE_P}" -gt 0 ] || [ "${CE_T}" -eq 0 ]; then
@@ -593,11 +626,11 @@ jobs:
             echo ""
             echo "**Expected version:** \`${EXPECTED}\`"
             echo ""
-            echo "| Edition | Healthcheck | Version | SVC | Puppeteer (=0) | DS Log Errors |"
-            echo "|---------|-------------|---------|-----|----------------|---------------|"
-            echo "| EE | ${EE_HC_ICON} ${EE_HC_LABEL} | ${EE_VER_ICON} \`${VERSION_EE_ACTUAL:-?}\` | SVC: ${EE_SVC_ICON} ${EE_SVC_LABEL} | ${EE_PPT_ICON} ${EE_PPT_DETAIL} | ${EE_D} |"
-            echo "| DE | ${DE_HC_ICON} ${DE_HC_LABEL} | ${DE_VER_ICON} \`${VERSION_DE_ACTUAL:-?}\` | SVC: ${DE_SVC_ICON} ${DE_SVC_LABEL} | ${DE_PPT_ICON} ${DE_PPT_DETAIL} | ${DE_D} |"
-            echo "| CE | ${CE_HC_ICON} ${CE_HC_LABEL} | ${CE_VER_ICON} \`${VERSION_CE_ACTUAL:-?}\` | SVC: ${CE_SVC_ICON} ${CE_SVC_LABEL} | ${CE_PPT_ICON} ${CE_PPT_DETAIL} | ${CE_D} |"
+            echo "| Edition | Healthcheck | Version | SVC | Node.js | Puppeteer (=0) | DS Log Errors |"
+            echo "|---------|-------------|---------|-----|---------|----------------|---------------|"
+            echo "| EE | ${EE_HC_ICON} ${EE_HC_LABEL} | ${EE_VER_ICON} \`${VERSION_EE_ACTUAL:-?}\` | SVC: ${EE_SVC_ICON} ${EE_SVC_LABEL} | ${EE_NODE_ICON} \`${NODE_EE_VERSIONS:-?}\` | ${EE_PPT_ICON} ${EE_PPT_DETAIL} | ${EE_D} |"
+            echo "| DE | ${DE_HC_ICON} ${DE_HC_LABEL} | ${DE_VER_ICON} \`${VERSION_DE_ACTUAL:-?}\` | SVC: ${DE_SVC_ICON} ${DE_SVC_LABEL} | ${DE_NODE_ICON} \`${NODE_DE_VERSIONS:-?}\` | ${DE_PPT_ICON} ${DE_PPT_DETAIL} | ${DE_D} |"
+            echo "| CE | ${CE_HC_ICON} ${CE_HC_LABEL} | ${CE_VER_ICON} \`${VERSION_CE_ACTUAL:-?}\` | SVC: ${CE_SVC_ICON} ${CE_SVC_LABEL} | ${CE_NODE_ICON} \`${NODE_CE_VERSIONS:-?}\` | ${CE_PPT_ICON} ${CE_PPT_DETAIL} | ${CE_D} |"
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -607,13 +640,13 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           # ── Console (ASCII table) ────────────────────────────────────────
-          SEP="+---------------+--------+---------+--------+----------+-----------+"
+          SEP="+---------------+--------+---------+--------+--------------+----------+-----------+"
           echo "$SEP"
-          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "Edition" "HC" "Version" "Svc" "Puppeteer" "DS Errors"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-12s | %-8s | %-9s |\n" "Edition" "HC" "Version" "Svc" "Node.js" "Puppeteer" "DS Errors"
           echo "$SEP"
-          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "EE" "${EE_HC_LABEL}" "${EE_VER_LABEL}" "SVC:${EE_SVC_LABEL}" "${EE_PPT_LABEL} ${EE_PPT_DETAIL}" "${EE_D}"
-          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "DE" "${DE_HC_LABEL}" "${DE_VER_LABEL}" "SVC:${DE_SVC_LABEL}" "${DE_PPT_LABEL} ${DE_PPT_DETAIL}" "${DE_D}"
-          printf "| %-13s | %-6s | %-7s | %-6s | %-8s | %-9s |\n" "CE" "${CE_HC_LABEL}" "${CE_VER_LABEL}" "SVC:${CE_SVC_LABEL}" "${CE_PPT_LABEL} ${CE_PPT_DETAIL}" "${CE_D}"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-12s | %-8s | %-9s |\n" "EE" "${EE_HC_LABEL}" "${EE_VER_LABEL}" "SVC:${EE_SVC_LABEL}" "${NODE_EE_VERSIONS:-?}" "${EE_PPT_LABEL} ${EE_PPT_DETAIL}" "${EE_D}"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-12s | %-8s | %-9s |\n" "DE" "${DE_HC_LABEL}" "${DE_VER_LABEL}" "SVC:${DE_SVC_LABEL}" "${NODE_DE_VERSIONS:-?}" "${DE_PPT_LABEL} ${DE_PPT_DETAIL}" "${DE_D}"
+          printf "| %-13s | %-6s | %-7s | %-6s | %-12s | %-8s | %-9s |\n" "CE" "${CE_HC_LABEL}" "${CE_VER_LABEL}" "SVC:${CE_SVC_LABEL}" "${NODE_CE_VERSIONS:-?}" "${CE_PPT_LABEL} ${CE_PPT_DETAIL}" "${CE_D}"
           echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
@@ -650,6 +683,9 @@ jobs:
                   'version_actual':   s('VERSION_EE_ACTUAL'),
                   'services_ok':      b('SERVICES_EE_OK'),
                   'services_text': s('SERVICES_EE_TEXT'),
+                  'node_ok':          b('NODE_EE_OK'),
+                  'node_versions':    s('NODE_EE_VERSIONS'),
+                  'node_text':        s('NODE_EE_TEXT'),
                   'puppeteer_failed':      n('PUPPETEER_EE_FAILED'),
                   'puppeteer_ok':          n('PUPPETEER_EE_OK'),
                   'puppeteer_total':       n('PUPPETEER_EE_TOTAL'),
@@ -657,7 +693,7 @@ jobs:
                   'puppeteer_wopi_failed': n('PUPPETEER_EE_WOPI_FAILED'),
                   'ds_log_errors':         n('DS_LOG_ERRORS_EE'),
                   'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_EE_TEXT', ''),
-                  'conclusion': 'success' if (b('HEALTHCHECK_EE') and b('VERSION_EE_OK') and b('SERVICES_EE_OK') and ppt_ok(n('PUPPETEER_EE_FAILED'), n('PUPPETEER_EE_TOTAL')) and n('DS_LOG_ERRORS_EE') == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_EE') and b('VERSION_EE_OK') and b('SERVICES_EE_OK') and b('NODE_EE_OK') and ppt_ok(n('PUPPETEER_EE_FAILED'), n('PUPPETEER_EE_TOTAL')) and n('DS_LOG_ERRORS_EE') == 0) else 'failure',
               },
               'de': {
                   'healthy':               b('HEALTHCHECK_DE'),
@@ -666,6 +702,9 @@ jobs:
                   'version_actual':        s('VERSION_DE_ACTUAL'),
                   'services_ok':           b('SERVICES_DE_OK'),
                   'services_text': s('SERVICES_DE_TEXT'),
+                  'node_ok':               b('NODE_DE_OK'),
+                  'node_versions':         s('NODE_DE_VERSIONS'),
+                  'node_text':             s('NODE_DE_TEXT'),
                   'puppeteer_failed':      n('PUPPETEER_DE_FAILED'),
                   'puppeteer_ok':          n('PUPPETEER_DE_OK'),
                   'puppeteer_total':       n('PUPPETEER_DE_TOTAL'),
@@ -673,7 +712,7 @@ jobs:
                   'puppeteer_wopi_failed': n('PUPPETEER_DE_WOPI_FAILED'),
                   'ds_log_errors':         n('DS_LOG_ERRORS_DE'),
                   'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_DE_TEXT', ''),
-                  'conclusion': 'success' if (b('HEALTHCHECK_DE') and b('VERSION_DE_OK') and b('SERVICES_DE_OK') and ppt_ok(n('PUPPETEER_DE_FAILED'), n('PUPPETEER_DE_TOTAL')) and n('DS_LOG_ERRORS_DE') == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_DE') and b('VERSION_DE_OK') and b('SERVICES_DE_OK') and b('NODE_DE_OK') and ppt_ok(n('PUPPETEER_DE_FAILED'), n('PUPPETEER_DE_TOTAL')) and n('DS_LOG_ERRORS_DE') == 0) else 'failure',
               },
               'ce': {
                   'healthy':               b('HEALTHCHECK_CE'),
@@ -682,6 +721,9 @@ jobs:
                   'version_actual':        s('VERSION_CE_ACTUAL'),
                   'services_ok':           b('SERVICES_CE_OK'),
                   'services_text': s('SERVICES_CE_TEXT'),
+                  'node_ok':               b('NODE_CE_OK'),
+                  'node_versions':         s('NODE_CE_VERSIONS'),
+                  'node_text':             s('NODE_CE_TEXT'),
                   'puppeteer_failed':      n('PUPPETEER_CE_FAILED'),
                   'puppeteer_ok':          n('PUPPETEER_CE_OK'),
                   'puppeteer_total':       n('PUPPETEER_CE_TOTAL'),
@@ -689,7 +731,7 @@ jobs:
                   'puppeteer_wopi_failed': n('PUPPETEER_CE_WOPI_FAILED'),
                   'ds_log_errors':         n('DS_LOG_ERRORS_CE'),
                   'ds_log_errors_text':    os.environ.get('DS_LOG_ERRORS_CE_TEXT', ''),
-                  'conclusion': 'success' if (b('HEALTHCHECK_CE') and b('VERSION_CE_OK') and b('SERVICES_CE_OK') and ppt_ok(n('PUPPETEER_CE_FAILED'), n('PUPPETEER_CE_TOTAL')) and n('DS_LOG_ERRORS_CE') == 0) else 'failure',
+                  'conclusion': 'success' if (b('HEALTHCHECK_CE') and b('VERSION_CE_OK') and b('SERVICES_CE_OK') and b('NODE_CE_OK') and ppt_ok(n('PUPPETEER_CE_FAILED'), n('PUPPETEER_CE_TOTAL')) and n('DS_LOG_ERRORS_CE') == 0) else 'failure',
               },
               'conclusion': os.environ.get('FINAL_CONCLUSION', 'failure'),
           }
