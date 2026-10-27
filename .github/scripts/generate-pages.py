@@ -12,17 +12,17 @@ RESULTS_DIR = ".github/workflow-results"
 OUTPUT_DIR = "_site"
 
 DBS = [
-    ("MySQL",         "mysql"),
-    ("PostgreSQL",    "postgres"),
-    ("PostgreSQL 14", "postgres14"),
-    ("PostgreSQL 15", "postgres15"),
-    ("PostgreSQL 16", "postgres16"),
-    ("PostgreSQL 17", "postgres17"),
-    ("MSSQL",         "mssql"),
-    ("Oracle",        "oracle"),
-    ("Oracle thick",  "oracle-thick"),
-    ("Dameng",        "dameng"),
-    ("MariaDB",       "mariadb"),
+    ("MySQL latest",          "mysql"),
+    ("PostgreSQL latest",     "postgres"),
+    ("PostgreSQL 14",         "postgres14"),
+    ("PostgreSQL 15",         "postgres15"),
+    ("PostgreSQL 16",         "postgres16"),
+    ("PostgreSQL 17",         "postgres17"),
+    ("MSSQL 2025 (custom)",   "mssql"),
+    ("Oracle latest",         "oracle"),
+    ("Oracle thick latest",   "oracle-thick"),
+    ("Dameng 8.1.3 (custom)", "dameng"),
+    ("MariaDB latest",        "mariadb"),
 ]
 
 OS_ENTRIES = [
@@ -596,10 +596,11 @@ def generate_dev():
         d = db_data[key]
         if d is None:
             db_rows.append(f'<tr><td>{escape(label)}</td>'
-                           + '<td class="na">—</td>' * 5 + '</tr>')
+                           + '<td class="na">—</td>' * 6 + '</tr>')
         else:
             db_rows.append(
                 f'<tr><td>{escape(label)}</td>'
+                + f'<td>{escape(d.get("db_version") or "—")}</td>'
                 + td_hc(d.get("healthy", False), d.get("hc_port"))
                 + td_version(d)
                 + td_oracle_mode(key, d)
@@ -608,7 +609,7 @@ def generate_dev():
                 + '</tr>'
             )
     db_body = ('<table><thead><tr>'
-               '<th>Database</th><th>Healthcheck</th><th>Version</th>'
+               '<th>Database</th><th>DB version</th><th>Healthcheck</th><th>Version</th>'
                '<th>Oracle driver</th><th>Puppeteer (=0)</th><th>DS Log Errors</th>'
                '</tr></thead><tbody>'
                + '\n'.join(db_rows)

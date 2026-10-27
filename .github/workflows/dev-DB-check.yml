@@ -197,24 +197,34 @@ jobs:
           echo "----------${{ matrix.db }} version-----------"
           case "${{ matrix.db }}" in
             mysql)
-              docker exec ${{ matrix.db_name }} mysql --version
+              DBV_OUT=$(docker exec ${{ matrix.db_name }} mysql --version || true)
               ;;
             postgres | postgres14 | postgres15 | postgres16 | postgres17)
-              docker exec ${{ matrix.db_name }} psql --version
+              DBV_OUT=$(docker exec ${{ matrix.db_name }} psql --version || true)
               ;;
             mssql)
-              docker exec ${{ matrix.db_name }} /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "onlYoff1ce" -Q "SELECT @@VERSION" -C
+              DBV_OUT=$(docker exec ${{ matrix.db_name }} /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "onlYoff1ce" -Q "SELECT @@VERSION" -C || true)
               ;;
             oracle | oracle-thick)
-              docker exec ${{ matrix.db_name }} sqlplus -version
+              DBV_OUT=$(docker exec ${{ matrix.db_name }} sqlplus -version || true)
               ;;
             dameng)
-              docker exec ${{ matrix.db_name }} bash -c '/opt/dmdbms/bin/disql -S SYSDBA/SYSDBA_dm001@localhost:5236 -E "SELECT banner FROM v\$version;"'
+              DBV_OUT=$(docker exec ${{ matrix.db_name }} bash -c '/opt/dmdbms/bin/disql -S SYSDBA/SYSDBA_dm001@localhost:5236 -E "SELECT banner FROM v\$version;"' || true)
               ;;
             mariadb)
-              docker exec ${{ matrix.db_name }} mariadb --version
+              DBV_OUT=$(docker exec ${{ matrix.db_name }} mariadb --version || true)
               ;;
           esac
+          echo "$DBV_OUT"
+          # actual DB server version for the dashboard (latest images change silently)
+          case "${{ matrix.db }}" in
+            oracle | oracle-thick) DBV_SRC=$(echo "$DBV_OUT" | grep -i '^Version') ;;  # "Release 23.0.0.0.0" is generic, "Version 23.26.0.0.0" is real
+            dameng) DBV_SRC=$(echo "$DBV_OUT" | grep 'DM Database Server') ;;
+            *)      DBV_SRC=$DBV_OUT ;;
+          esac
+          DB_VERSION=$(echo "$DBV_SRC" | grep -oE 'V?[0-9]+(\.[0-9]+)+|V[0-9]+' | head -1 || true)
+          echo "DB version: ${DB_VERSION:-unknown}"
+          echo "DB_VERSION=${DB_VERSION:-unknown}" >> $GITHUB_ENV
           echo "--------packageType must be 1--------"
           docker exec onlyoffice curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI local--------------"
@@ -485,6 +495,7 @@ jobs:
               "puppeteer_total": int(os.environ.get('PUPPETEER_TOTAL', '0') or '0'),
               "ds_log_errors": int(os.environ.get('DS_LOG_ERRORS', '0') or '0'),
               "ds_log_errors_text": os.environ.get('DS_LOG_ERRORS_TEXT', ''),
+              "db_version": os.environ.get('DB_VERSION', ''),
               "oracle_mode_ok": os.environ.get('ORACLE_MODE_OK', ''),
               "oracle_mode": os.environ.get('ORACLE_MODE', ''),
               "oracle_drivers": os.environ.get('ORACLE_DRIVERS', ''),
