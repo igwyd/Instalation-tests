@@ -300,6 +300,17 @@ def td_node(data):
     return f'<td class="{status(v)}"{tip}>{"✅" if v else "❌"} {vers}</td>'
 
 
+def td_oracle_mode(key, data):
+    # dev-DB-check: Oracle thin/thick confirmed by v$session_connect_info; other DBs and old JSON without the key — «—»
+    if not key.startswith("oracle") or "oracle_mode_ok" not in data:
+        return '<td class="na">—</td>'
+    v = data["oracle_mode_ok"] == "true"
+    mode = data.get("oracle_mode") or ("thick" if key == "oracle-thick" else "thin")
+    drv = (data.get("oracle_drivers") or "").replace(";", "\n")
+    tip = f' title="{escape("DS sessions: " + (drv or "none"), quote=True)}"'
+    return f'<td class="{status(v)}"{tip}>{"✅" if v else "❌"} {mode}</td>'
+
+
 def td_svc(data):
     if data is None:
         return '<td class="na">—</td>'
@@ -585,19 +596,20 @@ def generate_dev():
         d = db_data[key]
         if d is None:
             db_rows.append(f'<tr><td>{escape(label)}</td>'
-                           + '<td class="na">—</td>' * 4 + '</tr>')
+                           + '<td class="na">—</td>' * 5 + '</tr>')
         else:
             db_rows.append(
                 f'<tr><td>{escape(label)}</td>'
                 + td_hc(d.get("healthy", False), d.get("hc_port"))
                 + td_version(d)
+                + td_oracle_mode(key, d)
                 + td_ppt_breakdown(d)
                 + td_ds_errors(d)
                 + '</tr>'
             )
     db_body = ('<table><thead><tr>'
                '<th>Database</th><th>Healthcheck</th><th>Version</th>'
-               '<th>Puppeteer (=0)</th><th>DS Log Errors</th>'
+               '<th>Oracle driver</th><th>Puppeteer (=0)</th><th>DS Log Errors</th>'
                '</tr></thead><tbody>'
                + '\n'.join(db_rows)
                + '</tbody></table>\n'

@@ -259,6 +259,9 @@ jobs:
           echo "--- DS sessions in Oracle by client_driver ---"
           echo "${DRV:-<none>}"
           echo "expected: node-oracledb $WANT"
+          # for the dashboard: expected mode + DS sessions by driver, one line
+          echo "ORACLE_MODE=$([ $WANT = thk ] && echo thick || echo thin)" >> "$GITHUB_ENV"
+          echo "ORACLE_DRIVERS=$(echo "$DRV" | grep 'node-oracledb' | sed 's/^ *//' | paste -sd';' - | cut -c1-200)" >> "$GITHUB_ENV"
           echo "--- DS logs: Oracle driver errors (DPI-/NJS-/ORA-) ---"
           docker exec onlyoffice bash -c "grep -rhE 'DPI-|NJS-|ORA-[0-9]+|thick|Instant Client' /var/log/onlyoffice/documentserver/docservice/*.log /var/log/onlyoffice/documentserver/converter/*.log | sort -u | cut -c1-300 | head -20" || true
           # client_driver looks like "node-oracledb : 6.10.0 thn"
@@ -421,6 +424,9 @@ jobs:
             echo "| Version       | ${VER_ICON} ${VER_LABEL} | \`${EXPECTED}\` → \`${VERSION_ACTUAL:-not set}\` |"
             echo "| Puppeteer     | ${PPT_ICON} ${PPT_LABEL} | ${PPT_DETAIL} |"
             echo "| DS Log Errors | ${DS_DETAIL} | |"
+            if [ "${{ matrix.db_type }}" = "oracle" ]; then
+              echo "| Oracle driver | $([ "${ORACLE_MODE_OK:-}" = true ] && echo "✅ OK" || echo "❌ FAILED") | expected \`${ORACLE_MODE:-?}\`, sessions: \`${ORACLE_DRIVERS:-none}\` |"
+            fi
             echo ""
             if [ "$FAILED" -eq 1 ]; then
               echo "> ❌ **Final check FAILED**"
@@ -438,6 +444,9 @@ jobs:
           printf "| %-20s | %-6s | %-42s |\n" "Version"       "${VER_LABEL}" "${VER_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "Puppeteer"     "${PPT_LABEL}" "${PPT_DETAIL}"
           printf "| %-20s | %-6s | %-42s |\n" "DS Log Errors" ""  "${DS_DETAIL}"
+          if [ "${{ matrix.db_type }}" = "oracle" ]; then
+            printf "| %-20s | %-6s | %-42s |\n" "Oracle driver" "$([ "${ORACLE_MODE_OK:-}" = true ] && echo OK || echo FAILED)" "${ORACLE_MODE:-?}: ${ORACLE_DRIVERS:-none}"
+          fi
           echo "$SEP"
 
           if [ "$FAILED" -eq 1 ]; then
@@ -477,6 +486,8 @@ jobs:
               "ds_log_errors": int(os.environ.get('DS_LOG_ERRORS', '0') or '0'),
               "ds_log_errors_text": os.environ.get('DS_LOG_ERRORS_TEXT', ''),
               "oracle_mode_ok": os.environ.get('ORACLE_MODE_OK', ''),
+              "oracle_mode": os.environ.get('ORACLE_MODE', ''),
+              "oracle_drivers": os.environ.get('ORACLE_DRIVERS', ''),
               "conclusion": os.environ.get('FINAL_CONCLUSION', 'failure'),
               "k6": {
                   "exceptions": {
