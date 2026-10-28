@@ -18,7 +18,8 @@ Everything is scheduled on **Wednesday**. Jobs = GitHub-hosted runners the slot 
 | 13:00 | 16:00 Wed | dev-SRV-storage | 1 |
 | 13:00 | 16:00 Wed | dev-SRV-dependances | 1 |
 | 13:00 | 16:00 Wed | dev-TLS-dependencies | 1 |
-| 14:00 | 17:00 Wed | dev-DB-check | 10 |
+| 14:00 | 17:00 Wed | dev-DB-check | 11 |
+| 15:00 | 18:00 Wed | dev-APPS-install | 20 |
 
 Concurrency limit for GitHub-hosted Linux runners is per account plan — 20 on Free, 40 on Pro,
 60 on Team, 500 on Enterprise. Jobs over the limit are queued, not dropped. The 11:00 slot uses
@@ -39,7 +40,7 @@ Pre-release builds from S3 dev repo.
 | dev-OS (Ubuntu 26.04, Debian 12/13, CentOS 10, RHEL 8/9/10) | [![dev-OS](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-x64-arm64.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-OS-x64-arm64.yml) |
 
 
-### Docker installation (4 runners at the same time)
+### Docker installation (2 runners at the same time)
 - Install dev Docker image and run all tests (Scheduled every Wednesday at 16:00 UTC+3)
 
 | Test | x64/arm64 |
@@ -57,7 +58,7 @@ Pre-release builds from S3 dev repo.
 | dev-TLS-dependencies | [![dev-TLS-dependencies](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-TLS-dependencies.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-TLS-dependencies.yml) |
 
 
-### Backend tests (10 runners at the same time)
+### Backend tests (11 runners at the same time)
 - dev Docker images with differnet DB's (Scheduled every Wednesday at 17:00 UTC+3)
 
 | Test | Status |
@@ -65,8 +66,8 @@ Pre-release builds from S3 dev repo.
 | dev-DB-check (MySQL, PostgreSQL, MSSQL, Oracle, Dameng, MariaDB) | [![dev-DB-check](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml/badge.svg?branch=main)](https://github.com/igwyd/Instalation-tests/actions/workflows/dev-DB-check.yml) |
 
 
-### ONLYOFFICE Apps install (up to 19 runners, manual)
-- Install dev Docs, check the `/welcome` "Install apps" modal, install ONLYOFFICE Apps (4testing) on top of it and open a document from Apps in this Docs. Triggered manually via `workflow_dispatch` (`cases`: `all` or case numbers, e.g. `1,7`). Each job terminates its EC2 instance (with its disk) and deletes its DNS record at the end; `cleanup=true` removes what cancelled runs left behind.
+### ONLYOFFICE Apps install (up to 20 runners, Wednesday 18:00 UTC+3)
+- Install dev Docs, check the `/welcome` "Install apps" modal, install ONLYOFFICE Apps (4testing) on top of it and open a document from Apps in this Docs. Scheduled every Wednesday at 18:00 UTC+3 (all cases); can also be triggered manually via `workflow_dispatch` (`cases`: `all` or case numbers, e.g. `1,7`). Each job terminates its EC2 instance (with its disk) and deletes its DNS record at the end; `cleanup=true` removes what cancelled runs left behind.
 
 | Test | Status |
 |------|--------|

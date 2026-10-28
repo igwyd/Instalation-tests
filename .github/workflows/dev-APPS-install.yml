@@ -11,6 +11,8 @@ name: dev APPS install
 # Case 19: a license is put into Docs right after its install; the Apps wizard must then not ask for one.
 
 on:
+  schedule:
+    - cron: '0 15 * * 3'  # Wednesday 18:00 UTC+3
   workflow_dispatch:
     inputs:
       cases:
@@ -73,7 +75,7 @@ jobs:
       - name: Build matrix
         id: matrix
         env:
-          CASES: ${{ inputs.cases }}
+          CASES: ${{ inputs.cases || 'all' }}
         run: |
           python3 - << 'PYEOF' >> "$GITHUB_OUTPUT"
           import json, os, sys
