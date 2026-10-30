@@ -18,6 +18,9 @@ on:
       cases:
         description: '"all" or comma list of case numbers from the table in README (1-20)'
         default: 'all'
+      os:
+        description: 'One-off check: run the selected cases on this OS instead (OS key from prepare, e.g. debian11); results are not saved to the dashboard'
+        default: ''
       cleanup:
         description: 'Only terminate EC2 instances and DNS records left by cancelled runs, test nothing'
         type: boolean
@@ -76,6 +79,7 @@ jobs:
         id: matrix
         env:
           CASES: ${{ inputs.cases || 'all' }}
+          OS_OVERRIDE: ${{ inputs.os }}
         run: |
           python3 - << 'PYEOF' >> "$GITHUB_OUTPUT"
           import json, os, sys
@@ -83,6 +87,7 @@ jobs:
           OS = {
               'ubuntu2404': ('Ubuntu 24.04', 'deb', 'ubuntu',   '/dev/sda1', {'x64': 'ami-0b6c6ebed2801a5cb', 'arm64': 'ami-0a7a4e87939439934'}),
               'ubuntu2604': ('Ubuntu 26.04', 'deb', 'ubuntu',   '/dev/sda1', {'x64': 'ami-091138d0f0d41ff90', 'arm64': 'ami-07ad186bc37b8dac4'}),
+              'debian11':   ('Debian 11',    'deb', 'admin',    '/dev/xvda', {'x64': 'ami-02a0360f6bc557b12', 'arm64': 'ami-0efb5542a4bb3175e'}),
               'debian12':   ('Debian 12',    'deb', 'admin',    '/dev/xvda', {'x64': 'ami-095f312bef9bfe5b1', 'arm64': 'ami-04308cee1a3c8bb1c'}),
               'debian13':   ('Debian 13',    'deb', 'admin',    '/dev/xvda', {'x64': 'ami-023a5c1706f994759', 'arm64': 'ami-040945d6282a26609'}),
               'rhel9':      ('RHEL 9',       'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-0d8d3b1122e36c000', 'arm64': 'ami-0734d5fad59e3ba53'}),
@@ -132,11 +137,17 @@ jobs:
               if bad or not want:
                   sys.exit(f'cases: bad value(s) {bad or want}, allowed: all or {ids}')
               ids = sorted({int(x) for x in want})
+          over = os.environ.get('OS_OVERRIDE', '').strip()
+          if over and over not in OS:
+              sys.exit(f'os: unknown {over!r}, allowed: {list(OS)}')
           include = []
           for cid, method, os_key, arch, edition, port, ssl in CASES:
               if cid not in ids:
                   continue
+              os_key = over or os_key
               name, os_type, user, device, ami = OS[os_key]
+              if not ami[arch]:
+                  sys.exit(f'os: no {arch} AMI for {os_key}')
               include.append({
                   'case': cid, 'method': method, 'os_key': os_key, 'os_name': name, 'os_type': os_type,
                   'ssh_user': user, 'device_name': device, 'ami': ami[arch], 'arch': arch,
@@ -1133,7 +1144,8 @@ jobs:
       # the screenshot goes to screenshots/ at the bucket root, not results/: the dashboard deploy syncs
       # _site with --content-type text/html, which would break a png copied through it
       - name: Save results
-        if: always()
+        # a one-off OS override must not replace the case's regular result on the dashboard
+        if: always() && !inputs.os
         continue-on-error: true
         env:
           CASE: ${{ matrix.case }}
