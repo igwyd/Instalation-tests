@@ -6,6 +6,7 @@ on:
 jobs:
   test-compilation:
     runs-on: ubuntu-24.04
+    timeout-minutes: 360
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -68,60 +69,70 @@ jobs:
           EOF
 
       - name: Server restart
-        run: doctl compute droplet-action reboot $(doctl compute droplet list --format ID,Name | grep compile-test | awk '{print $1}')
+        run: doctl compute droplet-action reboot ${{ env.DROPLET_ID }}
 
       - name: Wait for instance to reboot
         run: sleep 120
 
-      - name: Install docker and ruby
+      - name: Create build user
         run: |
+          # depot_tools под root: "Running depot tools as root is sad" — собираем от обычного пользователя,
+          # automate.py сам вызывает sudo (apt, cmake.sh), поэтому NOPASSWD
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
-          sudo apt-get install ruby-full -y
-          for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
-          sudo apt-get update
-          sudo apt-get install ca-certificates curl
-          sudo install -m 0755 -d /etc/apt/keyrings
-          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-          sudo chmod a+r /etc/apt/keyrings/docker.asc
-          # Add the repository to Apt sources:
-          echo \
-            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-            $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
-            sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-          sudo apt-get update
-          sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
-          sudo docker --version
-          sudo docker compose version
-          ruby --version
-          free -h
+          useradd -m -s /bin/bash builder
+          echo 'builder ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/builder
+          chmod 440 /etc/sudoers.d/builder
           EOF
 
-      - name: Compile ONLYOFFICE Docs
+      - name: Start ONLYOFFICE Docs compilation
         run: |
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << EOF
-          git clone https://github.com/ONLYOFFICE/build_tools.git -b ${{ vars.ONLYOFFICE_BUILDTOOLS_BRANCH }}
-          cd build_tools
-          mkdir out
-          sudo docker build --tag onlyoffice-document-editors-builder --build-arg BRANCH=${{ vars.ONLYOFFICE_BUILDTOOLS_BRANCH }} .
-          sudo docker run --name onlyoffice-build-tools -d \
-            -e BRANCH=${{ vars.ONLYOFFICE_BUILDTOOLS_BRANCH }} \
-            -v /root/build_tools/out:/build_tools/out \
-            onlyoffice-document-editors-builder
-          sudo docker logs -f onlyoffice-build-tools >> build.log 2>&1
-          echo "================================="
-          sudo docker ps -a
-          ls -lah /root/build_tools/out
-          ls -lah /root/build_tools/
+          # Сборка ~4 часа: запускаем в фоне (nohup), чтобы не держать SSH-сессию всё это время.
+          # Полный лог — в ~/build.log на дроплете, код возврата — в ~/build.rc
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          sudo -iu builder git clone https://github.com/ONLYOFFICE/build_tools.git -b ${{ vars.ONLYOFFICE_BUILDTOOLS_BRANCH }}
+          sudo -iu builder bash -c 'cd ~/build_tools/tools/linux && nohup bash -c "python3 ./automate.py; echo \$? > ~/build.rc" > ~/build.log 2>&1 < /dev/null &'
+          sleep 10
+          tail -n 20 /home/builder/build.log
           EOF
+
+      - name: Wait for compilation
+        # меньше лимита job (360): после таймаута шага ещё успевают выполниться Get/Upload build log
+        timeout-minutes: 330
+        run: |
+          # В лог GitHub — только последняя строка build.log раз в 5 минут (~50 строк за 4 часа),
+          # полный лог — артефактом в конце
+          while :; do
+            sleep 300
+            OUT=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 root@${{ env.DROPLET_IP }}               'cat /home/builder/build.rc 2>/dev/null || echo running; du -h /home/builder/build.log | cut -f1; tail -n 1 /home/builder/build.log | cut -c1-200' || echo "ssh failed")
+            echo "[$(date -u +%H:%M)] $(echo "$OUT" | paste -sd ' | ')"
+            RC=$(echo "$OUT" | head -1)
+            [ "$RC" = running ] || [ "$RC" = "ssh failed" ] || break
+          done
+          echo "BUILD_RC=$RC" >> $GITHUB_ENV
+
+      - name: Get build log
+        if: always()
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} 'tail -n 200 /home/builder/build.log; gzip -kf /home/builder/build.log; ls -lah /home/builder/build_tools/out || true'
+          scp -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }}:/home/builder/build.log.gz .
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log.gz
 
       - name: Archive Compiled Files
         run: |
-          scp -o StrictHostKeyChecking=no Compile/archive_out.py root@${{ env.DROPLET_IP }}:/root/build_tools/archive_out.py
-          ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=10 root@${{ env.DROPLET_IP }} << EOF
-          echo "================================="
-          cd build_tools
-          ls -lahtr
-          echo "================================="
+          scp -o StrictHostKeyChecking=no Compile/archive_out.py root@${{ env.DROPLET_IP }}:/home/builder/build_tools/archive_out.py
+          ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
+          cd /home/builder/build_tools
           python3 archive_out.py
           ls -lahtr
           EOF
+
+      - name: Check build result
+        run: |
+          echo "automate.py exit code: ${{ env.BUILD_RC }}"
+          [ "${{ env.BUILD_RC }}" = 0 ]
