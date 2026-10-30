@@ -139,7 +139,7 @@ jobs:
           VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "sudo docker exec ds-ee-release dpkg-query -W onlyoffice-documentserver-ee" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
-          EXPECTED="${EXPECTED%-*}"   # переменная — X.Y.Z без билда; в пакете X.Y.Z-BUILD
+          EXPECTED="${EXPECTED%-*}"   # the variable is X.Y.Z without build; the package has X.Y.Z-BUILD
           echo "Version EE: installed=$VERSION, expected=$EXPECTED(-BUILD)"
           if [ "${VERSION%-*}" = "$EXPECTED" ]; then
             echo "VERSION_EE_OK=true" >> $GITHUB_ENV
@@ -261,7 +261,7 @@ jobs:
           VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "sudo docker exec ds-de-release dpkg-query -W onlyoffice-documentserver-de" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
-          EXPECTED="${EXPECTED%-*}"   # переменная — X.Y.Z без билда; в пакете X.Y.Z-BUILD
+          EXPECTED="${EXPECTED%-*}"   # the variable is X.Y.Z without build; the package has X.Y.Z-BUILD
           echo "Version DE: installed=$VERSION, expected=$EXPECTED(-BUILD)"
           if [ "${VERSION%-*}" = "$EXPECTED" ]; then
             echo "VERSION_DE_OK=true" >> $GITHUB_ENV
@@ -382,7 +382,7 @@ jobs:
           VERSION=$(ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "sudo docker exec ds-release dpkg-query -W onlyoffice-documentserver" | awk '{print $2}')
           EXPECTED="${{ vars.ONLYOFFICE_RELEASE_VERSION }}"
-          EXPECTED="${EXPECTED%-*}"   # переменная — X.Y.Z без билда; в пакете X.Y.Z-BUILD
+          EXPECTED="${EXPECTED%-*}"   # the variable is X.Y.Z without build; the package has X.Y.Z-BUILD
           echo "Version CE: installed=$VERSION, expected=$EXPECTED(-BUILD)"
           if [ "${VERSION%-*}" = "$EXPECTED" ]; then
             echo "VERSION_CE_OK=true" >> $GITHUB_ENV
@@ -454,7 +454,7 @@ jobs:
         if: always()
         continue-on-error: true
         run: |
-          # билд берём из протестированного образа (X.Y.Z-BUILD → BUILD): 4-й тег Hub — X.Y.Z.BUILD
+          # take the build from the tested image (X.Y.Z-BUILD → BUILD): the 4th Hub tag is X.Y.Z.BUILD
           for P in "EE onlyoffice/documentserver-ee ${VERSION_EE_ACTUAL}" "DE onlyoffice/documentserver-de ${VERSION_DE_ACTUAL}" "CE onlyoffice/documentserver ${VERSION_CE_ACTUAL}"; do
             set -- $P
             SUFFIX=$1 REPO=$2 BUILD="${3##*-}" VERSION="${{ vars.ONLYOFFICE_RELEASE_VERSION }}" bash .github/scripts/check-docker-tags.sh
@@ -499,7 +499,7 @@ jobs:
             fi
           done
 
-          echo "=== Docker Hub tags (latest, X.Y, X.Y.Z, X.Y.Z.BUILD — один образ) ==="
+          echo "=== Docker Hub tags (latest, X.Y, X.Y.Z, X.Y.Z.BUILD - one image) ==="
           for VAR in TAGS_EE_OK TAGS_DE_OK TAGS_CE_OK; do
             VAL="${!VAR}"
             echo "$VAR: ${VAL:-not set}"

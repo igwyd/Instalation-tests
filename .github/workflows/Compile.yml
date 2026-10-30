@@ -28,14 +28,17 @@ jobs:
 
       - name: Create Droplet
         run: |
-            doctl compute droplet create compile-test \
+            # Take ID/IP from the create output: the droplet is kept after the run, so grep by name
+            # found two compile-test droplets on the next run (Invalid format in GITHUB_ENV)
+            read ID IP < <(doctl compute droplet create compile-test \
               --region fra1 \
               --size s-4vcpu-8gb \
               --project-id ${{ secrets.DIGITALOCEAN_PROJECT_ID }} \
               --image ubuntu-24-04-x64 \
               --ssh-keys ${{ secrets.DIGITALOCEAN_SSH_KEY_ID }} \
-              --wait
-            IP=$(doctl compute droplet list --format Name,PublicIPv4 --no-header | grep compile-test | awk '{print $2}')
+              --format ID,PublicIPv4 --no-header \
+              --wait)
+            echo "DROPLET_ID=$ID" >> $GITHUB_ENV
             echo "DROPLET_IP=$IP" >> $GITHUB_ENV
   
       - name: Wait for SSH to be Ready
@@ -76,8 +79,8 @@ jobs:
 
       - name: Create build user
         run: |
-          # depot_tools под root: "Running depot tools as root is sad" — собираем от обычного пользователя,
-          # automate.py сам вызывает sudo (apt, cmake.sh), поэтому NOPASSWD
+          # depot_tools as root: "Running depot tools as root is sad" - build as a regular user;
+          # automate.py calls sudo itself (apt, cmake.sh), hence NOPASSWD
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
           useradd -m -s /bin/bash builder
           echo 'builder ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/builder
@@ -86,8 +89,8 @@ jobs:
 
       - name: Start ONLYOFFICE Docs compilation
         run: |
-          # Сборка ~4 часа: запускаем в фоне (nohup), чтобы не держать SSH-сессию всё это время.
-          # Полный лог — в ~/build.log на дроплете, код возврата — в ~/build.rc
+          # The build takes ~4 hours: run it in the background (nohup) instead of holding an SSH session.
+          # Full log goes to ~/build.log on the droplet, exit code to ~/build.rc
           ssh -o StrictHostKeyChecking=no root@${{ env.DROPLET_IP }} << 'EOF'
           sudo -iu builder git clone https://github.com/ONLYOFFICE/build_tools.git -b ${{ vars.ONLYOFFICE_BUILDTOOLS_BRANCH }}
           sudo -iu builder bash -c 'cd ~/build_tools/tools/linux && nohup bash -c "python3 ./automate.py; echo \$? > ~/build.rc" > ~/build.log 2>&1 < /dev/null &'
@@ -96,14 +99,14 @@ jobs:
           EOF
 
       - name: Wait for compilation
-        # меньше лимита job (360): после таймаута шага ещё успевают выполниться Get/Upload build log
+        # below the job limit (360): after a step timeout, Get/Upload build log still have time to run
         timeout-minutes: 330
         run: |
-          # В лог GitHub — только последняя строка build.log раз в 5 минут (~50 строк за 4 часа),
-          # полный лог — артефактом в конце
+          # Print only the last build.log line every 5 minutes to the GitHub log (~50 lines in 4 hours),
+          # the full log is uploaded as an artifact at the end
           while :; do
             sleep 300
-            OUT=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 root@${{ env.DROPLET_IP }}               'cat /home/builder/build.rc 2>/dev/null || echo running; du -h /home/builder/build.log | cut -f1; tail -n 1 /home/builder/build.log | cut -c1-200' || echo "ssh failed")
+            OUT=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 root@${{ env.DROPLET_IP }} 'cat /home/builder/build.rc 2>/dev/null || echo running; du -h /home/builder/build.log | cut -f1; tail -n 1 /home/builder/build.log | cut -c1-200' || echo "ssh failed")
             echo "[$(date -u +%H:%M)] $(echo "$OUT" | paste -sd ' | ')"
             RC=$(echo "$OUT" | head -1)
             [ "$RC" = running ] || [ "$RC" = "ssh failed" ] || break

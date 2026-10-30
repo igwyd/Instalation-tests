@@ -109,7 +109,7 @@ with sync_playwright() as pw:
         bar.screenshot(path=f'{a.out}/editor.png', full_page=True)
         bar.close()
 
-    # Apps edition: Settings -> Payments says "You are using ONLYOFFICE Apps <Edition>" (раньше DocSpace) (not exposed elsewhere)
+    # Apps edition: Settings -> Payments says "You are using ONLYOFFICE Apps <Edition>" (formerly DocSpace)(not exposed elsewhere)
     try:
         pay = ctx.new_page()
         pay.goto(f'{a.url}/portal-settings/payments/portal-payments', wait_until='domcontentloaded', timeout=60000)

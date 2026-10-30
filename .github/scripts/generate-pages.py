@@ -280,7 +280,7 @@ def docker_table(data, arch_label, tags=False, node=False):
 
 
 def td_tags(data):
-    # Docker Hub: latest / X.Y / X.Y.Z / X.Y.Z.BUILD — один образ (check-docker-tags.sh); старые JSON без ключа — «—»
+    # Docker Hub: latest / X.Y / X.Y.Z / X.Y.Z.BUILD point to one image (check-docker-tags.sh); old JSON without the key -> "—"
     if "tags_ok" not in data:
         return '<td class="na">—</td>'
     v = data["tags_ok"]
@@ -825,7 +825,7 @@ def apps_body(prefix="dev-apps-"):
             f'<td>{escape(str(d.get("docs_port", "")))} → {escape(str(d.get("docs_port_after", "")))}'
             f'{" → " + escape(str(d["docs_port_restored"])) if d.get("docs_port_restored") else ""}</td>'
             + ok("docs_before_ok")
-            + f'<td class="{status(d.get("welcome_ok"))}" title="{escape("В окне: " + d.get("welcome_cmd", "") + chr(10) + "Ожидалось: " + d.get("welcome_expected", ""))}">'
+            + f'<td class="{status(d.get("welcome_ok"))}" title="{escape("In the dialog: " + d.get("welcome_cmd", "") + chr(10) + "Expected: " + d.get("welcome_expected", ""))}">'
             f'{"✅" if d.get("welcome_ok") else "❌"}</td>' + ok("apps_install_ok") + ok("apps_up")
             + ok("docs_after_ok")
             # the port Docs was moved to; docker is not checked ("—"): it keeps its published port or goes under
@@ -846,25 +846,25 @@ def apps_body(prefix="dev-apps-"):
         return '<div class="placeholder"><p>No data yet</p></div>\n'
     # (header, tooltip) — hover text explains exactly what each check verifies
     cols = [
-        ("#", "Номер кейса из таблицы в README / CLAUDE.md"),
-        ("Method", "package — Docs и Apps ставятся пакетами (apt/dnf); docker — контейнерами"),
-        ("OS", "ОС тестового инстанса AWS EC2"),
-        ("Arch", "Архитектура инстанса: x64 (t3.xlarge) или arm64 (t4g.xlarge)"),
-        ("Docs", "Редакция Docs (CE/DE/EE), которую ставят первой. Apps должен взять ту же редакцию. «manual» — Docs поставлен вручную по мануалу helpcenter (без OneClickInstall-Docs, который делает SELinux httpd_t permissive): SELinux ✅ — режим Enforcing, httpd_t не permissive, после установки Apps порт Docs размечен как http_port_t и у nginx нет отказов bind (баг 84646). Детали — в подсказке ячейки"),
-        ("Docs port", "Порт Docs до установки Apps → после. Для пакетов Apps переносит Docs с 80 и 8888 на 8083 (освобождает 80 под свой openresty), другие порты (8083, 7070) остаются. Третье значение (только package) — порт Docs после удаления Apps (из восстановленного ds.conf), должен совпасть с первым; ответил ли Docs на нём — колонка Uninstall"),
-        ("Docs installed", "Docs установлен через OneClickInstall-Docs (нужной редакции и порта) и отвечает на /healthcheck ДО установки Apps"),
-        ("Welcome", "Страница /welcome/ Docs: data-platform = linux/docker, нет неподставленных {{...}}, в HTML есть команда установки Apps с нужным скриптом для редакции (CE apps-install.sh, DE apps-developer-install.sh, EE apps-enterprise-install.sh)"),
-        ("Apps install", "Установщик Apps (apps-install.sh, 4testing-сборка) завершился с кодом 0"),
-        ("Apps up", "Apps реально поднялся: API /api/2.0/settings отвечает (установщик может написать «Thank you» при неработающем Apps)"),
-        ("Docs alive", "Docs после установки Apps жив: /healthcheck = true (пакеты — на порту из ds.conf; docker — на опубликованном порту или через /ds-vpath/)"),
-        ("Port moved", "Только для package: порт Docs после установки Apps совпал с ожидаемым (80 → 8083, 8888 → 8083, иначе без изменений). Рядом — порт, на котором Docs оказался после установки Apps. Для docker не проверяется — «—»; там порт — опубликованный порт контейнера Docs или none, если Apps снял публикацию и отдаёт Docs через /ds-vpath/"),
-        ("Same Docs", "Apps «усыновил» тот же Docs, а не поставил второй: sha256 JWT-секрета до и после совпал; для docker ещё образ контейнера Docs остался тем же (не заменён другим)"),
-        ("Edition", "Редакция Docs и Apps совпала с заказанной. Docs: packageType из /info/info.json (0 CE, 1 EE, 2 DE) до и после установки Apps. Apps: редакция на странице Settings → Payments («You are using ONLYOFFICE DocSpace …», для DE/EE); для CE — мастер не просит лицензию (так же для кейсов, где лицензия добавлена в Docs заранее, напр. 19: мастер Apps не должен её просить). Docker — ещё INSTALLATION_TYPE в .env. Детали — в подсказке ячейки"),
-        ("HTTPS takeover", "Только для HTTPS-кейсов (13–18): Apps нашёл Docs на HTTPS и забрал его сертификат (тот же отпечаток на 443), http→https редирект работает, Docs переведён на HTTP, для letsencrypt — продление (certbot --dry-run + weekly-cron). Тип сертификата — справа; детали — в подсказке ячейки"),
-        ("Editor + typing", "E2E в Chromium: мастер Apps → логин → создание smoke.docx → редактор открылся (onDocumentReady, iframe с того же хоста) → ввод слова «test». Клик по OK раскрывает скриншот редактора"),
-        ("Uninstall", "После e2e запущено `apps-install.sh <package|docker> --uninstall true`. package, deps-kept: зависимости оставить, Docs оставить; package, deps-removed: зависимости удалить, Docs оставить (кейсы 2, 6, 14, 17). Проверяется: код 0, Docs отвечает на исходном адресе (протокол и порт как до Apps), ds.conf вернулся байт в байт (из ds.conf.apps.bak), JWT тот же, пакетов Apps нет, openresty остановлен, nginx работает, для HTTPS — на 443 снова исходный сертификат. docker: два вопроса (удалить volumes? / сохранить конфигурацию и данные Docs?), 4 варианта ответов по кейсам — docker-clean y/n (7, 12, 16), docker-keep-all n/y (8, 15), docker-keep-config y/y (9, 18), docker-keep-volumes n/n (10, 11); проверяется код 0, контейнеров onlyoffice нет, volumes удалены/оставлены и /app/onlyoffice/.env + DocumentServer/data есть/нет согласно ответам. Детали и список оставшихся зависимостей — в подсказке ячейки"),
-        ("Server clean", "Docs удалён, сервер чистый: package — пакетов onlyoffice-documentserver* нет и /healthcheck не отвечает true (apt purge / dnf remove); docker — контейнеров onlyoffice нет и /healthcheck не отвечает true"),
-        ("Run", "Дата и время завершения прогона (UTC)"),
+        ("#", "Case number from the table in README"),
+        ("Method", "package — Docs and Apps are installed as packages (apt/dnf); docker — as containers"),
+        ("OS", "OS of the AWS EC2 test instance"),
+        ("Arch", "Instance architecture: x64 (t3.xlarge) or arm64 (t4g.xlarge)"),
+        ("Docs", "Docs edition (CE/DE/EE) installed first. Apps must pick the same edition. «manual» — Docs installed by hand following the helpcenter manual (without OneClickInstall-Docs, which makes SELinux httpd_t permissive): SELinux ✅ — Enforcing mode, httpd_t not permissive, after the Apps install the Docs port is labeled http_port_t and nginx has no bind denials (bug 84646). Details in the cell tooltip"),
+        ("Docs port", "Docs port before Apps install → after. For packages Apps moves Docs from 80 and 8888 to 8083 (frees 80 for its openresty), other ports (8083, 7070) stay. The third value (package only) — Docs port after Apps uninstall (from the restored ds.conf), must match the first one; whether Docs answered on it — see the Uninstall column"),
+        ("Docs installed", "Docs installed via OneClickInstall-Docs (requested edition and port) and answers /healthcheck BEFORE the Apps install"),
+        ("Welcome", "Docs /welcome/ page: data-platform = linux/docker, no unsubstituted {{...}}, the HTML has the Apps install command with the right script for the edition (CE apps-install.sh, DE apps-developer-install.sh, EE apps-enterprise-install.sh)"),
+        ("Apps install", "The Apps installer (apps-install.sh, 4testing build) exited with code 0"),
+        ("Apps up", "Apps is really up: API /api/2.0/settings answers (the installer may print «Thank you» while Apps is not working)"),
+        ("Docs alive", "Docs is alive after the Apps install: /healthcheck = true (packages — on the port from ds.conf; docker — on the published port or via /ds-vpath/)"),
+        ("Port moved", "Package only: the Docs port after the Apps install matches the expected one (80 → 8083, 8888 → 8083, otherwise unchanged). Next to it — the port Docs ended up on after the Apps install. Not checked for docker — «—»; there the port is the published port of the Docs container, or none if Apps removed the publishing and serves Docs via /ds-vpath/"),
+        ("Same Docs", "Apps «adopted» the same Docs instead of installing a second one: sha256 of the JWT secret matches before and after; for docker the Docs container image also stayed the same (not replaced)"),
+        ("Edition", "Docs and Apps editions match the requested one. Docs: packageType from /info/info.json (0 CE, 1 EE, 2 DE) before and after the Apps install. Apps: edition on the Settings → Payments page («You are using ONLYOFFICE DocSpace …», for DE/EE); for CE — the wizard does not ask for a license (same for cases where the license is added to Docs beforehand, e.g. 19: the Apps wizard must not ask for it). Docker — also INSTALLATION_TYPE in .env. Details in the cell tooltip"),
+        ("HTTPS takeover", "HTTPS cases only (13–18): Apps found Docs on HTTPS and took over its certificate (same fingerprint on 443), the http→https redirect works, Docs moved to HTTP, for letsencrypt — renewal (certbot --dry-run + weekly cron). Certificate type on the right; details in the cell tooltip"),
+        ("Editor + typing", "E2E in Chromium: Apps wizard → login → create smoke.docx → the editor opened (onDocumentReady, iframe from the same host) → typing the word «test». Clicking OK expands the editor screenshot"),
+        ("Uninstall", "After e2e `apps-install.sh <package|docker> --uninstall true` is run. package, deps-kept: keep dependencies, keep Docs; package, deps-removed: remove dependencies, keep Docs (cases 2, 6, 14, 17). Checked: exit code 0, Docs answers on the original address (protocol and port as before Apps), ds.conf restored byte for byte (from ds.conf.apps.bak), same JWT, no Apps packages, openresty stopped, nginx running, for HTTPS — the original certificate on 443 again. docker: two questions (remove volumes? / keep configuration and Docs data?), 4 answer variants by case — docker-clean y/n (7, 12, 16), docker-keep-all n/y (8, 15), docker-keep-config y/y (9, 18), docker-keep-volumes n/n (10, 11); checked: exit code 0, no onlyoffice containers, volumes removed/kept and /app/onlyoffice/.env + DocumentServer/data present/absent according to the answers. Details and the list of remaining dependencies in the cell tooltip"),
+        ("Server clean", "Docs removed, the server is clean: package — no onlyoffice-documentserver* packages and /healthcheck does not answer true (apt purge / dnf remove); docker — no onlyoffice containers and /healthcheck does not answer true"),
+        ("Run", "Date and time the run finished (UTC)"),
     ]
     thead = ''.join(f'<th title="{escape(t)}">{h}</th>' if t else f'<th>{h}</th>' for h, t in cols)
     return (f'<table class="apps-table"><thead><tr>{thead}</tr></thead><tbody>'
