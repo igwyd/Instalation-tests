@@ -294,7 +294,7 @@ jobs:
 
       - name: Install pre-requisites for LOAD test
         run: |
-          git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.K6_BRANCH }}
+          git clone https://github.com/ONLYOFFICE/document-server-stress-testing.git -b ${{ vars.ONLYOFFICE_K6_BRANCH }}
           cd document-server-stress-testing/K6/
 
           sed -i 's|"serverNameOrIp": "localhost"|"serverNameOrIp": "onlyoffice"|' save-changes-document-random-close.json
