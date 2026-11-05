@@ -45,9 +45,12 @@ jobs:
           git submodule update --init puppeteer/files
           cd puppeteer/engine
           npm install
-          cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
-          
           sudo apt-get install jq -y
+          # Chrome 157+ upgrades http://<public IP>:80 to https and blocks the navigation (net::ERR_BLOCKED_BY_CLIENT)
+          jq '.puppeteerOptions.browserArgs.args = (((.puppeteerOptions.browserArgs.args // []) + ["--disable-features=HttpsUpgrades,HttpsFirstBalancedModeAutoEnable"]) | unique)' \
+            ../config_chrome_linux.json > tmp.json
+          mv tmp.json ../config_chrome_linux.json
+          cp ../config_chrome_linux.json ../config_chrome_linux.json.bak
 
       - name: Puppeteer API tests ONLYOFFICE-Docs
         continue-on-error: true

@@ -18,11 +18,8 @@ runs:
       run: |
         which jq || sudo apt-get install -y jq
         cd Dep.Tests/puppeteer/engine
-        # Chrome 157+ upgrades http://<public IP>:80 to https and blocks the navigation (net::ERR_BLOCKED_BY_CLIENT);
-        # private IPs and non-default ports (8083) are not upgraded, so only DS on a public IP at port 80 is hit
-        jq --arg url "${{ inputs.url }}" --arg flag "--disable-features=HttpsUpgrades,HttpsFirstBalancedModeAutoEnable" \
-          '.testOptions.url = $url | .puppeteerOptions.browserArgs.args = (((.puppeteerOptions.browserArgs.args // []) + [$flag]) | unique)' \
-          ../config_chrome_linux.json > tmp.json
+        # HttpsUpgrades flag for Chrome 157+ is added once in setup-puppeteer
+        jq --arg url "${{ inputs.url }}" '.testOptions.url = $url' ../config_chrome_linux.json > tmp.json
         mv tmp.json ../config_chrome_linux.json
         echo "-------------------------------------"
         cat ../config_chrome_linux.json
