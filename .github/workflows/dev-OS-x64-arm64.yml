@@ -335,27 +335,22 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
             'sudo docker exec $(sudo docker ps -q --filter "name=onlyoffice") supervisorctl start ds:example'
 
-      - name: Clear puppeteer output before Docker tests
-        run: rm -rf Dep.Tests/puppeteer/out
-
-      - name: Puppeteer API tests Docker install
+      - name: Puppeteer tests Docker install
         continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
-          echo "-------------------------------------"
-          cat ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+        timeout-minutes: 40
+        uses: ./.github/actions/run-puppeteer
+        with:
+          url: http://${{ env.EC2_IP }}/example
 
-      - name: Puppeteer WOPI tests Docker install
+      - name: Upload puppeteer output Docker install
+        if: always()
         continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
-          cat ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+        uses: actions/upload-artifact@v4
+        with:
+          name: puppeteer-${{ matrix.tag }}-docker-install
+          path: Dep.Tests/puppeteer/out
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Parse puppeteer results Docker
         if: always()
@@ -498,26 +493,22 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} \
             'sudo systemctl start ds-example'
 
-      - name: Clear puppeteer output before Native tests
-        run: rm -rf Dep.Tests/puppeteer/out
-
-      - name: Puppeteer API tests Native install
+      - name: Puppeteer tests Native install
         continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
-          cat ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+        timeout-minutes: 40
+        uses: ./.github/actions/run-puppeteer
+        with:
+          url: http://${{ env.EC2_IP }}/example
 
-      - name: Puppeteer WOPI tests Native install
+      - name: Upload puppeteer output Native install
+        if: always()
         continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
-          cat ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+        uses: actions/upload-artifact@v4
+        with:
+          name: puppeteer-${{ matrix.tag }}-native-install
+          path: Dep.Tests/puppeteer/out
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Parse puppeteer results Native
         if: always()
