@@ -177,27 +177,22 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
-      - name: Clear puppeteer output before EE tests
-        run: rm -rf Dep.Tests/puppeteer/out
-
-      - name: Puppeteer API tests ONLYOFFICE-Docs EE
+      - name: Puppeteer tests ONLYOFFICE-Docs EE
         continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          sed -i -E "s#\"url\": \"https://[^/]+\.teamlab\.info/example\"#\"url\": \"http://${{ env.EC2_IP }}/example\"#" ../config_chrome_linux.json
-          echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+        timeout-minutes: 40
+        uses: ./.github/actions/run-puppeteer
+        with:
+          url: http://${{ env.EC2_IP }}/example
 
-      - name: Puppeteer WOPI tests ONLYOFFICE-Docs EE
+      - name: Upload puppeteer output ONLYOFFICE-Docs EE
+        if: always()
         continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+        uses: actions/upload-artifact@v4
+        with:
+          name: puppeteer-docker-deb-${{ matrix.arch }}-ee
+          path: Dep.Tests/puppeteer/out
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Parse puppeteer results EE
         if: always()
@@ -296,26 +291,22 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "sudo docker exec ds-de-dev supervisorctl start ds:example"
 
-      - name: Clear puppeteer output before DE tests
-        run: rm -rf Dep.Tests/puppeteer/out
-
-      - name: Puppeteer API tests ONLYOFFICE-Docs DE
+      - name: Puppeteer tests ONLYOFFICE-Docs DE
         continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+        timeout-minutes: 40
+        uses: ./.github/actions/run-puppeteer
+        with:
+          url: http://${{ env.EC2_IP }}/example
 
-      - name: Puppeteer WOPI tests ONLYOFFICE-Docs DE
+      - name: Upload puppeteer output ONLYOFFICE-Docs DE
+        if: always()
         continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+        uses: actions/upload-artifact@v4
+        with:
+          name: puppeteer-docker-deb-${{ matrix.arch }}-de
+          path: Dep.Tests/puppeteer/out
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Parse puppeteer results DE
         if: always()
@@ -414,26 +405,22 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_IP }} \
             "sudo docker exec ds-dev supervisorctl start ds:example"
 
-      - name: Clear puppeteer output before CE tests
-        run: rm -rf Dep.Tests/puppeteer/out
-
-      - name: Puppeteer API tests ONLYOFFICE-Docs CE
+      - name: Puppeteer tests ONLYOFFICE-Docs CE
         continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers example
+        timeout-minutes: 40
+        uses: ./.github/actions/run-puppeteer
+        with:
+          url: http://${{ env.EC2_IP }}/example
 
-      - name: Puppeteer WOPI tests ONLYOFFICE-Docs CE
+      - name: Upload puppeteer output ONLYOFFICE-Docs CE
+        if: always()
         continue-on-error: true
-        run: |
-          cd Dep.Tests/puppeteer/engine
-          echo "-------------------------------------"
-          jq -r '.testOptions.url' ../config_chrome_linux.json
-          echo "-------------------------------------"
-          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi
+        uses: actions/upload-artifact@v4
+        with:
+          name: puppeteer-docker-deb-${{ matrix.arch }}-ce
+          path: Dep.Tests/puppeteer/out
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Parse puppeteer results CE
         if: always()
