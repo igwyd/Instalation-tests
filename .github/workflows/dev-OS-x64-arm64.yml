@@ -4,152 +4,66 @@ on:
   schedule:
     - cron: '0 11 * * 3'  # Wednesday 14:00 UTC+3
   workflow_dispatch:
+    inputs:
+      os:
+        description: 'One-off check of selected OS instead of all 14 jobs: comma list of <key> or <key>-<x64|arm64>, key is ubuntu2604, debian12, debian13, centos10, rhel8, rhel9, rhel10 (e.g. debian13-x64); empty = all. Results are not saved to the dashboard'
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Build matrix
+        id: matrix
+        env:
+          OS_FILTER: ${{ inputs.os }}
+        run: |
+          python3 - << 'PYEOF' >> "$GITHUB_OUTPUT"
+          import json, os, sys
+          # os key: name, package type, ssh user, root device, AMI per arch
+          OS = {
+              'ubuntu2604':  ('Ubuntu 26.04', 'deb', 'ubuntu',   '/dev/sda1', {'x64': 'ami-091138d0f0d41ff90', 'arm64': 'ami-07ad186bc37b8dac4'}),
+              'debian12':    ('Debian 12',   'deb', 'admin',    '/dev/xvda', {'x64': 'ami-095f312bef9bfe5b1', 'arm64': 'ami-04308cee1a3c8bb1c'}),
+              'debian13':    ('Debian 13',   'deb', 'admin',    '/dev/xvda', {'x64': 'ami-023a5c1706f994759', 'arm64': 'ami-040945d6282a26609'}),
+              'centos10':    ('CentOS 10',   'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-011969aa4b0fec8fe', 'arm64': 'ami-0da965a0c246cec33'}),
+              'rhel8':       ('RHEL 8',      'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-06ab04dfd55c423e4', 'arm64': 'ami-088bb968ff4a01d7a'}),
+              'rhel9':       ('RHEL 9',      'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-0d8d3b1122e36c000', 'arm64': 'ami-0734d5fad59e3ba53'}),
+              'rhel10':      ('RHEL 10',     'rpm', 'ec2-user', '/dev/sda1', {'x64': 'ami-0ad50334604831820', 'arm64': 'ami-02d5b54ba15715d30'}),
+          }
+          INSTANCE_TYPE = {'x64': 't2.medium', 'arm64': 't4g.medium'}
+          # empty input = every OS on both archs (the weekly run); otherwise "key" or "key-arch", comma separated
+          wanted = [w.strip() for w in os.environ.get('OS_FILTER', '').split(',') if w.strip()]
+          selected = []
+          for w in wanted:
+              key, _, arch = w.partition('-')
+              if key not in OS or arch not in ('', 'x64', 'arm64'):
+                  sys.exit(f"::error::Unknown os '{w}'. Use <key> or <key>-<x64|arm64>, key is one of: {', '.join(OS)}")
+              selected.append((key, arch))
+          include = []
+          for key, (name, os_type, ssh_user, device, amis) in OS.items():
+              for arch, ami in amis.items():
+                  if wanted and not any(k == key and a in ('', arch) for k, a in selected):
+                      continue
+                  include.append({
+                      'os_name': name, 'os_type': os_type, 'ssh_user': ssh_user, 'device_name': device,
+                      'arch': arch, 'ami': ami, 'instance_type': INSTANCE_TYPE[arch], 'tag': f'dev-{key}-{arch}',
+                  })
+          print('matrix=' + json.dumps({'include': include}))
+          PYEOF
+
   test:
+    needs: prepare
     runs-on: ubuntu-24.04
     name: ${{ matrix.os_name }} ${{ matrix.arch }}
     timeout-minutes: 120
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          # Ubuntu 26.04
-          - os_name: Ubuntu 26.04
-            os_type: deb
-            ssh_user: ubuntu
-            device_name: /dev/sda1
-            arch: x64
-            ami: ami-091138d0f0d41ff90
-            instance_type: t2.medium
-            tag: dev-ubuntu2604-x64
-
-          - os_name: Ubuntu 26.04
-            os_type: deb
-            ssh_user: ubuntu
-            device_name: /dev/sda1
-            arch: arm64
-            ami: ami-07ad186bc37b8dac4
-            instance_type: t4g.medium
-            tag: dev-ubuntu2604-arm64
-
-          # Debian 12
-          - os_name: Debian 12
-            os_type: deb
-            ssh_user: admin
-            device_name: /dev/xvda
-            arch: x64
-            ami: ami-095f312bef9bfe5b1
-            instance_type: t2.medium
-            tag: dev-debian12-x64
-
-          - os_name: Debian 12
-            os_type: deb
-            ssh_user: admin
-            device_name: /dev/xvda
-            arch: arm64
-            ami: ami-04308cee1a3c8bb1c
-            instance_type: t4g.medium
-            tag: dev-debian12-arm64
-
-          # Debian 13
-          - os_name: Debian 13
-            os_type: deb
-            ssh_user: admin
-            device_name: /dev/xvda
-            arch: x64
-            ami: ami-023a5c1706f994759
-            instance_type: t2.medium
-            tag: dev-debian13-x64
-
-          - os_name: Debian 13
-            os_type: deb
-            ssh_user: admin
-            device_name: /dev/xvda
-            arch: arm64
-            ami: ami-040945d6282a26609
-            instance_type: t4g.medium
-            tag: dev-debian13-arm64
-
-          # CentOS 10 stream
-          - os_name: CentOS 10
-            os_type: rpm
-            ssh_user: ec2-user
-            device_name: /dev/sda1
-            arch: x64
-            ami: ami-011969aa4b0fec8fe
-            instance_type: t2.medium
-            tag: dev-centos10-x64
-
-          - os_name: CentOS 10
-            os_type: rpm
-            ssh_user: ec2-user
-            device_name: /dev/sda1
-            arch: arm64
-            ami: ami-0da965a0c246cec33
-            instance_type: t4g.medium
-            tag: dev-centos10-arm64
-
-          # RHEL 8
-          - os_name: RHEL 8
-            os_type: rpm
-            ssh_user: ec2-user
-            device_name: /dev/sda1
-            arch: x64
-            ami: ami-06ab04dfd55c423e4
-            instance_type: t2.medium
-            tag: dev-rhel8-x64
-
-          - os_name: RHEL 8
-            os_type: rpm
-            ssh_user: ec2-user
-            device_name: /dev/sda1
-            arch: arm64
-            ami: ami-088bb968ff4a01d7a
-            instance_type: t4g.medium
-            tag: dev-rhel8-arm64
-
-          # RHEL 9
-          - os_name: RHEL 9
-            os_type: rpm
-            ssh_user: ec2-user
-            device_name: /dev/sda1
-            arch: x64
-            ami: ami-0d8d3b1122e36c000
-            instance_type: t2.medium
-            tag: dev-rhel9-x64
-
-          - os_name: RHEL 9
-            os_type: rpm
-            ssh_user: ec2-user
-            device_name: /dev/sda1
-            arch: arm64
-            ami: ami-0734d5fad59e3ba53
-            instance_type: t4g.medium
-            tag: dev-rhel9-arm64
-
-          # RHEL 10
-          - os_name: RHEL 10
-            os_type: rpm
-            ssh_user: ec2-user
-            device_name: /dev/sda1
-            arch: x64
-            ami: ami-0ad50334604831820
-            instance_type: t2.medium
-            tag: dev-rhel10-x64
-
-          - os_name: RHEL 10
-            os_type: rpm
-            ssh_user: ec2-user
-            device_name: /dev/sda1
-            arch: arm64
-            ami: ami-02d5b54ba15715d30
-            instance_type: t4g.medium
-            tag: dev-rhel10-arm64
-
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -626,7 +540,8 @@ jobs:
           fi
 
       - name: Save results
-        if: always()
+        # a one-off OS check must not replace the regular result on the dashboard
+        if: always() && !inputs.os
         continue-on-error: true
         env:
           OS_NAME: ${{ matrix.os_name }}
