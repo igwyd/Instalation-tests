@@ -24,6 +24,12 @@ runs:
         cat ../config_chrome_linux.json
         echo "-------------------------------------"
 
+    - name: Diagnose Chrome navigation to DS
+      shell: bash
+      continue-on-error: true
+      run: |
+        NODE_PATH="$PWD/Dep.Tests/puppeteer/engine/node_modules" timeout 300 node .github/scripts/chrome-nav-diag.js "${{ inputs.url }}"
+
     - name: Puppeteer API tests
       shell: bash
       continue-on-error: true
