@@ -19,6 +19,12 @@ if command -v getenforce >/dev/null; then
 fi
 if command -v docker >/dev/null; then
   echo "### docker ps -a"; docker ps -a --format 'table {{.Names}}	{{.Image}}	{{.Status}}	{{.Ports}}'
-  for c in $(docker ps -a --format '{{.Names}}'); do echo "### docker logs $c"; docker logs --tail 80 "$c" 2>&1; done
+  for c in $(docker ps -a --format '{{.Names}}'); do
+    # a crash-looping container repeats the same error at the tail; the first start, which shows what broke, is
+    # at the head (e.g. a migration interrupted on the first start fails with "Table ... already exists" ever after)
+    R=$(docker inspect -f '{{.RestartCount}}' "$c" 2>/dev/null)
+    if [ "${R:-0}" -gt 0 ]; then echo "### docker logs $c (first start, restarts: $R)"; docker logs "$c" 2>&1 | head -n 120; fi
+    echo "### docker logs $c"; docker logs --tail 80 "$c" 2>&1
+  done
 fi
 echo "### openresty/nginx configs with ssl"; grep -rlE 'listen\s+\S*443|ssl_certificate' /etc/openresty /etc/nginx 2>/dev/null
