@@ -165,6 +165,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # before the secrets check: if it fails (e.g. expired wildcard cert), Save results must still reach S3,
+      # otherwise the dashboard silently keeps the previous run's result
+      - name: Configure AWS CLI
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-east-1
+
       - name: Check required secrets
         env:
           APPS_ADMIN_PASSWORD: ${{ secrets.APPS_ADMIN_PASSWORD }}
@@ -233,12 +241,6 @@ jobs:
                    DOCS_CERT_BEFORE DOCS_CERT_AFTER HTTPS_REDIRECT_INFO DOCS_DEMOTED_INFO LE_RENEW_INFO HTTPS_DETECTED_INFO UNINSTALL_INFO UNINSTALL_MODE CLEANUP_INFO; do
             echo "$v=not set" >> "$GITHUB_ENV"
           done
-
-      - name: Configure AWS CLI
-        run: |
-          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws configure set default.region us-east-1
 
       # Apps' hardware check wants 4 cores, 8000+ MB RAM and 40 GB free disk on top of Docs (t3/t4g.xlarge)
       - name: Create EC2 Instance
@@ -662,7 +664,8 @@ jobs:
           else
             C=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps --format '{{.Names}} {{.Image}}' | awk '\$2 ~ /documentserver/ {print \$1; exit}'")
             SSL_LINES=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C sh -c \"grep -cE '^\s*listen\s+\S*443|ssl_certificate' /etc/onlyoffice/documentserver/nginx/ds.conf\"" || true)
-            P443=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker port $C 443/tcp 2>/dev/null" || true)
+            # docker port prints one line per address family (0.0.0.0:443, [::]:443): a multi-line value breaks GITHUB_ENV
+            P443=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker port $C 443/tcp 2>/dev/null" | xargs || true)
             INFO="container $C ds.conf TLS lines: ${SSL_LINES:-?}, publishes 443: ${P443:-no}"
             [ "$SSL_LINES" = "0" ] && [ -z "$P443" ] && OK=true || OK=false
           fi
@@ -875,31 +878,42 @@ jobs:
           echo "CLEANUP_INFO=$INFO" >> $GITHUB_ENV
           [ "$LEFT" = "0" ] && [ "$HC" != "true" ] && echo "CLEANUP_OK=true" >> $GITHUB_ENV
 
-      # Docker: Docs is not restored, the uninstaller only has to remove what it was asked to. Two prompts:
-      #   "Also remove data volumes (mysql, opensearch, documents)? (Y/n)"
-      #   "Keep configuration and Docs data for reinstallation? (Y/n)"
-      # The four answer pairs are spread over the Docker cases (x64 and arm64 in each):
-      #   docker-clean        y n - cases 7, 12, 16
-      #   docker-keep-all     n y - cases 8, 15
-      #   docker-keep-config  y y - cases 9, 18
-      #   docker-keep-volumes n n - cases 10, 11
+      # Docker: Apps is installed over a running Docs container. Which uninstall to expect depends on the published
+      # installer, so it is told by /app/onlyoffice/.docs-restore (written by the install since DocSpace-buildtools
+      # !672, 2026-10-27, the same check the uninstaller makes):
+      #  - present: docker-restore-docs - no questions, Apps containers removed, the original Docs container back
+      #    (same image, port, certificate, JWT), Apps data kept (onlyoffice_* volumes, .env). As in dev-APPS-install.
+      #  - absent (older installer): Docs is not restored, the uninstaller removes what it was asked to. Two prompts:
+      #      "Also remove data volumes (mysql, opensearch, documents)? (Y/n)"
+      #      "Keep configuration and Docs data for reinstallation? (Y/n)"
+      #    The four answer pairs are spread over the Docker cases (x64 and arm64 in each):
+      #      docker-clean        y n - cases 7, 12, 16
+      #      docker-keep-all     n y - cases 8, 15
+      #      docker-keep-config  y y - cases 9, 18
+      #      docker-keep-volumes n n - cases 10, 11
       # Finite answers, not `yes`: an endless stream into the installer's pty ended with "Killed" (2026-10-21),
       # and EOF on a prompt loops forever. Same script as the install, no branch or 4testing- images.
-      - name: Uninstall Apps and Docs (Docker)
+      - name: Uninstall Apps (Docker)
         if: matrix.method == 'docker'
         continue-on-error: true
         timeout-minutes: 70
         run: |
-          case ${{ matrix.case }} in
-            7|12|16) MODE=docker-clean;        VOL=y; KEEP=n;;
-            8|15)    MODE=docker-keep-all;     VOL=n; KEEP=y;;
-            9|18)    MODE=docker-keep-config;  VOL=y; KEEP=y;;
-            *)       MODE=docker-keep-volumes; VOL=n; KEEP=n;;
-          esac
+          RESTORE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -d /app/onlyoffice/.docs-restore && echo yes || echo no")
+          if [ "$RESTORE" = "yes" ]; then
+            # "n n" only for the old prompts, should they come: nothing is lost, the check fails on Docs not restored
+            MODE=docker-restore-docs; VOL=n; KEEP=n
+          else
+            case ${{ matrix.case }} in
+              7|12|16) MODE=docker-clean;        VOL=y; KEEP=n;;
+              8|15)    MODE=docker-keep-all;     VOL=n; KEEP=y;;
+              9|18)    MODE=docker-keep-config;  VOL=y; KEEP=y;;
+              *)       MODE=docker-keep-volumes; VOL=n; KEEP=n;;
+            esac
+          fi
           echo "UNINSTALL_MODE=$MODE" >> $GITHUB_ENV
           # the installer's named volumes (onlyoffice_*) before the uninstall, to tell removed from kept afterwards;
           # anonymous ones come from the original `docker run` of Docs (VOLUME in its image), not from Apps
-          VOLS_BEFORE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker volume ls -q" | grep '^onlyoffice_' | sort | tr '\n' ' ')
+          VOLS_BEFORE=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker volume ls -q" | grep '^onlyoffice_' | sort | tr '\n' ' ' || true)
           echo "volumes before: ${VOLS_BEFORE:-none}"
           ssh $SSH_OPTS $U@$EC2_IP "sudo env SCRIPT=$EXPECTED_APPS_SCRIPT ANSWERS='$VOL\n$KEEP\n' bash -s" << 'EOF'
           cd /opt/apps-test
@@ -908,13 +922,63 @@ jobs:
           EOF
           RC=$(ssh $SSH_OPTS $U@$EC2_IP 'cat /opt/apps-test/apps-uninstall.rc')
           ssh $SSH_OPTS $U@$EC2_IP 'tail -n 40 /opt/apps-test/apps-uninstall.out'
-          LEFT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps -a --format '{{.Names}}' | grep -c '^onlyoffice'" || true)
           ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps -a; sudo docker images; sudo docker volume ls; sudo ss -lntp; sudo ls -la /app/onlyoffice /app/onlyoffice/DocumentServer" || true
+          ALL_AFTER=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker volume ls -q" | sort)
+          HAS_ENV=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -f /app/onlyoffice/.env && echo yes || echo no")
+
+          if [ "$MODE" = "docker-restore-docs" ]; then
+            OK=true
+            INFO="$MODE, uninstall exit $RC"
+            [ "$RC" = "0" ] || OK=false
+
+            # Docs answers on its original address (DOCS_URL_BEFORE keeps protocol and port); the container just started
+            for i in $(seq 1 18); do
+              HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" | tr -d '\r\n' | head -c 60 || true)
+              [ "$HC" = "true" ] && break
+              sleep 10
+            done
+            INFO="$INFO; $DOCS_URL_BEFORE/healthcheck=${HC:-none}"
+            [ "$HC" = "true" ] || OK=false
+
+            # only the Docs container is left, from the same image, with the same JWT secret
+            OTHERS=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps -a --format '{{.Image}}'" | grep -vc documentserver || true)
+            C=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps --format '{{.Names}} {{.Image}}' | awk '\$2 ~ /documentserver/ {print \$1; exit}'" || true)
+            IMAGE=$( [ -n "$C" ] && ssh $SSH_OPTS $U@$EC2_IP "sudo docker inspect -f '{{.Config.Image}}' $C" || true)
+            INFO="$INFO; other containers left: ${OTHERS:-?}, Docs container: ${C:-none}, image $( [ -n "$IMAGE" ] && [ "$IMAGE" = "$DS_IMAGE_BEFORE" ] && echo same || echo "DIFFERS (${IMAGE:-none})" )"
+            [ "$OTHERS" = "0" ] && [ -n "$IMAGE" ] && [ "$IMAGE" = "$DS_IMAGE_BEFORE" ] || OK=false
+            JWT=$( [ -n "$C" ] && ssh $SSH_OPTS $U@$EC2_IP "sudo docker exec $C cat /etc/onlyoffice/documentserver/local.json" | jq -r '.services.CoAuthoring.secret.inbox.string // empty' 2>/dev/null || true)
+            JWT_SHA=$( [ -n "$JWT" ] && echo "$JWT" | sha256sum | cut -c1-16 || echo none )
+            [ "$JWT_SHA" != "none" ] && [ "$JWT_SHA" = "$JWT_SHA_BEFORE" ] || { OK=false; INFO="$INFO; JWT changed or not found"; }
+            # the port Docs is published on again - the third value of the dashboard's Docs port
+            PORT_R=$( [ -n "$C" ] && ssh $SSH_OPTS $U@$EC2_IP "sudo docker port $C 80/tcp 2>/dev/null | head -1 | awk -F: '{print \$NF}'" || true)
+            echo "DOCS_PORT_RESTORED=${PORT_R:-none}" >> $GITHUB_ENV
+            INFO="$INFO; Docs port $DOCS_PORT -> $DOCS_PORT_AFTER -> ${PORT_R:-none}"
+            [ "$PORT_R" = "$DOCS_PORT" ] || OK=false
+
+            # Apps data is retained: every onlyoffice_* volume and the configuration
+            GONE=""
+            for v in $VOLS_BEFORE; do case " $(echo $ALL_AFTER) " in *" $v "*) ;; *) GONE="$GONE $v";; esac; done
+            INFO="$INFO; onlyoffice_* volumes $(echo $VOLS_BEFORE | wc -w), removed:${GONE:- none}; /app/onlyoffice/.env: $HAS_ENV"
+            [ -z "$GONE" ] && [ "$HAS_ENV" = "yes" ] || OK=false
+
+            # HTTPS cases: Docs serves its own original certificate on 443 again
+            if [ "$DOCS_SSL" != "none" ]; then
+              FP=$(echo | openssl s_client -connect "$EC2_IP:443" -servername "$DOMAIN" 2>/dev/null | openssl x509 -noout -fingerprint -sha256 | cut -d= -f2 || true)
+              INFO="$INFO; cert on 443 $( [ -n "$FP" ] && [ "$FP" = "$DOCS_CERT_BEFORE" ] && echo same || echo "DIFFERS (${FP:-none})" )"
+              [ -n "$FP" ] && [ "$FP" = "$DOCS_CERT_BEFORE" ] || OK=false
+            fi
+            echo "$INFO"
+            echo "UNINSTALL_INFO=$INFO" >> $GITHUB_ENV
+            echo "UNINSTALL_OK=$OK" >> $GITHUB_ENV
+            # CLEANUP_* comes from "Remove Docs (Docker)"
+            exit 0
+          fi
+
+          LEFT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps -a --format '{{.Names}}' | grep -c '^onlyoffice'" || true)
           HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" | tr -d '\r\n' | head -c 60 || true)
 
           # volumes: "y" - none of the earlier ones is left, "n" - all of them are still there
-          ALL_AFTER=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker volume ls -q" | sort)
-          VOLS_AFTER=$(echo "$ALL_AFTER" | grep '^onlyoffice_' | tr '\n' ' ')
+          VOLS_AFTER=$(echo "$ALL_AFTER" | grep '^onlyoffice_' | tr '\n' ' ' || true)
           OTHER_LEFT=$(echo "$ALL_AFTER" | grep -v '^onlyoffice_' | grep -c . || true)
           GONE=0; KEPT=0; KEPT_NAMES=""
           for v in $VOLS_BEFORE; do
@@ -930,7 +994,6 @@ jobs:
           fi
 
           # configuration (.env) and Docs data: "y" - both stay, "n" - neither is left
-          HAS_ENV=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -f /app/onlyoffice/.env && echo yes || echo no")
           HAS_DATA=$(ssh $SSH_OPTS $U@$EC2_IP "sudo test -d /app/onlyoffice/DocumentServer/data && echo yes || echo no")
           if [ "$KEEP" = "y" ]; then
             [ "$HAS_ENV" = "yes" ] && [ "$HAS_DATA" = "yes" ] && CONF_OK=true || CONF_OK=false
@@ -944,6 +1007,27 @@ jobs:
           echo "CLEANUP_INFO=$INFO" >> $GITHUB_ENV
           [ "$RC" = "0" ] && [ "$LEFT" = "0" ] && [ "$VOL_OK" = "true" ] && [ "$CONF_OK" = "true" ] && echo "UNINSTALL_OK=true" >> $GITHUB_ENV
           [ "$LEFT" = "0" ] && [ "$HC" != "true" ] && echo "CLEANUP_OK=true" >> $GITHUB_ENV
+
+      # Docs restored (docker-restore-docs): everything checked, remove it and the kept Apps data to leave the
+      # server clean. The older installer has already removed what it was asked to and is judged above.
+      - name: Remove Docs (Docker)
+        if: always() && matrix.method == 'docker' && env.UNINSTALL_MODE == 'docker-restore-docs'
+        continue-on-error: true
+        run: |
+          ssh $SSH_OPTS $U@$EC2_IP 'bash -s' << 'EOF'
+          sudo docker ps -aq | xargs -r sudo docker rm -f
+          sudo docker volume ls -q | xargs -r sudo docker volume rm
+          sudo docker network ls --filter type=custom -q | xargs -r sudo docker network rm
+          sudo rm -rf /app/onlyoffice
+          EOF
+          LEFT=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker ps -aq | wc -l" || true)
+          VOLS=$(ssh $SSH_OPTS $U@$EC2_IP "sudo docker volume ls -q | wc -l" || true)
+          # an error page is multi-line HTML: one short line only, GITHUB_ENV breaks on multi-line values
+          HC=$(curl -s $CURL_TLS --max-time 10 "$DOCS_URL_BEFORE/healthcheck" | tr -d '\r\n' | head -c 60 || true)
+          INFO="containers left: ${LEFT:-?}, volumes left: ${VOLS:-?}, $DOCS_URL_BEFORE/healthcheck=${HC:-none}"
+          echo "$INFO"
+          echo "CLEANUP_INFO=$INFO" >> $GITHUB_ENV
+          [ "$LEFT" = "0" ] && [ "$VOLS" = "0" ] && [ "$HC" != "true" ] && echo "CLEANUP_OK=true" >> $GITHUB_ENV
 
       - name: Collect uninstall log
         if: always()
@@ -991,7 +1075,7 @@ jobs:
           data = {
               'run_date': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
               'case': int(e('CASE')), 'method': e('METHOD'), 'os_name': e('OS_NAME'), 'arch': e('ARCH'),
-              'edition': e('EDITION'), 'docs_port': e('DOCS_PORT'), 'docs_port_after': e('DOCS_PORT_AFTER'), 'docs_port_restored': e('DOCS_PORT_RESTORED', ''),
+              'edition': e('EDITION'), 'docs_port': e('DOCS_PORT'), 'docs_port_after': e('DOCS_PORT_AFTER', ''), 'docs_port_restored': e('DOCS_PORT_RESTORED', ''),
               'docs_before_ok': b('DOCS_BEFORE_OK'), 'welcome_ok': b('WELCOME_OK'), 'welcome_cmd': e('WELCOME_CMD', ''), 'welcome_expected': e('WELCOME_EXPECTED', ''),
               'apps_install_ok': b('APPS_INSTALL_OK'), 'apps_up': b('APPS_UP'),
               'docs_after_ok': b('DOCS_AFTER_OK'),
