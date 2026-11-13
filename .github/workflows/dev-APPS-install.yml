@@ -44,7 +44,7 @@ jobs:
       - name: Terminate EC2 instances left by previous runs
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_SECRET }}
           AWS_DEFAULT_REGION: us-east-1
         run: |
           IDS=$(aws ec2 describe-instances \
@@ -57,7 +57,7 @@ jobs:
       - name: Delete DNS records left by previous runs
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_SECRET }}
           AWS_DEFAULT_REGION: us-east-1
         run: |
           ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "$APPS_DNS_ZONE" --query 'HostedZones[0].Id' --output text)
@@ -188,7 +188,7 @@ jobs:
       - name: Configure AWS CLI
         run: |
           aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_ACCESS_KEY_SECRET }}
           aws configure set default.region us-east-1
 
       - name: Check required secrets

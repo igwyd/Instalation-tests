@@ -473,7 +473,7 @@ jobs:
           DB_NAME: ${{ matrix.db }}
           EXPECTED_VERSION: ${{ vars.ONLYOFFICE_DEV_VERSION }}-${{ vars.ONLYOFFICE_DEV_BUILD }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_SECRET }}
           AWS_DEFAULT_REGION: ${{ vars.DASHBOARD_BUCKET_REGION }}
         run: |
           mkdir -p .github/workflow-results
