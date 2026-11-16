@@ -81,7 +81,7 @@ jobs:
       - name: Renew SSL certificates
         run: |
           ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=3 ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
-            "sudo certbot renew --non-interactive -v && sudo systemctl reload nginx"
+            "sudo certbot renew --non-interactive -v && sudo systemctl restart nginx"
 
       - name: Docker cleanup before run
         run: |
@@ -683,6 +683,12 @@ jobs:
       # cannot reach the EC2's own public IP (AWS has no hairpin NAT), so an iptables
       # DNAT rule on the host redirects <EC2_IP>:9000 -> 172.17.0.1:9000 (host MinIO).
       # MinIO + the DNAT rule + the bucket are set up once and reused by all 3 cycles.
+      # DS is published on :80 here (not :8080 as in the HTTPS cycles), so the host nginx is
+      # stopped for the MinIO cycles and started again in "MinIO cleanup". On another port
+      # DS nginx redirects /example -> http://<IP>/example/ (port dropped), and the puppeteer
+      # URL can be neither "/example" (run.py and the browser follow the redirect off the
+      # server) nor "/example/" (Dep.Tests waits for "${url}/upload" = "//upload" -> pdf/vsdx
+      # upload timeouts).
 
       - name: MINIO_HTTP_FALSE Docker reInstall
         continue-on-error: true
@@ -690,7 +696,8 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
           sudo docker rm ds-ee-dev || true
-          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo systemctl stop nginx || true
+          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
 
       - name: Wait for DS startup 240
@@ -760,7 +767,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck; echo
+          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -768,7 +775,7 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI--------------"
-          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/hosting/discovery | tail -c 150; echo
+          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: MINIO_HTTP_FALSE Check healthcheck
@@ -776,9 +783,9 @@ jobs:
         run: |
           # No HTTPS here on purpose — DS served plain HTTP/IP so the browser doesn't hit
           # mixed-content blocking when it fetches presigned URLs directly from MinIO (also HTTP).
-          HC=$(curl -s "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || echo "error")
+          HC=$(curl -s "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/healthcheck" || echo "error")
           # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
-          echo "HC_PORT_MINIO_HTTP_FALSE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || true)" >> $GITHUB_ENV
+          echo "HC_PORT_MINIO_HTTP_FALSE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_MINIO_HTTP_FALSE=$HC" >> $GITHUB_ENV
 
@@ -810,8 +817,9 @@ jobs:
         run: |
           cd Dep.Tests/puppeteer/engine
           # Switch off the HTTPS domain to plain HTTP/IP — avoids mixed-content blocking when
-          # the browser fetches presigned URLs directly from MinIO (also plain HTTP)
-          sed -i -E "s#\"url\": \"https?://[^\"]*/example/?\"#\"url\": \"http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/example/\"#" ../config_chrome_linux.json
+          # the browser fetches presigned URLs directly from MinIO (also plain HTTP).
+          # No trailing slash: Dep.Tests waits for "${url}/upload" (see the MinIO cycles header)
+          sed -i -E "s#\"url\": \"https?://[^\"]*/example/?\"#\"url\": \"http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/example\"#" ../config_chrome_linux.json
           echo "-------------------------------------"
           jq -r '.testOptions.url' ../config_chrome_linux.json
           echo "-------------------------------------"
@@ -865,7 +873,8 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
           sudo docker rm ds-ee-dev || true
-          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo systemctl stop nginx || true
+          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
 
       - name: Wait for DS startup 240
@@ -902,7 +911,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck; echo
+          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -910,7 +919,7 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI--------------"
-          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/hosting/discovery | tail -c 150; echo
+          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: MINIO_HTTP_TRUE Check healthcheck
@@ -918,9 +927,9 @@ jobs:
         run: |
           # No HTTPS here on purpose — DS served plain HTTP/IP so the browser doesn't hit
           # mixed-content blocking when it fetches presigned URLs directly from MinIO (also HTTP).
-          HC=$(curl -s "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || echo "error")
+          HC=$(curl -s "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/healthcheck" || echo "error")
           # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
-          echo "HC_PORT_MINIO_HTTP_TRUE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || true)" >> $GITHUB_ENV
+          echo "HC_PORT_MINIO_HTTP_TRUE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_MINIO_HTTP_TRUE=$HC" >> $GITHUB_ENV
 
@@ -1004,7 +1013,8 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
           sudo docker rm ds-ee-dev || true
-          sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
+          sudo systemctl stop nginx || true
+          sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
 
       - name: Wait for DS startup 240
@@ -1041,7 +1051,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo apt-get install jq -y
           echo "-------------healthcheck-------------"
-          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck; echo
+          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/healthcheck; echo
           echo "-------------DS services-------------"
           sudo docker exec ds-ee-dev supervisorctl status all || true
           echo "---------Installed packages----------"
@@ -1049,16 +1059,16 @@ jobs:
           echo "--------packageType--------"
           sudo docker exec ds-ee-dev curl -s http://127.0.0.1/info/info.json | jq | grep -i -e buildVersion -e buildNumber -e packageType
           echo "-------------WOPI--------------"
-          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/hosting/discovery | tail -c 150; echo
+          curl -s http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/hosting/discovery | tail -c 150; echo
           EOF
 
       - name: MINIO_HTTP_PATH-STYLE Check healthcheck
         continue-on-error: true
         run: |
           # No HTTPS here on purpose — see MINIO_HTTP_TRUE Check healthcheck for why
-          HC=$(curl -s "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || echo "error")
+          HC=$(curl -s "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/healthcheck" || echo "error")
           # real TCP port curl connected to (0 = no connection), shown next to healthcheck in the dashboard
-          echo "HC_PORT_MINIO_HTTP_PATH_STYLE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}:8080/healthcheck" || true)" >> $GITHUB_ENV
+          echo "HC_PORT_MINIO_HTTP_PATH_STYLE=$(curl -s -o /dev/null -w '%{remote_port}' "http://${{ vars.AWS_DEV_SERVER_EC2_IP }}/healthcheck" || true)" >> $GITHUB_ENV
           echo "Healthcheck: $HC"
           echo "HEALTHCHECK_MINIO_HTTP_PATH_STYLE=$HC" >> $GITHUB_ENV
 
@@ -1144,6 +1154,9 @@ jobs:
           sudo iptables -t nat -D PREROUTING -p tcp -d ${{ vars.AWS_DEV_SERVER_EC2_IP }} --dport 9000 -j DNAT --to-destination 172.17.0.1:9000 2>/dev/null || true
           sudo docker rm -f minio 2>/dev/null || true
           sudo rm -rf /opt/minio/data
+          # DS of the MinIO cycles holds :80 - free it and bring the host nginx back for the HTTPS cycles
+          sudo docker rm -f ds-ee-dev 2>/dev/null || true
+          sudo systemctl start nginx
           EOF
 
       - name: AZURE_STORAGE_DIRECTURL_FALSE Docker reInstall
@@ -1167,12 +1180,13 @@ jobs:
           allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
 
       - name: AZURE_STORAGE_DIRECTURL_FALSE Enable nginx config
+        # reload-or-restart: nginx is stopped during the MinIO cycles; if "MinIO cleanup" failed to start it, reload would fail
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo rm -f /etc/nginx/sites-enabled/* && \
              sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
-             sudo nginx -t && sudo systemctl reload nginx"
+             sudo nginx -t && sudo systemctl reload-or-restart nginx"
 
       - name: AZURE_STORAGE_DIRECTURL_FALSE Configure
         continue-on-error: true
@@ -1316,12 +1330,13 @@ jobs:
           allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
 
       - name: AZURE_STORAGE_DIRECTURL_TRUE Enable nginx config
+        # reload-or-restart: nginx is stopped during the MinIO cycles; if "MinIO cleanup" failed to start it, reload would fail
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo rm -f /etc/nginx/sites-enabled/* && \
              sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
-             sudo nginx -t && sudo systemctl reload nginx"
+             sudo nginx -t && sudo systemctl reload-or-restart nginx"
 
       - name: AZURE_STORAGE_DIRECTURL_TRUE Configure
         continue-on-error: true
@@ -1462,12 +1477,13 @@ jobs:
           allow_hosts: ${{ vars.AWS_DEV_SERVER_DOMAIN }} ${{ vars.AWS_DEV_SERVER_EC2_IP }}
 
       - name: AZURE_STORAGE_ENCRYPTION_SCOPE Enable nginx config
+        # reload-or-restart: nginx is stopped during the MinIO cycles; if "MinIO cleanup" failed to start it, reload would fail
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
             "sudo rm -f /etc/nginx/sites-enabled/* && \
              sudo ln -s /etc/nginx/sites-available/default_proxy-https-to-http.conf /etc/nginx/sites-enabled/default_proxy-https-to-http.conf && \
-             sudo nginx -t && sudo systemctl reload nginx"
+             sudo nginx -t && sudo systemctl reload-or-restart nginx"
 
       - name: AZURE_STORAGE_ENCRYPTION_SCOPE Configure
         continue-on-error: true
@@ -1795,7 +1811,7 @@ jobs:
         if: always()
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
-            "sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true && sudo docker system prune -af"
+            "sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true && sudo docker system prune -af; sudo systemctl start nginx || true"
 
       - name: Stop EC2 Instance
         if: always()
