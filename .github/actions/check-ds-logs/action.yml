@@ -54,32 +54,41 @@ runs:
         # writes matches to a temp file, then prints: count, marker, deduped sample
         TAIL="> /tmp/ds_log_errors.txt; wc -l < /tmp/ds_log_errors.txt; echo ===SAMPLE===; sort -u /tmp/ds_log_errors.txt | head -n ${{ inputs.sample_lines }} | cut -c1-300"
 
+        # RC != 0 means the logs could not be read (ssh down, container gone, ...) - must not count as "0 errors"
+        RC=0
         case "${{ inputs.mode }}" in
           ssh-native)
             OUT=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
-              "sudo grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" $TAIL" 2>/dev/null || echo "0")
+              "sudo grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" $TAIL" 2>/dev/null) || RC=$?
             ;;
           ssh-docker)
             OUT=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
-              "sudo docker exec ${{ inputs.container }} bash -c 'grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" $TAIL'" 2>/dev/null || echo "0")
+              "sudo docker exec ${{ inputs.container }} bash -c 'grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" $TAIL'" 2>/dev/null) || RC=$?
             ;;
           docker-local)
-            OUT=$(docker exec ${{ inputs.container }} bash -c "grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" $TAIL" 2>/dev/null || echo "0")
+            OUT=$(docker exec ${{ inputs.container }} bash -c "grep -Ph \"$PATTERN\" ${LOG_FILES[*]} 2>/dev/null | grep -Pv \"$EXCLUDE\" $TAIL" 2>/dev/null) || RC=$?
             ;;
           ssh-docker-logs)
+            # docker logs failure is hidden by the pipe - check the container exists first
             OUT=$(ssh -o StrictHostKeyChecking=no ${{ inputs.ssh_user }}@${{ inputs.ssh_host }} \
-              "sudo docker logs ${{ inputs.container }} 2>&1 | grep -Ph \"$PATTERN\" 2>/dev/null | grep -Pv \"$EXCLUDE\" $TAIL" 2>/dev/null || echo "0")
+              "sudo docker inspect ${{ inputs.container }} >/dev/null 2>&1 || exit 3; sudo docker logs ${{ inputs.container }} 2>&1 | grep -Ph \"$PATTERN\" 2>/dev/null | grep -Pv \"$EXCLUDE\" $TAIL" 2>/dev/null) || RC=$?
             ;;
           *)
             echo "Unknown mode: ${{ inputs.mode }}"
-            OUT="0"
+            OUT=""
+            RC=2
             ;;
         esac
 
         ERRORS=$(printf '%s\n' "$OUT" | head -n 1 | tr -dc '0-9')
-        if [ -z "$ERRORS" ]; then ERRORS=0; fi
         # everything after the marker is the sample; strip our own heredoc delimiter just in case
         SAMPLE=$(printf '%s\n' "$OUT" | sed -n '/^===SAMPLE===$/,$p' | tail -n +2 | grep -v '^DSLOGEOF$' || true)
+        if [ "$RC" -ne 0 ] || [ -z "$ERRORS" ]; then
+          # count as 1 error so every final check / dashboard cell shows it as failed, with the reason as sample
+          echo "::warning::DS logs ${{ inputs.label }} could not be read (mode=${{ inputs.mode }}, exit code $RC)"
+          ERRORS=1
+          SAMPLE="DS log check failed: logs could not be read (mode=${{ inputs.mode }}, exit code $RC) - DS/container/SSH unavailable?"
+        fi
 
         echo "DS log errors ${{ inputs.label }}: $ERRORS"
         if [ -n "$SAMPLE" ]; then printf '%s\n' "$SAMPLE"; fi
