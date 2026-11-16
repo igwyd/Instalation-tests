@@ -220,6 +220,7 @@ jobs:
           allow_hosts: ${{ env.EC2_IP }}
 
       - name: Clear puppeteer output before EE tests
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: Puppeteer API tests ONLYOFFICE-Docs EE
@@ -353,6 +354,7 @@ jobs:
           allow_hosts: ${{ env.EC2_IP }}
 
       - name: Clear puppeteer output before DE tests
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: Puppeteer API tests ONLYOFFICE-Docs DE
@@ -485,6 +487,7 @@ jobs:
           allow_hosts: ${{ env.EC2_IP }}
 
       - name: Clear puppeteer output before CE tests
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: Puppeteer API tests ONLYOFFICE-Docs CE
@@ -689,6 +692,7 @@ jobs:
           allow_hosts: ${{ env.EC2_IP }}
 
       - name: Clear puppeteer output before EE upgrade tests
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: Puppeteer API tests ONLYOFFICE-Docs EE

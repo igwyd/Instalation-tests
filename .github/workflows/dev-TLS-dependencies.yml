@@ -170,6 +170,7 @@ jobs:
         run: docker exec onlyoffice supervisorctl start ds:example
 
       - name: POSTGRES_TLS Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: POSTGRES_TLS Puppeteer API tests
@@ -383,6 +384,7 @@ jobs:
         run: docker exec onlyoffice supervisorctl start ds:example
 
       - name: MYSQL_TLS Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: MYSQL_TLS Puppeteer API tests
@@ -595,6 +597,7 @@ jobs:
         run: docker exec onlyoffice supervisorctl start ds:example
 
       - name: MARIADB_TLS Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: MARIADB_TLS Puppeteer API tests
@@ -807,6 +810,7 @@ jobs:
         run: docker exec onlyoffice supervisorctl start ds:example
 
       - name: MSSQL_TLS Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: MSSQL_TLS Puppeteer API tests
@@ -1013,6 +1017,7 @@ jobs:
         run: docker exec onlyoffice supervisorctl start ds:example
 
       - name: REDIS_TLS Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: REDIS_TLS Puppeteer API tests
@@ -1254,6 +1259,7 @@ jobs:
         run: docker exec onlyoffice supervisorctl start ds:example
 
       - name: RABBITMQ_TLS Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: RABBITMQ_TLS Puppeteer API tests
@@ -1561,6 +1567,7 @@ jobs:
         run: docker exec onlyoffice supervisorctl start ds:example
 
       - name: ALL_TLS Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: ALL_TLS Puppeteer API tests

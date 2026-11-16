@@ -155,6 +155,7 @@ jobs:
             "sudo docker exec ds-ee-release supervisorctl start ds:example"
 
       - name: Clear puppeteer output before EE tests
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: Puppeteer API tests ONLYOFFICE-Docs EE
@@ -277,6 +278,7 @@ jobs:
             "sudo docker exec ds-de-release supervisorctl start ds:example"
 
       - name: Clear puppeteer output before DE tests
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: Puppeteer API tests ONLYOFFICE-Docs DE
@@ -398,6 +400,7 @@ jobs:
             "sudo docker exec ds-release supervisorctl start ds:example"
 
       - name: Clear puppeteer output before CE tests
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: Puppeteer API tests ONLYOFFICE-Docs CE

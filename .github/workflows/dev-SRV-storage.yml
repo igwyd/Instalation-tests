@@ -180,6 +180,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: AWS_S3_FALSE Puppeteer API tests
@@ -328,6 +329,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: AWS_S3_TRUE Puppeteer API tests
@@ -475,6 +477,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: AWS_S3_PATH-STYLE Puppeteer API tests
@@ -623,6 +626,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: AWS_S3_KMS Puppeteer API tests
@@ -810,6 +814,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: MINIO_HTTP_FALSE Puppeteer API tests
@@ -954,6 +959,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: MINIO_HTTP_TRUE Puppeteer API tests
@@ -1093,6 +1099,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: MINIO_HTTP_PATH-STYLE Puppeteer API tests
@@ -1253,6 +1260,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: AZURE_STORAGE_DIRECTURL_FALSE Puppeteer API tests
@@ -1403,6 +1411,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: AZURE_STORAGE_DIRECTURL_TRUE Puppeteer API tests
@@ -1551,6 +1560,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: AZURE_STORAGE_ENCRYPTION_SCOPE Puppeteer API tests

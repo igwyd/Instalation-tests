@@ -177,6 +177,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: DS-VPATH Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: DS-VPATH Puppeteer API tests
@@ -318,6 +319,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: AMQP_ARTEMIS Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: AMQP_ARTEMIS Puppeteer API tests
@@ -451,6 +453,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: AMQP_CLASSIC Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: AMQP_CLASSIC Puppeteer API tests
@@ -632,6 +635,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: REDIS_REDIS Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: REDIS_REDIS Puppeteer API tests
@@ -814,6 +818,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: REDIS_IOREDIS Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: REDIS_IOREDIS Puppeteer API tests
@@ -1013,6 +1018,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: REDIS_CLUSTER_REDIS Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: REDIS_CLUSTER_REDIS Puppeteer API tests
@@ -1183,6 +1189,7 @@ jobs:
             "sudo docker exec ds-ee-dev supervisorctl start ds:example"
 
       - name: REDIS_CLUSTER_IOREDIS Clear puppeteer output
+        if: always()
         run: rm -rf Dep.Tests/puppeteer/out
 
       - name: REDIS_CLUSTER_IOREDIS Puppeteer API tests
