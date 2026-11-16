@@ -191,7 +191,7 @@ def pkg_table(data, arch_label, upgrade=True):
                         + '<td class="na">—</td>' * 5 + '</tr>')
         if upgrade:
             rows.append('<tr><td>EE Release</td>' + '<td class="na">—</td>' * 5 + '</tr>')
-            rows.append('<tr><td>EE Upgrade</td>' + '<td class="na">—</td>' * (6 if tags else 5) + '</tr>')
+            rows.append('<tr><td>EE Upgrade</td>' + '<td class="na">—</td>' * 5 + '</tr>')
     else:
         for key, label in [("ee", "EE"), ("de", "DE"), ("ce", "CE")]:
             ed = data.get(key, {})
