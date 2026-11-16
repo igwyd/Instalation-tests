@@ -1084,7 +1084,8 @@ jobs:
           echo "-------------CLIENT LIST over mTLS (proves DS's authenticated connections)-------------"
           CLIENTS=$(docker exec redis-tls redis-cli --tls --cert /certs/client.crt --key /certs/client.key --cacert /certs/ca.crt -p 6380 -a StrongPass123 --no-auth-warning CLIENT LIST)
           echo "$CLIENTS"
-          CONNECTED=$(echo "$CLIENTS" | grep -c "addr=")
+          # CLIENT LIST always includes redis-cli's own connection (cmd=client|list) - don't count it
+          CONNECTED=$(echo "$CLIENTS" | grep "addr=" | grep -vc "cmd=client|list" || true)
           echo "Connected clients: $CONNECTED"
 
           if [ "$PLAIN_CLOSED" = "true" ] && [ "$NOCERT_REJECTED" = "true" ] && [ "$CONNECTED" -gt 0 ]; then
@@ -1623,7 +1624,8 @@ jobs:
           echo "-------------Redis CLIENT LIST over mTLS-------------"
           CLIENTS=$(docker exec redis-tls redis-cli --tls --cert /certs/server.crt --key /certs/server.key --cacert /certs/ca.crt -p 6380 -a StrongPass123 --no-auth-warning CLIENT LIST)
           echo "$CLIENTS"
-          if [ "$(echo "$CLIENTS" | grep -c "addr=")" -gt 0 ]; then REDIS_OK=true; else REDIS_OK=false; fi
+          # CLIENT LIST always includes redis-cli's own connection (cmd=client|list) - don't count it
+          if [ "$(echo "$CLIENTS" | grep "addr=" | grep -vc "cmd=client|list" || true)" -gt 0 ]; then REDIS_OK=true; else REDIS_OK=false; fi
 
           echo "-------------RabbitMQ list_connections-------------"
           RMQ_ROWS=$(docker exec rabbitmq-tls rabbitmqctl list_connections user ssl peer_cert_subject 2>&1)
