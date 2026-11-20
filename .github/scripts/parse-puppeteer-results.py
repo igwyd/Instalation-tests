@@ -9,17 +9,34 @@ Usage:
   python3 parse-puppeteer-results.py                  # single run
   python3 parse-puppeteer-results.py --edition EE     # multi-edition (EE/DE/CE)
 """
+import glob
 import os
 import re
 import sys
 
+OUT_DIR = "Dep.Tests/puppeteer/out"
 
-def count_results(path):
+
+def find_report(provider):
+    """Locate report.html of a provider regardless of the Dep.Tests output layout:
+    out/<provider>/ (old) or out/<version>/web/<provider>/ (new). If several are
+    found, take the most recently modified one."""
+    found = glob.glob(f"{OUT_DIR}/**/{provider}/report.html", recursive=True)
+    if not found:
+        return None
+    return max(found, key=os.path.getmtime)
+
+
+def count_results(provider):
     """Return (ok, err) counts from a puppeteer report. Missing report -> (0, 0),
     i.e. TOTAL == 0, which downstream treats as 'nothing ran' (a failure)."""
-    if not os.path.exists(path):
-        print(f"Report not found: {path}")
+    path = find_report(provider)
+    if path is None:
+        print(f"::error::Puppeteer report not found for provider '{provider}' under {OUT_DIR}")
+        reports = sorted(glob.glob(f"{OUT_DIR}/**/report.html", recursive=True))
+        print("report.html files present: " + (", ".join(reports) if reports else "none"))
         return 0, 0
+    print(f"Report ({provider}): {path}")
     with open(path) as f:
         content = f.read()
     ok = 0
@@ -37,8 +54,8 @@ def count_results(path):
     return ok, err
 
 
-api_ok,  api_err  = count_results("Dep.Tests/puppeteer/out/example/report.html")
-wopi_ok, wopi_err = count_results("Dep.Tests/puppeteer/out/wopi/report.html")
+api_ok,  api_err  = count_results("example")
+wopi_ok, wopi_err = count_results("wopi")
 
 api_total  = api_ok  + api_err
 wopi_total = wopi_ok + wopi_err

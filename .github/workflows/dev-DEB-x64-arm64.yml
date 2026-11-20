@@ -256,6 +256,16 @@ jobs:
           python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # (WOPI: not ready) python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
 
+      - name: Upload puppeteer output EE
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: puppeteer-deb-${{ matrix.arch }}-ee
+          path: Dep.Tests/puppeteer/out
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Parse puppeteer results EE
         if: always()
         run: python3 .github/scripts/parse-puppeteer-results.py --edition EE
@@ -389,6 +399,16 @@ jobs:
           python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # (WOPI: not ready) python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
 
+      - name: Upload puppeteer output DE
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: puppeteer-deb-${{ matrix.arch }}-de
+          path: Dep.Tests/puppeteer/out
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Parse puppeteer results DE
         if: always()
         run: python3 .github/scripts/parse-puppeteer-results.py --edition DE
@@ -521,6 +541,16 @@ jobs:
           python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # (WOPI: not ready) python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+
+      - name: Upload puppeteer output CE
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: puppeteer-deb-${{ matrix.arch }}-ce
+          path: Dep.Tests/puppeteer/out
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Parse puppeteer results CE
         if: always()
@@ -728,6 +758,16 @@ jobs:
           python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
           # (WOPI: not ready) python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+
+      - name: Upload puppeteer output EE after upgrade
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: puppeteer-deb-${{ matrix.arch }}-ee-after-upgrade
+          path: Dep.Tests/puppeteer/out
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Parse puppeteer results EE after upgrade
         if: always()
