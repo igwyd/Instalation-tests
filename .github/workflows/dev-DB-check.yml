@@ -8,6 +8,9 @@ on:
       db:
         description: 'Which matrix entries to run: all or a comma-separated list (mysql, postgres, postgres14..17, mssql, oracle, oracle-thick, dameng, mariadb)'
         default: all
+      k6_vu:
+        description: 'One-off: override k6 VU count (ramp and main stage), e.g. 50. Empty = values from the matrix. Result is NOT saved to the dashboard'
+        default: ''
 
 permissions:
   contents: read
@@ -308,20 +311,41 @@ jobs:
           cd document-server-stress-testing/K6/
           cat save-changes-document-random-close.json
 
+      - name: K6 diagnostics start
+        continue-on-error: true
+        env:
+          DB_CONTAINER: ${{ matrix.db_name }}
+        run: bash .github/scripts/k6-diag.sh start
+
       - name: Run K6 LOAD test
         working-directory: document-server-stress-testing/K6
+        env:
+          K6_VU_OVERRIDE: ${{ inputs.k6_vu }}
         run: |
           set -o pipefail
+          RAMP="${{ matrix.k6_stage_ramp }}"
+          MAIN="${{ matrix.k6_stage_main }}"
+          if [ -n "${K6_VU_OVERRIDE}" ]; then
+            [[ "${K6_VU_OVERRIDE}" =~ ^[0-9]+$ ]] || { echo "k6_vu must be a number: ${K6_VU_OVERRIDE}"; exit 1; }
+            RAMP="1m:${K6_VU_OVERRIDE}"; MAIN="9m:${K6_VU_OVERRIDE}"
+            echo "::notice::k6 VU override: ${K6_VU_OVERRIDE} (matrix: ${{ matrix.k6_stage_ramp }} / ${{ matrix.k6_stage_main }})"
+          fi
           docker run --rm \
             -u "$(id -u):$(id -g)" \
             --network ds-network \
             -v "$(pwd)":/k6 \
             grafana/k6 run /k6/save-changes-document-random-close.js \
             --quiet \
-            -s "${{ matrix.k6_stage_ramp }}" -s "${{ matrix.k6_stage_main }}" \
+            -s "${RAMP}" -s "${MAIN}" \
             | tee k6-output.txt
 
+      - name: K6 diagnostics report
+        if: always()
+        continue-on-error: true
+        run: bash .github/scripts/k6-diag.sh report
+
       - name: Parse K6 results
+        if: always()
         continue-on-error: true
         run: |
           python3 - << 'PYEOF'
@@ -467,7 +491,7 @@ jobs:
           fi
 
       - name: Save results
-        if: always()
+        if: always() && inputs.k6_vu == ''
         continue-on-error: true
         env:
           DB_NAME: ${{ matrix.db }}
