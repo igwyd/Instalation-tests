@@ -206,6 +206,11 @@ jobs:
           sudo curl -s http://${{ env.EC2_IP }}:8083/hosting/discovery | tail -c 150; echo
           EOF
 
+      - name: SELinux diagnostics EE
+        if: always()
+        continue-on-error: true
+        run: ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} 'bash -s' < .github/scripts/rpm-selinux-diag.sh
+
       - name: Check DS default services EE
         continue-on-error: true
         run: |
@@ -352,6 +357,11 @@ jobs:
           sudo curl -s http://${{ env.EC2_IP }}:8083/hosting/discovery | tail -c 150; echo
           EOF
 
+      - name: SELinux diagnostics DE
+        if: always()
+        continue-on-error: true
+        run: ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} 'bash -s' < .github/scripts/rpm-selinux-diag.sh
+
       - name: Check DS default services DE
         continue-on-error: true
         run: |
@@ -496,6 +506,11 @@ jobs:
           echo "------------WOPI external------------"
           sudo curl -s http://${{ env.EC2_IP }}:8083/hosting/discovery | tail -c 150; echo
           EOF
+
+      - name: SELinux diagnostics CE
+        if: always()
+        continue-on-error: true
+        run: ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} 'bash -s' < .github/scripts/rpm-selinux-diag.sh
 
       - name: Check DS default services CE
         continue-on-error: true
@@ -647,6 +662,11 @@ jobs:
           sudo curl -s http://${{ env.EC2_IP }}:8083/hosting/discovery | tail -c 150; echo
           EOF
 
+      - name: SELinux diagnostics EE RELEASE
+        if: always()
+        continue-on-error: true
+        run: ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} 'bash -s' < .github/scripts/rpm-selinux-diag.sh
+
       - name: Check healthcheck EE RELEASE and save JWT before upgrade
         continue-on-error: true
         run: |
@@ -706,6 +726,11 @@ jobs:
           echo "------------WOPI external------------"
           sudo curl -s http://${{ env.EC2_IP }}:8083/hosting/discovery | tail -c 150; echo
           EOF
+
+      - name: SELinux diagnostics EE UPGRADE
+        if: always()
+        continue-on-error: true
+        run: ssh -o StrictHostKeyChecking=no ec2-user@${{ env.EC2_IP }} 'bash -s' < .github/scripts/rpm-selinux-diag.sh
 
       - name: Check healthcheck, version and JWT after upgrade
         continue-on-error: true
