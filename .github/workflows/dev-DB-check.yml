@@ -160,6 +160,11 @@ jobs:
           echo '--- license ---'
           docker exec onlyoffice ls /var/www/onlyoffice/Data/
 
+      - name: Check license is accepted by DS
+        env:
+          CONTAINER: onlyoffice
+        run: bash .github/scripts/check-ds-license.sh
+
       - name: Set Oracle driver mode (thin=${{ matrix.oracle_thin || 'true' }})
         if: matrix.db_type == 'oracle'
         run: |
