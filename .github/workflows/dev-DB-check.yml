@@ -260,9 +260,20 @@ jobs:
         run: docker exec onlyoffice supervisorctl start ds:example
 
       - name: Run Puppeteer Tests
+        timeout-minutes: 40
         uses: ./.github/actions/run-puppeteer
         with:
           url: http://${{ env.RUNNER_IP }}/example
+
+      - name: Upload puppeteer output
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: puppeteer-db-${{ matrix.db }}
+          path: Dep.Tests/puppeteer/out
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Check Oracle driver mode (thin=${{ matrix.oracle_thin || 'true' }})
         if: matrix.db_type == 'oracle'
