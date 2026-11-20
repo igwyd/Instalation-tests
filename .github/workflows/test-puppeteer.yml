@@ -65,7 +65,7 @@ jobs:
           python3 run.py \
           --suite daily \
           --disable_animation \
-          --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 \
+          --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 \
           --threads 2 \
           --providers example
 
@@ -79,6 +79,6 @@ jobs:
           python3 run.py \
           --suite daily \
           --disable_animation \
-          --config_params puppeteerOptions.headless=true puppeteerOptions.channel=chrome puppeteerOptions.protocolTimeout=100000 \
+          --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 \
           --threads 2 \
           --providers wopi

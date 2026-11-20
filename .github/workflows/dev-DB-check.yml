@@ -264,7 +264,6 @@ jobs:
         uses: ./.github/actions/run-puppeteer
         with:
           url: http://${{ env.RUNNER_IP }}/example
-          system_chrome: 'false'
 
       - name: Upload puppeteer output
         if: always()
