@@ -102,6 +102,8 @@ Cases 13–18: Docs already serves HTTPS on 443 for `div-apps-<case>-<run>.qa-on
 
 Case 19: the Apps DE license (`APPS_LICENSE_DE`) is put into Docs right after its install; Apps EE is then installed on top and its wizard must not ask for a license (`LICENSE_REQUIRED=false`).
 
+If Docs does not answer `/healthcheck` after install (10 min), the `Wait for Docs healthcheck` step prints diagnostics from the instance in a log group: listening ports, local healthcheck, nginx status/log, DS services, SELinux AVC and `http_port_t`, firewall.
+
 
 ## Release
 

@@ -529,7 +529,23 @@ jobs:
             [ "$HC" = "true" ] && break
             sleep 10
           done
-          [ "$HC" = "true" ] || { echo "::error::Docs healthcheck $DOCS_URL_BEFORE/healthcheck is not true after 10 min"; exit 0; }
+          if [ "$HC" != "true" ]; then
+            # why Docs does not answer from outside: what listens, nginx state, SELinux denials, local answer
+            echo "::group::Docs healthcheck diagnostics (last answer: '${HC:0:100}')"
+            ssh $SSH_OPTS $U@$EC2_IP "sudo env P=$DOCS_PORT bash -s" << 'EOF' || true
+          echo "--- listening ports"; ss -ltnp 2>&1 | grep -E ":($P|80|443|8000) " || echo "nothing listens on $P/80/443/8000"
+          echo "--- local healthcheck"; for u in "http://127.0.0.1:$P/healthcheck" http://127.0.0.1:8000/healthcheck; do echo "$u -> $(curl -s -m 5 "$u" | head -c 100) (rc $?)"; done
+          echo "--- nginx"; systemctl status nginx --no-pager -l 2>&1 | tail -15
+          journalctl -u nginx --no-pager -n 30 2>&1 | tail -30
+          tail -n 20 /var/log/nginx/error.log /var/log/onlyoffice/documentserver/nginx.error.log 2>&1
+          echo "--- ds services"; systemctl is-active ds-docservice ds-converter 2>&1; docker ps 2>&1 | head -5
+          echo "--- selinux"; getenforce 2>&1; ausearch -m avc -ts recent 2>&1 | tail -15
+          semanage port -l 2>/dev/null | grep -E "^http_port_t"
+          echo "--- firewall"; firewall-cmd --list-ports 2>&1 | head -3
+          EOF
+            echo "::endgroup::"
+            echo "::error::Docs healthcheck $DOCS_URL_BEFORE/healthcheck is not true after 10 min"; exit 0
+          fi
           echo "Docs is up: $DOCS_URL_BEFORE"
           if [ "$DOCS_SSL" != "none" ]; then
             # the certificate Docs serves now, to compare with the one Apps serves after the takeover
