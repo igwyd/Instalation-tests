@@ -231,14 +231,7 @@ jobs:
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          # TEMP: long daily suite disabled, short tests below
-          # python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example
 
       - name: Puppeteer WOPI tests ONLYOFFICE-Docs EE
         continue-on-error: true
@@ -247,14 +240,7 @@ jobs:
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          # TEMP: long daily suite disabled, short tests below
-          # python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          # (WOPI: not ready) python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi
 
       - name: Upload puppeteer output EE
         if: always()
@@ -374,14 +360,7 @@ jobs:
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          # TEMP: long daily suite disabled, short tests below
-          # python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example
 
       - name: Puppeteer WOPI tests ONLYOFFICE-Docs DE
         continue-on-error: true
@@ -390,14 +369,7 @@ jobs:
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          # TEMP: long daily suite disabled, short tests below
-          # python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          # (WOPI: not ready) python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi
 
       - name: Upload puppeteer output DE
         if: always()
@@ -517,14 +489,7 @@ jobs:
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          # TEMP: long daily suite disabled, short tests below
-          # python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example
 
       - name: Puppeteer WOPI tests ONLYOFFICE-Docs CE
         continue-on-error: true
@@ -533,14 +498,7 @@ jobs:
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          # TEMP: long daily suite disabled, short tests below
-          # python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          # (WOPI: not ready) python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi
 
       - name: Upload puppeteer output CE
         if: always()
@@ -734,14 +692,7 @@ jobs:
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          # TEMP: long daily suite disabled, short tests below
-          # python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
-          python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example || true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers example
 
       - name: Puppeteer WOPI tests ONLYOFFICE-Docs EE
         continue-on-error: true
@@ -750,14 +701,7 @@ jobs:
           echo "-------------------------------------"
           cat ../config_chrome_linux.json
           echo "-------------------------------------"
-          # TEMP: long daily suite disabled, short tests below
-          # python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi
-          python3 run.py ../tests/web/desktop/word/input/input_text.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/spreadsheets/hometab/font/font_bold.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/presentation/hometab/input/input_text_and_download.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/pdf/smoke/check_find_for_a_specific_pdf.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          python3 run.py ../tests/web/desktop/pdf-form/rightmenu/insert_checkbox.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
-          # (WOPI: not ready) python3 run.py ../tests/web/desktop/openers/vsdx.js --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi || true
+          python3 run.py --suite daily --disable_animation --config_params puppeteerOptions.headless=true puppeteerOptions.protocolTimeout=100000 --providers wopi
 
       - name: Upload puppeteer output EE after upgrade
         if: always()
