@@ -75,6 +75,21 @@ jobs:
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
+      # fail once, before any EC2 instance is created, instead of 20 jobs failing on the same 404
+      - name: Check OneClickInstall-Docs and DocSpace-buildtools branches exist
+        env:
+          ONECLICK_BRANCH: ${{ vars.ONLYOFFICE_ONECLICK_BRANCH }}
+          APPS_BRANCH: ${{ vars.ONLYOFFICE_APPS_DEV_BRANCH }}
+        run: |
+          FAIL=0
+          check() { # $1 variable name, $2 branch, $3 URL of a file/archive the test downloads from that branch
+            [ -n "$2" ] || { echo "::error::variable $1 is not set"; FAIL=1; return; }
+            curl -fsSIL -o /dev/null "$3" || { echo "::error::branch '$2' (variable $1) not found: $3"; FAIL=1; }
+          }
+          check ONLYOFFICE_ONECLICK_BRANCH "$ONECLICK_BRANCH" "https://github.com/ONLYOFFICE/OneClickInstall-Docs/archive/refs/heads/$ONECLICK_BRANCH.tar.gz"
+          check ONLYOFFICE_APPS_DEV_BRANCH "$APPS_BRANCH" "https://raw.githubusercontent.com/ONLYOFFICE/DocSpace-buildtools/$APPS_BRANCH/install/OneClickInstall/apps-install.sh"
+          exit $FAIL
+
       - name: Build matrix
         id: matrix
         env:
