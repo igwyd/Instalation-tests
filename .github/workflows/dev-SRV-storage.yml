@@ -86,7 +86,12 @@ jobs:
       - name: Docker cleanup before run
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
-            "sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true && sudo docker system prune -af"
+            "sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true && sudo docker system prune -af --volumes"
+
+      - name: Disk usage on EC2 (before run)
+        continue-on-error: true
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }}             "df -h /; sudo docker system df; sudo du -xh --max-depth=1 /var /opt /home 2>/dev/null | sort -rh | head -15"
 
       - name: Docker run ONLYOFFICE-Docs EE
         run: |
@@ -240,7 +245,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
-          sudo docker rm ds-ee-dev || true
+          sudo docker rm -fv ds-ee-dev || true
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
 
@@ -388,7 +393,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
-          sudo docker rm ds-ee-dev || true
+          sudo docker rm -fv ds-ee-dev || true
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
 
@@ -536,7 +541,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
-          sudo docker rm ds-ee-dev || true
+          sudo docker rm -fv ds-ee-dev || true
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
 
@@ -699,7 +704,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
-          sudo docker rm ds-ee-dev || true
+          sudo docker rm -fv ds-ee-dev || true
           sudo systemctl stop nginx || true
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
@@ -719,7 +724,7 @@ jobs:
         continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
-          sudo docker rm -f minio 2>/dev/null || true
+          sudo docker rm -fv minio 2>/dev/null || true
           sudo rm -rf /opt/minio/data && sudo mkdir -p /opt/minio/data
           # Browser talks to MinIO directly (different origin from the DS domain) when
           # useDirectStorageUrls=true, so those requests need CORS or the browser blocks them.
@@ -738,6 +743,8 @@ jobs:
           # step is continue-on-error, so print the container state — a dead MinIO otherwise
           # only shows up much later as failing puppeteer tests
           sudo docker ps -a --filter name=minio --format 'minio container: {{.Status}}'
+          df -h /
+          sudo docker ps --filter name=minio --filter status=running -q | grep -q . || echo "::error::MinIO container is not running (disk: see df above)"
           # hairpin workaround: DS container -> EC2 public IP:9000 -> host MinIO
           sudo iptables -t nat -C PREROUTING -p tcp -d ${{ vars.AWS_DEV_SERVER_EC2_IP }} --dport 9000 -j DNAT --to-destination 172.17.0.1:9000 2>/dev/null || \
             sudo iptables -t nat -A PREROUTING -p tcp -d ${{ vars.AWS_DEV_SERVER_EC2_IP }} --dport 9000 -j DNAT --to-destination 172.17.0.1:9000
@@ -877,7 +884,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
-          sudo docker rm ds-ee-dev || true
+          sudo docker rm -fv ds-ee-dev || true
           sudo systemctl stop nginx || true
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
@@ -1018,7 +1025,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
-          sudo docker rm ds-ee-dev || true
+          sudo docker rm -fv ds-ee-dev || true
           sudo systemctl stop nginx || true
           sudo docker run -itd -p 80:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
@@ -1159,10 +1166,10 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo iptables -t nat -D PREROUTING -p tcp -d ${{ vars.AWS_DEV_SERVER_EC2_IP }} --dport 9000 -j DNAT --to-destination 172.17.0.1:9000 2>/dev/null || true
-          sudo docker rm -f minio 2>/dev/null || true
+          sudo docker rm -fv minio 2>/dev/null || true
           sudo rm -rf /opt/minio/data
           # DS of the MinIO cycles holds :80 - free it and bring the host nginx back for the HTTPS cycles
-          sudo docker rm -f ds-ee-dev 2>/dev/null || true
+          sudo docker rm -fv ds-ee-dev 2>/dev/null || true
           sudo systemctl start nginx
           EOF
 
@@ -1171,7 +1178,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
-          sudo docker rm ds-ee-dev || true
+          sudo docker rm -fv ds-ee-dev || true
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
 
@@ -1322,7 +1329,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
-          sudo docker rm ds-ee-dev || true
+          sudo docker rm -fv ds-ee-dev || true
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
 
@@ -1470,7 +1477,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} << EOF
           sudo docker stop ds-ee-dev || true
-          sudo docker rm ds-ee-dev || true
+          sudo docker rm -fv ds-ee-dev || true
           sudo docker run -itd -p 8080:80 -e WOPI_ENABLED=true --name ds-ee-dev onlyoffice/4testing-documentserver-ee:${{ vars.ONLYOFFICE_DEV_VERSION }}.${{ vars.ONLYOFFICE_DEV_BUILD }}
           EOF
 
@@ -1821,7 +1828,7 @@ jobs:
         if: always()
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ vars.AWS_DEV_SERVER_EC2_IP }} \
-            "sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true && sudo docker system prune -af; sudo systemctl start nginx || true"
+            "sudo docker stop \$(sudo docker ps -q) 2>/dev/null || true && sudo docker system prune -af --volumes; sudo systemctl start nginx || true"
 
       - name: Stop EC2 Instance
         if: always()
