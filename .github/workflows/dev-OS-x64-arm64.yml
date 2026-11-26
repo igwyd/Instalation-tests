@@ -155,13 +155,16 @@ jobs:
 
       # ==================== Docker install (printf "y") ====================
       - name: Download OneClickInstall-Docs repo for Docker install
-        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
           rm -rf OneClickInstall-Docs && mkdir OneClickInstall-Docs
           curl -fsSL https://github.com/ONLYOFFICE/OneClickInstall-Docs/archive/refs/heads/${{ vars.ONLYOFFICE_ONECLICK_BRANCH }}.tar.gz \
             | tar xz --strip-components=1 -C OneClickInstall-Docs
           ls OneClickInstall-Docs
+          if [ ! -f OneClickInstall-Docs/docs-install.sh ]; then
+            echo "::error::OneClickInstall-Docs/docs-install.sh not found: branch '${{ vars.ONLYOFFICE_ONECLICK_BRANCH }}' (var ONLYOFFICE_ONECLICK_BRANCH) does not exist or download failed"
+            exit 1
+          fi
           EOF
 
       # Minimal RHEL 10 AMIs lack the netfilter kernel modules for the running kernel,
@@ -301,13 +304,16 @@ jobs:
 
       # ==================== Native install (printf "n") ====================
       - name: Download OneClickInstall-Docs repo for native install
-        continue-on-error: true
         run: |
           ssh -o StrictHostKeyChecking=no ${{ matrix.ssh_user }}@${{ env.EC2_IP }} << 'EOF'
           sudo rm -rf OneClickInstall-Docs && mkdir OneClickInstall-Docs
           curl -fsSL https://github.com/ONLYOFFICE/OneClickInstall-Docs/archive/refs/heads/${{ vars.ONLYOFFICE_ONECLICK_BRANCH }}.tar.gz \
             | tar xz --strip-components=1 -C OneClickInstall-Docs
           ls OneClickInstall-Docs
+          if [ ! -f OneClickInstall-Docs/docs-install.sh ]; then
+            echo "::error::OneClickInstall-Docs/docs-install.sh not found: branch '${{ vars.ONLYOFFICE_ONECLICK_BRANCH }}' (var ONLYOFFICE_ONECLICK_BRANCH) does not exist or download failed"
+            exit 1
+          fi
           EOF
 
       # The exact dev build (VERSION-BUILD from vars) is downloaded straight from the S3 build artifacts
