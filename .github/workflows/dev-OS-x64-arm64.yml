@@ -18,6 +18,19 @@ jobs:
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+
+      # Fail before any EC2 instance is created if the branch / dev packages / docker tag are missing
+      - name: Check dev artifacts exist
+        env:
+          ONECLICK_BRANCH: ${{ vars.ONLYOFFICE_ONECLICK_BRANCH }}
+          DEV_VERSION: ${{ vars.ONLYOFFICE_DEV_VERSION }}
+          DEV_BUILD: ${{ vars.ONLYOFFICE_DEV_BUILD }}
+        run: bash .github/scripts/check-dev-artifacts.sh
+
       - name: Build matrix
         id: matrix
         env:
