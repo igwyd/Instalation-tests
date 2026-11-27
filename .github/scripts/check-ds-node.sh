@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Checks the Node.js version embedded (pkg) in DS binaries inside a Docker container (bug 84664).
+# Checks the Node.js version embedded (pkg) in DS binaries (bug 84664): inside a Docker container
+# (CONTAINER set, dev-Docker-DEB) or directly on the host (CONTAINER empty, DEB/RPM package install).
 # Every binary must be built with exactly EXPECTED_NODE (repo variable ONLYOFFICE_NODEJS_VERSION, e.g. v24.22.3).
 # Missing binaries (e.g. adminpanel in CE) are skipped.
-# Env: SSH_TARGET (user@ip), SUFFIX (EE|DE|CE), CONTAINER, EXPECTED_NODE (with or without leading "v")
+# Env: SSH_TARGET (user@ip), SUFFIX (EE|DE|CE|EE_UPGRADE), CONTAINER (optional), EXPECTED_NODE (with or without leading "v")
 # Writes NODE_<SUFFIX>_OK, NODE_<SUFFIX>_VERSIONS (unique, one line) and NODE_<SUFFIX>_TEXT (one line per binary, tooltip) to GITHUB_ENV.
 EXPECTED_NODE="v${EXPECTED_NODE#v}"
 if [ "$EXPECTED_NODE" = "v" ]; then
@@ -13,7 +14,9 @@ if [ "$EXPECTED_NODE" = "v" ]; then
   exit 1
 fi
 
-RAW=$(ssh -o StrictHostKeyChecking=no "$SSH_TARGET" "sudo docker exec -i $CONTAINER bash -s" 2>/dev/null <<'EOF' || true
+if [ -n "$CONTAINER" ]; then REMOTE="sudo docker exec -i $CONTAINER bash -s"; WHERE="container $CONTAINER"
+else REMOTE="sudo bash -s"; WHERE="host $SSH_TARGET"; fi
+RAW=$(ssh -o StrictHostKeyChecking=no "$SSH_TARGET" "$REMOTE" 2>/dev/null <<'EOF' || true
 for f in /var/www/onlyoffice/documentserver/server/DocService/docservice \
          /var/www/onlyoffice/documentserver/server/FileConverter/converter \
          /var/www/onlyoffice/documentserver/server/Metrics/metrics \
@@ -34,7 +37,7 @@ while read -r f v; do
   VERS+="$v"$'\n'
 done <<< "$RAW"
 # no binaries found at all = nothing was checked, not a pass
-[ "$N" -gt 0 ] || { OK=false; TEXT="❌ no DS binaries found in $CONTAINER"$'\n'; }
+[ "$N" -gt 0 ] || { OK=false; TEXT="❌ no DS binaries found in $WHERE"$'\n'; }
 VERS=$(printf '%s' "$VERS" | sort -u | paste -sd' ' -)
 
 printf 'Node.js in binaries %s (expected %s):\n%s' "$SUFFIX" "$EXPECTED_NODE" "$TEXT"

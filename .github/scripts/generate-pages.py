@@ -180,7 +180,7 @@ def td_ds_errors(data):
             f'<pre class="dslog">{escape(text)}</pre></details></td>')
 
 
-def pkg_table(data, arch_label, upgrade=True):
+def pkg_table(data, arch_label, upgrade=True, node=False):
     run_date = (data or {}).get("run_date", "")
     date_part = f' <span class="date">· {escape(run_date)}</span>' if run_date else ""
 
@@ -188,10 +188,10 @@ def pkg_table(data, arch_label, upgrade=True):
     if data is None:
         for label in ["EE", "DE", "CE"]:
             rows.append(f'<tr><td>{label}</td>'
-                        + '<td class="na">—</td>' * 5 + '</tr>')
+                        + '<td class="na">—</td>' * (6 if node else 5) + '</tr>')
         if upgrade:
-            rows.append('<tr><td>EE Release</td>' + '<td class="na">—</td>' * 5 + '</tr>')
-            rows.append('<tr><td>EE Upgrade</td>' + '<td class="na">—</td>' * 5 + '</tr>')
+            rows.append('<tr><td>EE Release</td>' + '<td class="na">—</td>' * (6 if node else 5) + '</tr>')
+            rows.append('<tr><td>EE Upgrade</td>' + '<td class="na">—</td>' * (6 if node else 5) + '</tr>')
     else:
         for key, label in [("ee", "EE"), ("de", "DE"), ("ce", "CE")]:
             ed = data.get(key, {})
@@ -201,6 +201,7 @@ def pkg_table(data, arch_label, upgrade=True):
                 + td_hc(ed.get("healthy", False), ed.get("hc_port"))
                 + td_version(ed)
                 + svc_cell
+                + (td_node(ed) if node else '')
                 + td_ppt_breakdown(ed)
                 + td_ds_errors(ed)
                 + '</tr>'
@@ -219,6 +220,7 @@ def pkg_table(data, arch_label, upgrade=True):
                 + td_hc(hc_rel, ug.get("hc_port_release"))
                 + f'<td>{escape(ver_rel)}</td>'
                 + f'<td class="{status(jwt_rel)}">JWT: {"✅ YES" if jwt_rel else "❌ FAIL"}</td>'
+                + ('<td class="na">—</td>' if node else '')
                 + '<td class="na">—</td>'
                 + '<td class="na">—</td>'
                 + '</tr>'
@@ -231,6 +233,7 @@ def pkg_table(data, arch_label, upgrade=True):
                 + td_hc(hc_upg, ug.get("hc_port_upgrade"))
                 + td_version(ug)
                 + f'<td class="{status(jwt_match)}">JWT: {"✅ MATCH" if jwt_match else "❌ FAIL"}</td>'
+                + (td_node(ug) if node else '')
                 + td_ppt_breakdown(ug)
                 + td_ds_errors(ug)
                 + '</tr>'
@@ -238,7 +241,8 @@ def pkg_table(data, arch_label, upgrade=True):
 
     thead = ('<thead><tr>'
              '<th>Edition</th><th>Healthcheck</th><th>Version</th>'
-             f'<th>{"SVC/JWT" if upgrade else "SVC"}</th><th>Puppeteer (=0)</th><th>DS Log Errors</th>'
+             f'<th>{"SVC/JWT" if upgrade else "SVC"}</th>' + ('<th>Node.js</th>' if node else '') +
+             '<th>Puppeteer (=0)</th><th>DS Log Errors</th>'
              '</tr></thead>')
     return (f'<h3>{arch_label}{date_part}</h3>\n'
             f'<table>{thead}<tbody>' + '\n'.join(rows) + '</tbody></table>\n')
@@ -585,8 +589,8 @@ def generate_dev():
     dep_checks     = load("dev-srv-dependances.json")
     tls_deps       = load("dev-tls-dependencies.json")
 
-    deb_body        = pkg_table(deb_x64, "x64") + pkg_table(deb_arm64, "arm64")
-    rpm_body        = pkg_table(rpm_x64, "x64") + pkg_table(rpm_arm64, "arm64")
+    deb_body        = pkg_table(deb_x64, "x64", node=True) + pkg_table(deb_arm64, "arm64", node=True)
+    rpm_body        = pkg_table(rpm_x64, "x64", node=True) + pkg_table(rpm_arm64, "arm64", node=True)
     docker_deb_body = docker_table(docker_deb_x64, "x64", node=True) + docker_table(docker_deb_arm64, "arm64", node=True)
 
     # DB section body
