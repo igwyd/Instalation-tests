@@ -18,7 +18,7 @@ DBS = [
     ("PostgreSQL 15",         "postgres15"),
     ("PostgreSQL 16",         "postgres16"),
     ("PostgreSQL 17",         "postgres17"),
-    ("MSSQL 2025 (custom)",   "mssql"),
+    ("MSSQL 2025 latest",     "mssql"),
     ("Oracle latest",         "oracle"),
     ("Oracle thick latest",   "oracle-thick"),
     ("Dameng 8.1.3 (custom)", "dameng"),

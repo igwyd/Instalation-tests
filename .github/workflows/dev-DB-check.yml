@@ -33,7 +33,7 @@ jobs:
             {"db": "postgres15", "db_image": "postgres:15", "db_name": "postgresdb", "db_port": 5432, "db_type": "postgres", "db_database": "onlyoffice", "db_user": "onlyoffice", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:500", "k6_stage_main": "9m:500"},
             {"db": "postgres16", "db_image": "postgres:16", "db_name": "postgresdb", "db_port": 5432, "db_type": "postgres", "db_database": "onlyoffice", "db_user": "onlyoffice", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:500", "k6_stage_main": "9m:500"},
             {"db": "postgres17", "db_image": "postgres:17", "db_name": "postgresdb", "db_port": 5432, "db_type": "postgres", "db_database": "onlyoffice", "db_user": "onlyoffice", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:500", "k6_stage_main": "9m:500"},
-            {"db": "mssql", "db_image": "docker.io/igwyd890/mssql-onlyoffice:2025", "db_name": "mssqldb", "db_port": 1433, "db_type": "mssql", "db_database": "onlyoffice", "db_user": "sa", "db_pwd": "onlYoff1ce", "k6_stage_ramp": "1m:50", "k6_stage_main": "9m:50"},
+            {"db": "mssql", "db_image": "mcr.microsoft.com/mssql/server:2025-latest", "db_name": "mssqldb", "db_port": 1433, "db_type": "mssql", "db_database": "onlyoffice", "db_user": "onlyoffice", "db_pwd": "DocsDb_2026", "k6_stage_ramp": "1m:50", "k6_stage_main": "9m:50"},
             {"db": "oracle", "db_image": "container-registry.oracle.com/database/free:latest-lite", "db_name": "oracledb", "db_port": 1521, "db_type": "oracle", "db_database": "FREEPDB1", "db_user": "SYSTEM", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:100", "k6_stage_main": "9m:100"},
             {"db": "oracle-thick", "db_image": "container-registry.oracle.com/database/free:latest-lite", "db_name": "oracledb", "db_port": 1521, "db_type": "oracle", "db_database": "FREEPDB1", "db_user": "SYSTEM", "db_pwd": "onlyoffice", "k6_stage_ramp": "1m:100", "k6_stage_main": "9m:100", "oracle_thin": "false"},
             {"db": "dameng", "db_image": "igwyd890/dameng-onlyoffice:8.1.3", "db_name": "damengdb", "db_port": 5236, "db_type": "dameng", "db_database": "onlyoffice", "db_user": "onlyoffice", "db_pwd": "Onlyoffice_2026", "k6_stage_ramp": "1m:500", "k6_stage_main": "9m:500"},
@@ -84,10 +84,15 @@ jobs:
                 ${{ matrix.db_image }}
               ;;
             mssql)
+              # stock Microsoft image: create DB, login and user (db_owner) before DS connects;
+              # DS creates its tables itself. Password must not contain the login name (MSSQL policy)
               docker run -d --network ds-network --name ${{ matrix.db_name }} \
                 -e ACCEPT_EULA=Y \
-                -e SA_PASSWORD=onlYoff1ce \
+                -e MSSQL_SA_PASSWORD=onlYoff1ce \
                 ${{ matrix.db_image }}
+              CONTAINER=${{ matrix.db_name }} SA_PWD=onlYoff1ce \
+                DB_NAME=${{ matrix.db_database }} DB_USER=${{ matrix.db_user }} DB_PWD=${{ matrix.db_pwd }} \
+                bash .github/scripts/mssql-init.sh
               ;;
             oracle | oracle-thick)
               docker run -d --network ds-network --name ${{ matrix.db_name }} \
