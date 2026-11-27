@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
 # Checks the Node.js version embedded (pkg) in DS binaries inside a Docker container (bug 84664).
-# Fixed versions: Node.js 22, 24 or 26. Missing binaries (e.g. adminpanel in CE) are skipped.
-# Env: SSH_TARGET (user@ip), SUFFIX (EE|DE|CE), CONTAINER
+# Every binary must be built with exactly EXPECTED_NODE (repo variable ONLYOFFICE_NODEJS_VERSION, e.g. v24.22.3).
+# Missing binaries (e.g. adminpanel in CE) are skipped.
+# Env: SSH_TARGET (user@ip), SUFFIX (EE|DE|CE), CONTAINER, EXPECTED_NODE (with or without leading "v")
 # Writes NODE_<SUFFIX>_OK, NODE_<SUFFIX>_VERSIONS (unique, one line) and NODE_<SUFFIX>_TEXT (one line per binary, tooltip) to GITHUB_ENV.
+EXPECTED_NODE="v${EXPECTED_NODE#v}"
+if [ "$EXPECTED_NODE" = "v" ]; then
+  echo "::error::Repository variable ONLYOFFICE_NODEJS_VERSION is not set (expected Node.js version, e.g. v24.22.3)"
+  echo "NODE_${SUFFIX}_OK=false" >> "$GITHUB_ENV"
+  echo "NODE_${SUFFIX}_VERSIONS=none" >> "$GITHUB_ENV"
+  { echo "NODE_${SUFFIX}_TEXT<<NODE_EOF"; echo "❌ ONLYOFFICE_NODEJS_VERSION is not set"; echo "NODE_EOF"; } >> "$GITHUB_ENV"
+  exit 1
+fi
+
 RAW=$(ssh -o StrictHostKeyChecking=no "$SSH_TARGET" "sudo docker exec -i $CONTAINER bash -s" 2>/dev/null <<'EOF' || true
 for f in /var/www/onlyoffice/documentserver/server/DocService/docservice \
          /var/www/onlyoffice/documentserver/server/FileConverter/converter \
@@ -18,17 +28,18 @@ EOF
 OK=true; TEXT=""; VERS=""; N=0
 while read -r f v; do
   [ -z "$f" ] && continue
-  N=$((N+1)); v=${v:-?}; major=${v#v}; major=${major%%.*}
-  case $major in 22|24|26) mark="✅" ;; *) mark="❌"; OK=false ;; esac
-  TEXT+="$mark $(basename "$f"): $v (expected: v22/v24/v26)"$'\n'
+  N=$((N+1)); v=${v:-?}
+  if [ "$v" = "$EXPECTED_NODE" ]; then mark="✅"; else mark="❌"; OK=false; fi
+  TEXT+="$mark $(basename "$f"): $v (expected: $EXPECTED_NODE)"$'\n'
   VERS+="$v"$'\n'
 done <<< "$RAW"
 # no binaries found at all = nothing was checked, not a pass
 [ "$N" -gt 0 ] || { OK=false; TEXT="❌ no DS binaries found in $CONTAINER"$'\n'; }
 VERS=$(printf '%s' "$VERS" | sort -u | paste -sd' ' -)
 
-printf 'Node.js in binaries %s:\n%s' "$SUFFIX" "$TEXT"
+printf 'Node.js in binaries %s (expected %s):\n%s' "$SUFFIX" "$EXPECTED_NODE" "$TEXT"
 echo "Node.js $SUFFIX OK: $OK"
+[ "$OK" = true ] || echo "::error::Node.js in $SUFFIX binaries: ${VERS:-none}, expected $EXPECTED_NODE (ONLYOFFICE_NODEJS_VERSION)"
 echo "NODE_${SUFFIX}_OK=$OK" >> "$GITHUB_ENV"
 echo "NODE_${SUFFIX}_VERSIONS=${VERS:-none}" >> "$GITHUB_ENV"
 { echo "NODE_${SUFFIX}_TEXT<<NODE_EOF"; printf '%s' "$TEXT"; echo "NODE_EOF"; } >> "$GITHUB_ENV"

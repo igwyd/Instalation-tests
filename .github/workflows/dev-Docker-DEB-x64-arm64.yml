@@ -169,6 +169,7 @@ jobs:
         continue-on-error: true
         run: |
           SSH_TARGET=ubuntu@${{ env.EC2_IP }} SUFFIX=EE CONTAINER=ds-ee-dev \
+            EXPECTED_NODE="${{ vars.ONLYOFFICE_NODEJS_VERSION }}" \
             bash .github/scripts/check-ds-node.sh
 
       - name: Start ds-example EE
@@ -283,6 +284,7 @@ jobs:
         continue-on-error: true
         run: |
           SSH_TARGET=ubuntu@${{ env.EC2_IP }} SUFFIX=DE CONTAINER=ds-de-dev \
+            EXPECTED_NODE="${{ vars.ONLYOFFICE_NODEJS_VERSION }}" \
             bash .github/scripts/check-ds-node.sh
 
       - name: Start ds-example DE
@@ -397,6 +399,7 @@ jobs:
         continue-on-error: true
         run: |
           SSH_TARGET=ubuntu@${{ env.EC2_IP }} SUFFIX=CE CONTAINER=ds-dev \
+            EXPECTED_NODE="${{ vars.ONLYOFFICE_NODEJS_VERSION }}" \
             bash .github/scripts/check-ds-node.sh
 
       - name: Start ds-example CE
